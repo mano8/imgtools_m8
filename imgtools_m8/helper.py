@@ -167,8 +167,11 @@ class ImageToolsHelper:
     @staticmethod
     def is_valid_image_ext(ext: str) -> bool:
         """List directory files"""
-        ext = ext.lower()
-        return ext in ImageToolsHelper.get_valid_images_ext()
+        result = False
+        if Ut.is_str(ext, not_null=True):
+            ext = ext.lower()
+            result = ext in ImageToolsHelper.get_valid_images_ext()
+        return result
 
     @staticmethod
     def is_valid_jpg_ext(ext: str):
