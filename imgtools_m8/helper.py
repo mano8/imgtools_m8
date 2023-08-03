@@ -110,6 +110,10 @@ class ImageToolsHelper:
                     'key': key,
                     'nb_upscale': tmp
                 })
+            result['stats'] = sorted(
+                result.get('stats'),
+                key=lambda d: d['nb_upscale']
+            )
             result['max_upscale'] = counter
         return result
 
