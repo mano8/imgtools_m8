@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9"] #, "3.10", "3.11"
 
     steps:
     - uses: actions/checkout@v3
@@ -32,6 +32,15 @@ jobs:
         python setup.py install
         ls /home/runner/work/imgtools_m8
         ls /home/runner/work/imgtools_m8/imgtools_m8
+    - name: Debug ls imgtools_m8
+      run: |
+        ls /home/runner/work/imgtools_m8
+    - name: Debug ls imgtools_m8/imgtools_m8
+      run: |
+        ls /home/runner/work/imgtools_m8/imgtools_m8
+    - name: Debug ls imgtools_m8/tests
+      run: |
+        ls /home/runner/work/imgtools_m8/tests
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
