@@ -503,8 +503,8 @@ class ImageTools:
 
     @staticmethod
     def image_resize(image: ndarray,
-                     width: int | float | None = None,
-                     height: int | float | None = None,
+                     width: int or float or None = None,
+                     height: int or float or None = None,
                      inter=cv2.INTER_AREA
                      ) -> ndarray or None:
         """Resize an image"""

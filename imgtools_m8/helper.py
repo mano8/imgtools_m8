@@ -131,7 +131,7 @@ class ImageToolsHelper:
         return ImageToolsHelper.get_files_list(path, ext=ImageToolsHelper.get_valid_images_ext())
 
     @staticmethod
-    def get_files_list(path: str, ext: str | list | None = None):
+    def get_files_list(path: str, ext: str or None = None):
         """List files from path."""
         return [
             f
