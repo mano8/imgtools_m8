@@ -46,8 +46,10 @@ And you need output formats as JPEG (with 80% quality) and WEBP (with 70% qualit
                 {  # Get resized output file to exact width of 1600px
                     'fixed_width': 1600,
                     'formats': [
-                        {'ext': '.jpg', 'quality': 80},
-                        {'ext': '.webp', 'quality': 70}
+                        # JPEg defauts are 'quality': 95, 'progressive': 0, 'optimize': 0
+                        {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1},
+                        {'ext': '.webp', 'quality': 70},
+                        {'ext': '.png', 'compression': 2}
                     ]
                 },
                 {  # Get resized output file to exact width of 800px
@@ -67,8 +69,16 @@ And you need output formats as JPEG (with 80% quality) and WEBP (with 70% qualit
         >>> imgtools.run()
 ```   
 This will create 4 files in the output directory :
- - Two JPEG files resized as defined (1600px and 800px), with 80% quality
- - Two WEBP files resized as defined (1600px and 800px), with 70% quality
+ - Two JPEG files resized as defined width (1600px and 800px), with 80% quality, JPEG progressive and optimize features enabled 
+ - Two WEBP files resized as defined width (1600px and 800px), with 70% quality
+ - One PNG file resized as defined width (1600px), with PNG compression level = 2 
+
+The output file names are set as:
+```plaintext
+    >>> 'originalName'_'imageWidth'x'imageHeight'.'outputExtension'
+    >>> # egg :
+    >>> originalFileName_1400x1360.jpeg
+```
 
 In this case source file is precessed as:
  - upscale 2x (source file is now 900px/560px)
