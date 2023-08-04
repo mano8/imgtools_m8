@@ -40,7 +40,8 @@ jobs:
         ls /home/runner/work/imgtools_m8/imgtools_m8
     - name: Debug ls imgtools_m8/tests
       run: |
-        ls /home/runner/work/imgtools_m8/tests
+        ls /home/runner/work/imgtools_m8/imgtools_m8/tests
+        ls /home/runner/work/imgtools_m8/imgtools_m8/dummy_dir
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
