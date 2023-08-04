@@ -138,17 +138,17 @@ class TestImageToolsHelper:
     def test_get_images_list():
         """Test get_images_list method"""
         files = ImageToolsHelper.get_images_list('dummy_dir')
-        assert len(files) == 1
+        assert len(files) == 2
 
     @staticmethod
     def test_get_files_list():
         """Test get_files_list method"""
         files = ImageToolsHelper.get_files_list('dummy_dir')
-        assert len(files) == 3
+        assert len(files) == 4
         files = ImageToolsHelper.get_files_list('dummy_dir', ext='.jpg')
-        assert len(files) == 1
+        assert len(files) == 2
         files = ImageToolsHelper.get_files_list('dummy_dir', ext=['.jpg', '.txt'])
-        assert len(files) == 3
+        assert len(files) == 4
 
     @staticmethod
     def test_is_valid_image_ext():
