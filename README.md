@@ -1,2 +1,4 @@
 # imgtools_m8
-Simple image tools package. Upsacale using deep learning and cv2.
+Simple image tools package. Used to convert, downscale or upscale images.
+
+Use deep learning and cv2 to upscale image using [Xavier Weber](https://github.com/Saafke) models, (more info [here](https://towardsdatascience.com/deep-learning-based-super-resolution-with-opencv-4fd736678066))
