@@ -41,7 +41,7 @@ class ImageExpander:
                 }
             else:
                 self.model_conf = {
-                    'path': os.path.join(os.path.abspath('..'), 'models')
+                    'path': os.path.join(os.path.abspath('..'), 'imgtools_m8', 'models')
                 }
             if ImageExpander.is_file_name(
                     model_path=self.model_conf.get('path'),
@@ -57,7 +57,7 @@ class ImageExpander:
                 })
         else:
             self.model_conf = {
-                'path': os.path.join(os.path.abspath('..'), 'models'),
+                'path': os.path.join(os.path.abspath('..'), 'imgtools_m8', 'models'),
                 'file_name': 'EDSR_x2.pb',
                 'model_name': 'edsr',
                 'scale': 2
