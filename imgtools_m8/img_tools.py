@@ -62,6 +62,14 @@ class ImageTools:
             self.expander.init_sr()
             self.expander.load_model()
 
+    def get_expander_model_scale(self) -> bool:
+        """Test if is_ready"""
+        result = 0
+        self.init_expander_model()
+        if self.has_expander_model():
+            result = self.expander.model_conf.get('scale')
+        return result
+
     def has_conf(self) -> bool:
         """Test if instance has valid configuration"""
         return self.has_source_path() \
@@ -254,7 +262,7 @@ class ImageTools:
             upscale_stats = ImageToolsHelper.get_upscale_stats(
                 size=size,
                 output_formats=self.output_conf.get('output_formats'),
-                model_scale=self.model_conf.get('scale')
+                model_scale=self.get_expander_model_scale()
             )
             result = self.resize_image_from_conf(
                 image=image,

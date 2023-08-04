@@ -27,12 +27,6 @@ class TestImageTools:
 
         Invoked for every test function in the module.
         """
-        model_conf = {
-            'path': os.path.join(os.path.abspath('..'), 'models'),
-            'file_name': 'EDSR_x2.pb',
-            'model_name': 'edsr',
-            'scale': 2
-        }
         source_path = os.path.join(os.path.abspath('.'), 'dummy_dir')
         output_conf = {
             'path': os.path.join(os.path.abspath('.'), 'dummy_output'),
@@ -50,7 +44,6 @@ class TestImageTools:
         }
 
         self.obj = ImageTools(
-            model_conf=model_conf,
             source_path=source_path,
             output_conf=output_conf
         )
