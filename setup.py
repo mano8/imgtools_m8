@@ -11,6 +11,10 @@ setup(
     name='imgtools_m8',
     version='0.0.1',
     packages=['tests', 'imgtools_m8'],
+    package_data={
+        'imgtools_m8': ['models/*.pb'],
+        'tests': ['dummy_dir/*.jpg', 'dummy_dir/*.txt', 'dummy_output/']
+    },
     url='https://github.com/mano8/imgtools_m8',
     license='Apache',
     author='Eli Serra',
