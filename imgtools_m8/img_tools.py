@@ -181,7 +181,7 @@ class ImageTools:
                                upscale_stats: dict,
                                file_name: str
                                ) -> ndarray or None:
-        """Re Scale image"""
+        """Resize image from output configuration"""
         result = False
         if image is not None \
                 and Ut.is_tuple(size) \

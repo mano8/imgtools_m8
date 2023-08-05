@@ -47,5 +47,3 @@ def configure_logging(debug: bool = False):
     logger.addHandler(syslog)
 
     logger.debug("Logger ready. debug : %s", debug)
-
-

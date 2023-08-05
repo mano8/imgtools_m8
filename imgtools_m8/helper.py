@@ -119,11 +119,6 @@ class ImageToolsHelper:
 
     @staticmethod
     def get_image_size(image: ndarray) -> tuple or None:
-        """Test if is valid image"""
-        return type(image) is ndarray
-
-    @staticmethod
-    def get_image_size(image: ndarray) -> tuple or None:
         """Get image size tuple (h, w)"""
         size = None
         if image is not None:
