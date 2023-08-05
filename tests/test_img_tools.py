@@ -5,7 +5,6 @@ Use pytest package.
 """
 import pytest
 import os
-from numpy import ndarray
 from imgtools_m8.img_tools import ImageTools
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.exceptions import ImgToolsException

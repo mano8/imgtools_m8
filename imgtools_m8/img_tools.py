@@ -189,7 +189,6 @@ class ImageTools:
                 and Ut.is_list(upscale_stats.get('stats'), not_null=True):
             output_formats = self.output_conf.get('output_formats')
             upscale_counter = 0
-            resized = image
             result = True
             self.init_expander_model()
             for upscale in upscale_stats.get('stats'):
