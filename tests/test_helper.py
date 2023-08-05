@@ -5,7 +5,6 @@ Use pytest package.
 """
 import os
 import cv2
-from numpy import ndarray
 import pytest
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.exceptions import ImgToolsException
@@ -210,4 +209,3 @@ class TestImageToolsHelper:
         assert ImageToolsHelper.get_string_file_size(
             os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
         ) == "77.52 KB"
-

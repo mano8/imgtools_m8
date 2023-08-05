@@ -144,7 +144,7 @@ class ImageExpander:
                      fixed_size: int or None = None
                      ) -> bool:
         """Test if image need upscale"""
-        if type(image) == ndarray:
+        if image is not None:
             (h, w) = ImageToolsHelper.get_image_size(image)
             result = ImageToolsHelper.need_upscale(
                 width=w,

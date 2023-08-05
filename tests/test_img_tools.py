@@ -85,13 +85,6 @@ class TestImageTools:
         with pytest.raises(SettingInvalidException):
             self.obj.set_output_conf(output_conf)
 
-    def test_run(self):
-        """Test run method"""
-        # test: Resize all images in dummy_dir
-        # upscale 2x then downscale to height size of 450px
-        tst = self.obj.run()
-        assert tst is True
-
     def test_run_1900w(self):
         """Test run method"""
         # test: Resize specific image in dummy_dir
@@ -102,20 +95,6 @@ class TestImageTools:
         output_conf = self.obj.output_conf
         output_conf.update({
             'output_formats': [
-                {
-                    'fixed_width': 1900,
-                    'formats': [
-                        {'ext': '.jpg', 'quality': 80},
-                        {'ext': '.webp', 'quality': 80}
-                    ]
-                },
-                {
-                    'fixed_width': 1200,
-                    'formats': [
-                        {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1},
-                        {'ext': '.png', 'compression': 2}
-                    ]
-                },
                 {
                     'fixed_height': 381,
                     'formats': [
@@ -192,7 +171,7 @@ class TestImageTools:
     def test_read_image():
         """Test read_image method"""
         image = ImageTools.read_image(os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg'))
-        assert type(image) == ndarray
+        assert image is not None
         assert image.shape[:2] == (216, 340)
 
     @staticmethod

@@ -127,7 +127,7 @@ class ImageTools:
                     ) -> ndarray or None:
         """Set image output path file"""
         result = None
-        if type(image) == ndarray:
+        if image is not None:
             (h, w) = ImageToolsHelper.get_image_size(image)
             fixed_height = output_format.get('fixed_height')
             fixed_width = output_format.get('fixed_width')
