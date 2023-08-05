@@ -32,11 +32,8 @@ class TestImageTools:
             'path': os.path.join('.', 'tests', 'dummy_output'),
             'output_formats': [
                 {
-                    'fixed_width': 450,
-                    'fixed_height': 450,
                     'formats': [
-                        {'ext': '.jpg', 'quality': 80},
-                        {'ext': '.webp', 'quality': 80}
+                        {'ext': '.jpg', 'quality': 80}
                     ]
                 }
             ]
@@ -85,10 +82,10 @@ class TestImageTools:
         with pytest.raises(SettingInvalidException):
             self.obj.set_output_conf(output_conf)
 
-    def test_run_1900w(self):
+    def test_run_(self):
         """Test run method"""
-        # test: Resize specific image in dummy_dir
-        # upscale 6x then downscale to width size of 1900px
+        tst = self.obj.run()
+        assert tst is True
         self.obj.set_source_path(
             source_path=os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
         )
@@ -104,7 +101,7 @@ class TestImageTools:
                 {
                     'fixed_size': 200,
                     'formats': [
-                        {'ext': '.jpg', 'quality': 80}
+                        {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
                     ]
                 }
             ]
