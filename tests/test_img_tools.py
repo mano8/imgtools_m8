@@ -50,13 +50,12 @@ class TestImageTools:
 
     def test_has_conf(self):
         """Test has_conf method"""
-        print(os.path.abspath('.'))
         assert self.obj.has_conf() is True
 
     def test_set_output_conf(self):
         """Test set_output_conf method"""
         output_conf = {
-            'path': os.path.join(os.path.abspath('.'), 'dummy_output'),
+            'path': os.path.join('.', 'tests', 'dummy_output'),
             'output_formats': [
                 {
                     'formats': [
@@ -98,7 +97,7 @@ class TestImageTools:
         # test: Resize specific image in dummy_dir
         # upscale 6x then downscale to width size of 1900px
         self.obj.set_source_path(
-            source_path=os.path.join(os.path.abspath('.'), 'dummy_dir', 'recien_llegado.jpg')
+            source_path=os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
         )
         output_conf = self.obj.output_conf
         output_conf.update({
@@ -140,7 +139,7 @@ class TestImageTools:
         # test: Resize specific image in dummy_dir
         # 50% jpg quality
         self.obj.set_source_path(
-            source_path=os.path.join(os.path.abspath('.'), 'dummy_dir', 'mar.jpg')
+            source_path=os.path.join('.', 'tests', 'dummy_dir', 'mar.jpg')
         )
         output_conf = self.obj.output_conf
         output_conf.update({
@@ -173,16 +172,16 @@ class TestImageTools:
     def test_is_source_path():
         """Test is_source_path method."""
         assert ImageTools.is_source_path(
-            source_path=os.path.join(os.path.abspath('.'), 'dummy_dir')
+            source_path=os.path.join('.', 'tests', 'dummy_dir')
         ) is True
         assert ImageTools.is_source_path(
-            source_path=os.path.join(os.path.abspath('.'), 'dummy_dir', 'recien_llegado.jpg')
+            source_path=os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
         ) is True
         assert ImageTools.is_source_path(
-            source_path=os.path.join(os.path.abspath('.'), 'dummy_dir', 'bad_file')
+            source_path=os.path.join('.', 'tests', 'dummy_dir', 'bad_file')
         ) is False
         assert ImageTools.is_source_path(
-            source_path=os.path.join(os.path.abspath('.'), 'bad_dir')
+            source_path=os.path.join('.', 'tests', 'bad_dir')
         ) is False
 
     @staticmethod
@@ -192,14 +191,14 @@ class TestImageTools:
     @staticmethod
     def test_read_image():
         """Test read_image method"""
-        image = ImageTools.read_image(os.path.join('dummy_dir', 'recien_llegado.jpg'))
+        image = ImageTools.read_image(os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg'))
         assert type(image) == ndarray
         assert image.shape[:2] == (216, 340)
 
     @staticmethod
     def test_get_image_size():
         """Test get_image_size method"""
-        image = ImageTools.read_image(os.path.join('dummy_dir', 'recien_llegado.jpg'))
+        image = ImageTools.read_image(os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg'))
         size = ImageToolsHelper.get_image_size(image)
         assert size == (216, 340)
 
@@ -221,7 +220,7 @@ class TestImageTools:
     @staticmethod
     def test_image_resize():
         """Test image_resize method"""
-        image = ImageTools.read_image(os.path.join('dummy_dir', 'recien_llegado.jpg'))
+        image = ImageTools.read_image(os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg'))
         resized = ImageTools.image_resize(image, width=200)
         assert image.shape[:2] == (216, 340)
         assert resized.shape[:2] == (127, 200)

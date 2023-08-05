@@ -54,7 +54,7 @@ class TestImageExpander:
     def test_get_models_list():
         """Test get_models_list method"""
         models_list = ImageExpander.get_models_list(
-            os.path.join('..', 'imgtools_m8', 'models')
+            os.path.join('.', 'imgtools_m8', 'models')
         )
         assert len(models_list) > 0
         assert 'EDSR_x2.pb' in models_list
@@ -77,7 +77,7 @@ class TestImageExpander:
     def test_is_model_conf():
         """Test is_model_conf method"""
         assert ImageExpander.is_model_conf({
-            'path': os.path.join('..', 'imgtools_m8', 'models'),
+            'path': os.path.join('.', 'imgtools_m8', 'models'),
             'file_name': 'EDSR_x2.pb',
             'model_name': 'edsr',
             'scale': 2
@@ -89,32 +89,32 @@ class TestImageExpander:
             'scale': 2
         }) is False
         assert ImageExpander.is_model_conf({
-            'path': os.path.join('..', 'imgtools_m8', 'models'),
+            'path': os.path.join('.', 'imgtools_m8', 'models'),
             'file_name': 'EDSR_x2',  # bad file_name without extension
             'model_name': 'edsr',
             'scale': 2
         }) is False
         assert ImageExpander.is_model_conf({}) is False
         assert ImageExpander.is_model_conf({
-            'path': os.path.join('..', 'imgtools_m8', 'models'),
+            'path': os.path.join('.', 'imgtools_m8', 'models'),
             'file_name': 'EDSR_x2.pb',
             'model_name': 'edsrBad',  # bad model_name must be part of file_name
             'scale': 2
         }) is False
         assert ImageExpander.is_model_conf({
-            'path': os.path.join('..', 'imgtools_m8', 'models'),
+            'path': os.path.join('.', 'imgtools_m8', 'models'),
             'file_name': 'EDSR_x2.pb',
             'model_name': 'edsr',
             'scale': 3  # bad scale != of file_name
         }) is False
         assert ImageExpander.is_model_conf({
-            'path': os.path.join('..', 'imgtools_m8', 'models'),
+            'path': os.path.join('.', 'imgtools_m8', 'models'),
             'file_name': 'EDSR_x12.pb',
             'model_name': 'edsr',
             'scale': 12  # bad scale > 8 (2 >= scale <= 8)
         }) is False
         assert ImageExpander.is_model_conf({
-            'path': os.path.join('..', 'imgtools_m8', 'models'),
+            'path': os.path.join('.', 'imgtools_m8', 'models'),
             'file_name': 'EDSR_x1.pb',
             'model_name': 'edsr',
             'scale': 1  # bad scale < 2 (2 >= scale <= 8)
