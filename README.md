@@ -1,3 +1,4 @@
+[![Python package](https://github.com/mano8/imgtools_m8/actions/workflows/python-package.yml/badge.svg)](https://github.com/mano8/imgtools_m8/actions/workflows/python-package.yml)
 # imgtools_m8
 Simple image tools package. Used to convert, downscale and/or upscale images.
 
