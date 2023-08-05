@@ -137,17 +137,17 @@ class TestImageToolsHelper:
     @staticmethod
     def test_get_images_list():
         """Test get_images_list method"""
-        files = ImageToolsHelper.get_images_list('dummy_dir')
+        files = ImageToolsHelper.get_images_list(os.path.join('.', 'tests', 'dummy_dir'))
         assert len(files) == 2
 
     @staticmethod
     def test_get_files_list():
         """Test get_files_list method"""
-        files = ImageToolsHelper.get_files_list('dummy_dir')
+        files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'))
         assert len(files) == 4
-        files = ImageToolsHelper.get_files_list('dummy_dir', ext='.jpg')
+        files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'), ext='.jpg')
         assert len(files) == 2
-        files = ImageToolsHelper.get_files_list('dummy_dir', ext=['.jpg', '.txt'])
+        files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'), ext=['.jpg', '.txt'])
         assert len(files) == 4
 
     @staticmethod
@@ -190,7 +190,7 @@ class TestImageToolsHelper:
     def test_get_image_size():
         """Test get_image_size method"""
         image = cv2.imread(
-            os.path.join(os.path.abspath('.'), 'dummy_dir', 'recien_llegado.jpg')
+            os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
         )
         assert ImageToolsHelper.get_image_size(
             image
@@ -208,6 +208,6 @@ class TestImageToolsHelper:
     def test_get_string_file_size():
         """Test get_string_file_size method"""
         assert ImageToolsHelper.get_string_file_size(
-            os.path.join(os.path.abspath('.'), 'dummy_dir', 'recien_llegado.jpg')
+            os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
         ) == "77.52 KB"
 
