@@ -6,7 +6,7 @@ __copyright__ = "Copyright 2023, Eli Serra"
 __deprecated__ = False
 __license__ = "MIT"
 __status__ = "Production"
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 
 class AppFilter(logging.Filter):
