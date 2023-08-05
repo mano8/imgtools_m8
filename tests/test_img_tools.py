@@ -27,9 +27,9 @@ class TestImageTools:
 
         Invoked for every test function in the module.
         """
-        source_path = os.path.join(os.path.abspath('.'), 'dummy_dir')
+        source_path = os.path.join('.', 'dummy_dir')
         output_conf = {
-            'path': os.path.join(os.path.abspath('.'), 'dummy_output'),
+            'path': os.path.join('.', 'dummy_output'),
             'output_formats': [
                 {
                     'fixed_width': 450,
