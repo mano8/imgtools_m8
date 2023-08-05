@@ -175,6 +175,76 @@ class ImageTools:
                 return image
         return result
 
+    def upscale_image(self,
+                      image: ndarray,
+                      size: tuple,
+                      upscale_stats: dict,
+                      file_name: str
+                      ) -> ndarray or None:
+        """Resize image from output configuration"""
+        result = False
+        if image is not None \
+                and Ut.is_tuple(size) \
+                and Ut.is_dict(upscale_stats, not_null=True) \
+                and Ut.is_list(upscale_stats.get('stats'), not_null=True):
+            output_formats = self.output_conf.get('output_formats')
+            upscale_counter = 0
+            result = True
+            self.init_expander_model()
+            for upscale in upscale_stats.get('stats'):
+                key = upscale.get('key')
+                nb_upscale = upscale.get('nb_upscale')
+                output_format = output_formats[key]
+                if nb_upscale > 0:
+                    if nb_upscale > upscale_counter:
+                        nb_upscale_needed = nb_upscale - upscale_counter
+                        image = self.expander.many_image_upscale(
+                            image=image,
+                            nb_upscale=nb_upscale_needed
+                        )
+                        upscale_counter = nb_upscale
+                    resized = self.resize_need(
+                        image=image,
+                        output_format=output_format
+                    )
+                else:
+                    resized = self.resize_need(
+                        image=image,
+                        output_format=output_format
+                    )
+
+                if not ImageTools.write_images_by_format(
+                        image=resized,
+                        output_path=self.output_conf.get('path'),
+                        file_name=file_name,
+                        output_format=output_format.get('formats')):
+                    result = False
+        return result
+
+    def downscale_or_convert_image(self,
+                                   image: ndarray,
+                                   size: tuple,
+                                   file_name: str
+                                   ) -> ndarray or None:
+        """Downscale or convert image"""
+        result = False
+        if image is not None \
+                and Ut.is_tuple(size):
+            resized = image
+            result = True
+            for output_format in self.output_conf.get('output_formats'):
+                resized = self.resize_need(
+                    image=resized,
+                    output_format=output_format
+                )
+                if not ImageTools.write_images_by_format(
+                        image=resized,
+                        output_path=self.output_conf.get('path'),
+                        file_name=file_name,
+                        output_format=output_format.get('formats')):
+                    result = False
+        return result
+
     def resize_image_from_conf(self,
                                image: ndarray,
                                size: tuple,
@@ -187,57 +257,21 @@ class ImageTools:
                 and Ut.is_tuple(size) \
                 and Ut.is_dict(upscale_stats, not_null=True)\
                 and Ut.is_list(upscale_stats.get('stats'), not_null=True):
-            output_formats = self.output_conf.get('output_formats')
-            upscale_counter = 0
-            resized = image
             # if upscale needed
             if upscale_stats.get('max_upscale') > 0:
-                result = True
-                self.init_expander_model()
-                for upscale in upscale_stats.get('stats'):
-                    key = upscale.get('key')
-                    nb_upscale = upscale.get('nb_upscale')
-                    output_format = output_formats[key]
-                    if nb_upscale > 0:
-                        if nb_upscale > upscale_counter:
-                            nb_upscale_needed = nb_upscale - upscale_counter
-                            image = self.expander.many_image_upscale(
-                                image=image,
-                                nb_upscale=nb_upscale_needed
-                            )
-                            upscale_counter = nb_upscale
-                        resized = self.resize_need(
-                            image=image,
-                            output_format=output_format
-                        )
-                    else:
-                        resized = self.resize_need(
-                            image=image,
-                            output_format=output_format
-                        )
-                    if resized is not None:
-                        if not ImageTools.write_images_by_format(
-                                image=resized,
-                                output_path=self.output_conf.get('path'),
-                                file_name=file_name,
-                                output_format=output_format.get('formats')):
-                            result = False
-
-            # if only downscale or write image needed
+                result = self.upscale_image(
+                    image=image,
+                    size=size,
+                    upscale_stats=upscale_stats,
+                    file_name=file_name
+                )
+            # if only downscale or convert image needed
             else:
-                result = True
-                for output_format in self.output_conf.get('output_formats'):
-                    resized = self.resize_need(
-                        image=resized,
-                        output_format=output_format
-                    )
-                    if resized is not None:
-                        if not ImageTools.write_images_by_format(
-                                image=resized,
-                                output_path=self.output_conf.get('path'),
-                                file_name=file_name,
-                                output_format=output_format.get('formats')):
-                            result = False
+                result = self.downscale_or_convert_image(
+                    image=image,
+                    size=size,
+                    file_name=file_name
+                )
         return result
 
     def get_output_images(self,

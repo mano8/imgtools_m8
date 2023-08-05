@@ -95,34 +95,6 @@ class ImageExpander:
                 test = True
         return test
 
-    def loop_upscale_image(self,
-                           image: ndarray,
-                           fixed_width: int or None = None,
-                           fixed_height: int or None = None,
-                           fixed_size: int or None = None
-                           ) -> ndarray or None:
-        """Upscale image on loop."""
-        max_loops = 10
-        nb_loops = 0
-        while self.need_upscale(
-                    image=image,
-                    fixed_width=fixed_width,
-                    fixed_height=fixed_height,
-                    fixed_size=fixed_size
-                ) or nb_loops > max_loops:
-            # Upscale the image
-            image = self.sr.upsample(image)
-            nb_loops += 1
-        return image
-
-    def upscale_image(self,
-                      image: ndarray,
-                      ) -> ndarray or None:
-        """Upscale image."""
-        if image is not None:
-            image = self.sr.upsample(image)
-        return image
-
     def many_image_upscale(self,
                            image: ndarray,
                            nb_upscale: int
@@ -136,29 +108,6 @@ class ImageExpander:
                 image = self.sr.upsample(image)
                 counter += 1
         return image
-
-    @staticmethod
-    def need_upscale(image: ndarray,
-                     fixed_width: int or None = None,
-                     fixed_height: int or None = None,
-                     fixed_size: int or None = None
-                     ) -> bool:
-        """Test if image need upscale"""
-        if image is not None:
-            (h, w) = ImageToolsHelper.get_image_size(image)
-            result = ImageToolsHelper.need_upscale(
-                width=w,
-                height=h,
-                fixed_width=fixed_width,
-                fixed_height=fixed_height,
-                fixed_size=fixed_size
-            )
-        else:
-            raise ImgToolsException(
-                "[ImageExpander::need_upscale]"
-                "Error: Image must be a ndarray type."
-            )
-        return result
 
     @staticmethod
     def get_models_list(path):
