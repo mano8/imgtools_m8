@@ -24,8 +24,8 @@ class TestImageExpander:
 
         Invoked for every test function in the module.
         """
-        self.models_path = os.path.join('..', 'imgtools_m8', 'models')
-        self.source_path = os.path.join('.', 'dummy_dir')
+        self.models_path = os.path.join('.', 'imgtools_m8', 'models')
+        self.source_path = os.path.join('.', 'tests', 'dummy_dir')
         self.obj = ImageExpander()
 
     def test_set_model_conf(self):

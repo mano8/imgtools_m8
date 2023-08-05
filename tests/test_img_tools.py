@@ -27,9 +27,9 @@ class TestImageTools:
 
         Invoked for every test function in the module.
         """
-        source_path = os.path.join('.', 'dummy_dir')
+        source_path = os.path.join('.', 'tests', 'dummy_dir')
         output_conf = {
-            'path': os.path.join('.', 'dummy_output'),
+            'path': os.path.join('.', 'tests', 'dummy_output'),
             'output_formats': [
                 {
                     'fixed_width': 450,
@@ -50,6 +50,7 @@ class TestImageTools:
 
     def test_has_conf(self):
         """Test has_conf method"""
+        print(os.path.abspath('.'))
         assert self.obj.has_conf() is True
 
     def test_set_output_conf(self):
