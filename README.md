@@ -33,6 +33,13 @@ Next you will need to define output configuration:
     who contains optional output sizes and output image format   
     (extension and compression options)
 
+It is possible to resize images with different options:
+ - fixed_width: resize image to exact width (in pixel)
+ - fixed_height: resize image to exact height (in pixel)
+ - fixed_size: resize image depending on first limitation reached (height or width)
+ - fixed_width and fixed_height: resize image depending on first limitation reached.   
+ same as fixed_size but can set different height/width values.  
+   
 Example :
 The source file is 450px width and 280px height.
 You want resized output file to exact width of 1600px and 800px.
