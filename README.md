@@ -101,7 +101,7 @@ The output file names are set as:
 ```
 One of above results is :
 <div align="center">
-  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/dummy_output/recien_llegado_1200x762.jpg" alt="Recien Llegado @Cezar llañez" width="1200" height="762" />
+  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/dummy_output/recien_llegado_1200x762.jpg" alt="Recien Llegado @Cezar llañez" width="1200px" />
   <p>recien_llegado_1200x762.jpg by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a></p>
 </div>
 
