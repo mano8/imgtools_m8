@@ -463,7 +463,7 @@ class ImageTools:
         return result
 
     @staticmethod
-    def write_image_format(image: ndarray,
+    def write_image_format(image: ndarray or None,
                            output_path: str,
                            file_name: str,
                            output_format: dict
@@ -490,7 +490,7 @@ class ImageTools:
         return result
 
     @staticmethod
-    def write_images_by_format(image: ndarray,
+    def write_images_by_format(image: ndarray or None,
                                output_path: str,
                                file_name: str,
                                output_format: list
@@ -510,11 +510,11 @@ class ImageTools:
         return result
 
     @staticmethod
-    def write_image(image: ndarray,
+    def write_image(image: ndarray or None,
                     output_path: str,
                     file_name: str,
                     ext: str,
-                    options: list or None
+                    options: list or None = None
                     ) -> ndarray or None:
         """Init sr"""
         out_path = ImageTools.set_output_path(

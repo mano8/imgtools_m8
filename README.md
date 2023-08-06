@@ -2,6 +2,7 @@
 [![PyPI package](https://img.shields.io/pypi/v/imgtools_m8.svg)](https://pypi.org/project/imgtools_m8/)
 [![codecov](https://codecov.io/gh/mano8/imgtools_m8/branch/main/graph/badge.svg?token=0J31F62GB7)](https://codecov.io/gh/mano8/imgtools_m8)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/c401bed6812d4f9bb77bfaee16cf0abe)](https://www.codacy.com/gh/mano8/imgtools_m8/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=mano8/imgtools_m8&amp;utm_campaign=Badge_Grade)  
+[![Downloads](https://static.pepy.tech/badge/imgtools-m8)](https://pepy.tech/project/imgtools-m8)
 # imgtools_m8
 Simple image tools package. Used to convert, downscale and/or upscale images.
 
@@ -14,12 +15,12 @@ Install from GitHub repository :
 To install directly from GitHub:
 
 ```plaintext
-$ python3 -m pip install "git+https://github.com/mano8/imgtools_m8"
+$ python3 -m pip install "git+https://github.com/mano8/imgtools_m8 --upgrade"
 ```
 
 To install from PypI :
 
-``python3 -m pip install imgtools_m8``
+``python3 -m pip install imgtools_m8 --upgrade``
 
 ## How to use
 
@@ -48,10 +49,15 @@ It is possible to resize images with different options:
  - fixed_width and fixed_height: resize image depending on first limitation reached.   
  same as fixed_size but can set different height/width values.  
    
-Example :
-The source file is 450px width and 280px height.
-You want resized output file to exact width of 1600px and 800px.
-And you need output formats as JPEG (with 80% quality) and WEBP (with 70% quality)
+Example :  
+The source file is 340px width and 216px height.
+<div align="center">
+  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/dummy_dir/recien_llegado.jpg" alt="Recien Llegado @Cezar llañez" width="340" height="216" />
+  Recien llegado by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a>
+</div>
+
+We want resized output file to exact width of 1900px and 1200px.
+And we need output formats as JPEG (with 80% quality) and WEBP (with 70% quality)
 ```plaintext
     >>> source_path = /path/to/image.png
     >>> output_conf = {
@@ -59,19 +65,18 @@ And you need output formats as JPEG (with 80% quality) and WEBP (with 70% qualit
             'path': /my/output/path/directory, 
             'output_formats': [
                 {  # Get resized output file to exact width of 1600px
-                    'fixed_width': 1600,
+                    'fixed_width': 1900,
                     'formats': [
                         # JPEg defauts are 'quality': 95, 'progressive': 0, 'optimize': 0
                         {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1},
-                        {'ext': '.webp', 'quality': 70},
-                        {'ext': '.png', 'compression': 2}
                     ]
                 },
                 {  # Get resized output file to exact width of 800px
-                    'fixed_width': 800,
+                    'fixed_width': 1200,
                     'formats': [
                         {'ext': '.jpg', 'quality': 80},
                         {'ext': '.webp', 'quality': 70}
+                        {'ext': '.png', 'compression': 2}
                     ]
                 }
             ]
@@ -84,9 +89,9 @@ And you need output formats as JPEG (with 80% quality) and WEBP (with 70% qualit
         >>> imgtools.run()
 ```   
 This will create 4 files in the output directory :
- - Two JPEG files resized as defined width (1600px and 800px), with 80% quality, JPEG progressive and optimize features enabled 
- - Two WEBP files resized as defined width (1600px and 800px), with 70% quality
- - One PNG file resized as defined width (1600px), with PNG compression level = 2 
+ - Two JPEG files resized as defined width (1900px and 1200px), with 80% quality, JPEG progressive and optimize features enabled 
+ - Two WEBP files resized as defined width (1900px and 1200px), with 70% quality
+ - One PNG file resized as defined width (1900px), with PNG compression level = 2 
 
 The output file names are set as:
 ```plaintext
@@ -94,12 +99,21 @@ The output file names are set as:
     >>> # egg :
     >>> originalFileName_1400x1360.jpeg
 ```
+One of above results is :
+<div align="center">
+  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/dummy_output/recien_llegado_1200x762.jpg" alt="Recien Llegado @Cezar llañez" width="340" height="216" />
+  recien_llegado_1200x762.jpg by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a>
+</div>
 
 In this case source file is precessed as:
- - upscale 2x (source file is now 900px/560px)
- - for 800px width output downscale and save as .jpeg an .webp
- - upscale 2x (source file is now 1800px/1120px)
- - for 1600px width output downscale and save as .jpeg an .webp
+ - upscale 2x (source file is now 680px/432px)
+ - upscale 2x (source file is now 1360px/864px)
+ - for 1200px width output downscale and save as 
+   recien_llegado_1200x762.jpg
+   recien_llegado_1200x762.webp
+   recien_llegado_1200x762.png
+ - upscale 2x (source file is now 2720px/1728px)
+ - for 1900px width output downscale and save as recien_llegado_1900x1207.jpeg an .webp
 
 By default, the image tool use [EDSR_x2.pb](https://github.com/Saafke/EDSR_Tensorflow/tree/master)
 deep learning model, to improve quality.
