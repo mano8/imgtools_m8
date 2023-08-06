@@ -59,7 +59,7 @@ The source file is 340px width and 216px height.
 We want resized output file to exact width of 1900px and 1200px.
 And we need output formats as JPEG (with 80% quality) and WEBP (with 70% quality)
 ```plaintext
-    >>> source_path = /path/to/image.png
+    >>> source_path = "./tests/dummy_dir/recien_llegado.jpg"
     >>> output_conf = {
             # Output path
             'path': /my/output/path/directory, 
@@ -156,20 +156,20 @@ Here a complete example using TF-ESPCN_x2 model to upscale images :
         'path': "/path/to/your/downloaded/model/directory",
         'file_name': 'TF-ESPCN_x2.pb',
     }
-    >>> source_path = /path/to/image.png
+    >>> source_path = "./tests/dummy_dir"
     >>> output_conf = {
             # Output path
             'path': /my/output/path/directory, 
             'output_formats': [
                 {  # Get resized output file to exact width of 1600px
-                    'fixed_width': 1600,
+                    'fixed_width': 1900,
                     'formats': [
                         {'ext': '.jpg', 'quality': 80},
                         {'ext': '.webp', 'quality': 70}
                     ]
                 },
                 {  # Get resized output file to exact width of 800px
-                    'fixed_width': 800,
+                    'fixed_width': 1200,
                     'formats': [
                         {'ext': '.jpg', 'quality': 80},
                         {'ext': '.webp', 'quality': 70}
