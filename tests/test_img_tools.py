@@ -31,6 +31,8 @@ class TestImageTools:
             'path': os.path.join('.', 'tests', 'dummy_output'),
             'output_formats': [
                 {
+                    'fixed_width': 260,
+                    'fixed_height': 200,
                     'formats': [
                         {'ext': '.jpg', 'quality': 80}
                     ]
@@ -98,6 +100,12 @@ class TestImageTools:
                     ]
                 },
                 {
+                    'fixed_width': 220,
+                    'formats': [
+                        {'ext': '.png', 'compression': 3}
+                    ]
+                },
+                {
                     'fixed_size': 200,
                     'formats': [
                         {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
@@ -160,8 +168,28 @@ class TestImageTools:
         ) is False
 
     @staticmethod
-    def test_is_output_conf():
-        """Test is_output_conf method"""
+    def test_write_images_by_format():
+        """Test write_images_by_format method"""
+        source_path = os.path.join('.', 'tests', 'dummy_dir', 'mar.jpg')
+        image = ImageTools.read_image(source_path)
+        assert ImageTools.write_images_by_format(
+            image=image,
+            output_path=os.path.join('.', 'tests', 'dummy_output'),
+            file_name="bad",
+            output_format=[
+                {'ext_bad': '.webp', 'quality_bad': 80}
+            ]
+        ) is False
+    @staticmethod
+    def test_write_image():
+        """Test write_image method"""
+        with pytest.raises(ImgToolsException):
+            ImageTools.write_image(
+                image=None,
+                output_path="bad",
+                file_name="bad",
+                ext=".jpeg"
+            )
 
     @staticmethod
     def test_read_image():
