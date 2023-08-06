@@ -38,9 +38,15 @@ jobs:
     - name: Test with pytest
       run: |
          coverage run -m pytest -s
+    - name: Ls root path
+      run: |
+         ls /home/runner/work/imgtools_m8
+    - name: Ls pytest root path
+      run: |
+         ls /home/runner/work/imgtools_m8/imgtools_m8
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        files: //home/runner/work/imgtools_m8/imgtools_m8/coverage.xml,/home/runner/work/imgtools_m8/imgtools_m8/e2e-coverage.xml
+        files: /home/runner/work/imgtools_m8/imgtools_m8/coverage.xml,/home/runner/work/imgtools_m8/imgtools_m8/e2e-coverage.xml
         verbose: true
