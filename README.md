@@ -1,4 +1,7 @@
 [![Python package](https://github.com/mano8/imgtools_m8/actions/workflows/python-package.yml/badge.svg)](https://github.com/mano8/imgtools_m8/actions/workflows/python-package.yml)
+[![PyPI package](https://img.shields.io/pypi/v/imgtools_m8.svg)](https://pypi.org/project/imgtools_m8/)
+[![codecov](https://codecov.io/gh/mano8/imgtools_m8/branch/main/graph/badge.svg?token=0J31F62GB7)](https://codecov.io/gh/mano8/imgtools_m8)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/c401bed6812d4f9bb77bfaee16cf0abe)](https://www.codacy.com/gh/mano8/imgtools_m8/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=mano8/imgtools_m8&amp;utm_campaign=Badge_Grade)  
 # imgtools_m8
 Simple image tools package. Used to convert, downscale and/or upscale images.
 
@@ -13,6 +16,10 @@ To install directly from GitHub:
 ```plaintext
 $ python3 -m pip install "git+https://github.com/mano8/imgtools_m8"
 ```
+
+To install from PypI :
+
+``python3 -m pip install imgtools_m8``
 
 ## How to use
 
