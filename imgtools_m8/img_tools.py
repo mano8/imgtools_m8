@@ -65,8 +65,8 @@ class ImageTools:
     def get_expander_model_scale(self) -> bool:
         """Test if is_ready"""
         result = 0
-        self.init_expander_model()
-        if self.has_expander_model():
+        self.init_expander()
+        if self.has_expander():
             result = self.expander.model_conf.get('scale')
         return result
 
