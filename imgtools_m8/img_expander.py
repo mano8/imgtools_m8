@@ -63,13 +63,14 @@ class ImageExpander:
                 'scale': 2
             }
 
-        if Ut.is_dict(model_conf, not_null=True) \
-                and not self.has_model_conf():
+        if (Ut.is_dict(model_conf, not_null=True) \
+                and not self.has_model_conf())\
+                or not self.has_model_conf():
             raise SettingInvalidException(
                 "[ImageExpander::set_model_conf] "
                 "Error: Invalid model configuration."
             )
-        elif self.has_model_conf():
+        else:
             test = True
         return test
 
