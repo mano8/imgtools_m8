@@ -4,8 +4,6 @@ ImageExpander unittest class.
 Use pytest package.
 """
 import pytest
-import os
-from .helper import HelperTest
 from imgtools_m8.img_expander import ImageExpander
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.exceptions import SettingInvalidException
