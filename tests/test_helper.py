@@ -6,6 +6,7 @@ Use pytest package.
 import os
 import cv2
 import pytest
+from .helper import HelperTest
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.exceptions import ImgToolsException
@@ -137,17 +138,20 @@ class TestImageToolsHelper:
     @staticmethod
     def test_get_images_list():
         """Test get_images_list method"""
-        files = ImageToolsHelper.get_images_list(os.path.join('.', 'tests', 'dummy_dir'))
+        files = ImageToolsHelper.get_images_list(
+            HelperTest.get_source_path()
+        )
         assert len(files) == 3
 
     @staticmethod
     def test_get_files_list():
         """Test get_files_list method"""
-        files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'))
+        sources = HelperTest.get_source_path()
+        files = ImageToolsHelper.get_files_list(sources)
         assert len(files) == 5
-        files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'), ext='.jpg')
+        files = ImageToolsHelper.get_files_list(sources, ext='.jpg')
         assert len(files) == 3
-        files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'), ext=['.jpg', '.txt'])
+        files = ImageToolsHelper.get_files_list(sources, ext=['.jpg', '.txt'])
         assert len(files) == 5
 
     @staticmethod
@@ -190,7 +194,9 @@ class TestImageToolsHelper:
     def test_get_image_size():
         """Test get_image_size method"""
         image = cv2.imread(
-            os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
+            os.path.join(
+                HelperTest.get_source_path(),
+                'recien_llegado.jpg')
         )
         assert ImageToolsHelper.get_image_size(
             image
@@ -214,5 +220,7 @@ class TestImageToolsHelper:
     def test_get_string_file_size():
         """Test get_string_file_size method"""
         assert ImageToolsHelper.get_string_file_size(
-            os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
+            os.path.join(
+                HelperTest.get_source_path(),
+                'recien_llegado.jpg')
         ) == "77.52 KB"
