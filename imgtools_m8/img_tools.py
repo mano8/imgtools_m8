@@ -305,19 +305,27 @@ class ImageTools:
                     source_path=source_path
                 )
             )
-            # Upscale the image
-            size = ImageToolsHelper.get_image_size(image)
-            upscale_stats = ImageToolsHelper.get_upscale_stats(
-                size=size,
-                output_formats=self.output_conf.get('output_formats'),
-                model_scale=self.get_expander_model_scale()
-            )
-            result = self.resize_image_from_conf(
-                image=image,
-                size=size,
-                upscale_stats=upscale_stats,
-                file_name=file_name
-            )
+            if image is not None:
+                size = ImageToolsHelper.get_image_size(image)
+                upscale_stats = ImageToolsHelper.get_upscale_stats(
+                    size=size,
+                    output_formats=self.output_conf.get('output_formats'),
+                    model_scale=self.get_expander_model_scale()
+                )
+                result = self.resize_image_from_conf(
+                    image=image,
+                    size=size,
+                    upscale_stats=upscale_stats,
+                    file_name=file_name
+                )
+            else:
+                logger.warning(
+                    "[ImageTools] Bad image file : %s (size: %s)",
+                    source_path,
+                    ImageToolsHelper.get_string_file_size(
+                        source_path=source_path
+                    )
+                )
         return result
 
     def run(self):
