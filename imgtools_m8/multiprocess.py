@@ -36,8 +36,9 @@ class MultiProcessImage(ImageTools):
                             model_conf=model_conf
                             )
 
-    def run_multiple(self):
+    def run_multiple(self) -> bool:
         """Run from directory with multiprocessing"""
+        result = False
         start_time = time.time()
         files = ImageToolsHelper.get_images_list(self.source_path)
         if self.has_conf() \
@@ -53,7 +54,11 @@ class MultiProcessImage(ImageTools):
                         file
                     ))
                 # Multi Process Images
-                pool.starmap(self.get_output_images, prms)
+                result = pool.starmap(self.get_output_images, prms)
+                if False in result:
+                    result = False
+                else:
+                    result = True
             finally:
                 pool.close()
                 pool.join()
@@ -62,3 +67,4 @@ class MultiProcessImage(ImageTools):
             "Processing time %s sec",
             time.time() - start_time
         )
+        return result
