@@ -17,7 +17,7 @@ setup(
     },
     package_data={
         'imgtools_m8': ['models/*.pb'],
-        'tests': ['dummy_dir/*.jpg', 'dummy_dir/*.txt', 'dummy_output/']
+        'tests': ['sources_test/*.jpg', 'sources_test/*.txt', 'output_test/']
     },
     url='https://github.com/mano8/imgtools_m8',
     license='Apache',
