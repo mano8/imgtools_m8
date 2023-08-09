@@ -57,7 +57,7 @@ class ImageExpander:
                 })
         else:
             self.model_conf = {
-                'path': os.path.join('.', 'imgtools_m8', 'models'),
+                'path': ImageToolsHelper.get_package_models_path(),
                 'file_name': 'EDSR_x2.pb',
                 'model_name': 'edsr',
                 'scale': 2
