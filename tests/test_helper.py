@@ -6,6 +6,7 @@ Use pytest package.
 import os
 import cv2
 import pytest
+from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.exceptions import ImgToolsException
 
@@ -137,17 +138,17 @@ class TestImageToolsHelper:
     def test_get_images_list():
         """Test get_images_list method"""
         files = ImageToolsHelper.get_images_list(os.path.join('.', 'tests', 'dummy_dir'))
-        assert len(files) == 2
+        assert len(files) == 3
 
     @staticmethod
     def test_get_files_list():
         """Test get_files_list method"""
         files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'))
-        assert len(files) == 4
+        assert len(files) == 5
         files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'), ext='.jpg')
-        assert len(files) == 2
+        assert len(files) == 3
         files = ImageToolsHelper.get_files_list(os.path.join('.', 'tests', 'dummy_dir'), ext=['.jpg', '.txt'])
-        assert len(files) == 4
+        assert len(files) == 5
 
     @staticmethod
     def test_is_valid_image_ext():
@@ -194,6 +195,12 @@ class TestImageToolsHelper:
         assert ImageToolsHelper.get_image_size(
             image
         ) == (216, 340)
+
+    @staticmethod
+    def test_get_package_models_path():
+        """Test get_package_models_path method"""
+        path = ImageToolsHelper.get_package_models_path()
+        assert Ut.is_str(path) and "models" in path
 
     @staticmethod
     def test_convert_size():

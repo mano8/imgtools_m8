@@ -197,6 +197,12 @@ class ImageTools:
                 output_format = output_formats[key]
                 if nb_upscale > 0:
                     if nb_upscale > upscale_counter:
+                        logger.debug(
+                            "[ImageTools] Image upscale %s / %s -> %sx",
+                            upscale_counter,
+                            nb_upscale,
+                            self.get_expander_model_scale()
+                        )
                         nb_upscale_needed = nb_upscale - upscale_counter
                         image = self.expander.many_image_upscale(
                             image=image,
@@ -259,6 +265,11 @@ class ImageTools:
                 and Ut.is_list(upscale_stats.get('stats'), not_null=True):
             # if upscale needed
             if upscale_stats.get('max_upscale') > 0:
+                logger.debug(
+                    "[ImageTools] Image need upscale %s times (%sx)",
+                    upscale_stats.get('max_upscale'),
+                    self.get_expander_model_scale()
+                )
                 result = self.upscale_image(
                     image=image,
                     size=size,
@@ -267,6 +278,9 @@ class ImageTools:
                 )
             # if only downscale or convert image needed
             else:
+                logger.debug(
+                    "[ImageTools] Image need downscale or conversion."
+                )
                 result = self.downscale_or_convert_image(
                     image=image,
                     size=size,
@@ -284,26 +298,34 @@ class ImageTools:
                 and os.path.isfile(source_path) \
                 and Ut.is_str(file_name):
             image = cv2.imread(source_path)
-            logger.info(
-                "Open image : %s (size: %s)",
+            logger.debug(
+                "[ImageTools] Open image : %s (size: %s)",
                 source_path,
                 ImageToolsHelper.get_string_file_size(
                     source_path=source_path
                 )
             )
-            # Upscale the image
-            size = ImageToolsHelper.get_image_size(image)
-            upscale_stats = ImageToolsHelper.get_upscale_stats(
-                size=size,
-                output_formats=self.output_conf.get('output_formats'),
-                model_scale=self.get_expander_model_scale()
-            )
-            result = self.resize_image_from_conf(
-                image=image,
-                size=size,
-                upscale_stats=upscale_stats,
-                file_name=file_name
-            )
+            if image is not None:
+                size = ImageToolsHelper.get_image_size(image)
+                upscale_stats = ImageToolsHelper.get_upscale_stats(
+                    size=size,
+                    output_formats=self.output_conf.get('output_formats'),
+                    model_scale=self.get_expander_model_scale()
+                )
+                result = self.resize_image_from_conf(
+                    image=image,
+                    size=size,
+                    upscale_stats=upscale_stats,
+                    file_name=file_name
+                )
+            else:
+                logger.warning(
+                    "[ImageTools] Bad image file : %s (size: %s)",
+                    source_path,
+                    ImageToolsHelper.get_string_file_size(
+                        source_path=source_path
+                    )
+                )
         return result
 
     def run(self):
@@ -529,6 +551,14 @@ class ImageTools:
                 result = cv2.imwrite(out_path, image, options)
             else:
                 result = cv2.imwrite(out_path, image)
+
+            logger.debug(
+                "[ImageTools] Write image %s (size: %s)",
+                out_path,
+                ImageToolsHelper.get_string_file_size(
+                    source_path=out_path
+                )
+            )
         else:
             raise ImgToolsException(
                 "Unable to resize the image."
@@ -549,6 +579,9 @@ class ImageTools:
         # if both the width and height are None, then return the
         # original image
         if width is None and height is None:
+            logger.debug(
+                "[ImageTools] Image no need to be resized."
+            )
             return image
 
         # check to see if the width is None
@@ -577,6 +610,13 @@ class ImageTools:
         resized = None
         if dim is not None:
             # resize the image
+            logger.debug(
+                "[ImageTools] Resize image from %s x %s to %s x %s pix",
+                w,
+                h,
+                dim[1],
+                dim[0]
+            )
             resized = cv2.resize(image, dsize=dim, interpolation=inter)
 
         # return the resized image

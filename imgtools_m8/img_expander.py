@@ -57,19 +57,20 @@ class ImageExpander:
                 })
         else:
             self.model_conf = {
-                'path': os.path.join('.', 'imgtools_m8', 'models'),
+                'path': ImageToolsHelper.get_package_models_path(),
                 'file_name': 'EDSR_x2.pb',
                 'model_name': 'edsr',
                 'scale': 2
             }
 
-        if Ut.is_dict(model_conf, not_null=True) \
-                and not self.has_model_conf():
+        if (Ut.is_dict(model_conf, not_null=True) \
+                and not self.has_model_conf())\
+                or not self.has_model_conf():
             raise SettingInvalidException(
                 "[ImageExpander::set_model_conf] "
                 "Error: Invalid model configuration."
             )
-        elif self.has_model_conf():
+        else:
             test = True
         return test
 

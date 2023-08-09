@@ -126,6 +126,11 @@ class ImageToolsHelper:
         return size
 
     @staticmethod
+    def get_package_models_path() -> str or None:
+        """Get package models' path."""
+        return os.path.join(os.path.dirname(__file__), 'models')
+
+    @staticmethod
     def get_images_list(path):
         """List images from path."""
         return ImageToolsHelper.get_files_list(path, ext=ImageToolsHelper.get_valid_images_ext())

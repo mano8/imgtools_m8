@@ -86,7 +86,8 @@ class TestImageTools:
     def test_run_(self):
         """Test run method"""
         tst = self.obj.run()
-        assert tst is True
+        # unable to upscale bad_image.jpg
+        assert tst is False
         self.obj.set_source_path(
             source_path=os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
         )
