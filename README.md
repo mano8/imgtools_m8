@@ -52,7 +52,7 @@ It is possible to resize images with different options:
 Example :  
 The source file is 340px width and 216px height.
 <div align="center">
-  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/dummy_dir/recien_llegado.jpg" alt="Recien Llegado @Cezar llañez" width="340" height="216" />   
+  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/sources_test/recien_llegado.jpg" alt="Recien Llegado @Cezar llañez" width="340" height="216" />   
   <p>Recien llegado by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a></p>
 </div>
 
@@ -101,7 +101,7 @@ The output file names are set as:
 ```
 One of above results is :
 <div align="center">
-  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/dummy_output/recien_llegado_1200x762.jpg" alt="Recien Llegado @Cezar llañez" width="1200px" />
+  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/output_test/recien_llegado_1200x762.jpg" alt="Recien Llegado @Cezar llañez" width="1200px" />
   <p>recien_llegado_1200x762.jpg by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a></p>
 </div>
 
