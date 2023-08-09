@@ -5,6 +5,7 @@ Use pytest package.
 """
 import pytest
 import os
+from .helper import HelperTest
 from imgtools_m8.img_tools import ImageTools
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.exceptions import ImgToolsException
@@ -26,9 +27,9 @@ class TestImageTools:
 
         Invoked for every test function in the module.
         """
-        source_path = os.path.join('.', 'tests', 'dummy_dir')
+        source_path = HelperTest.get_source_path()
         output_conf = {
-            'path': os.path.join('.', 'tests', 'dummy_output'),
+            'path': HelperTest.get_output_path(),
             'output_formats': [
                 {
                     'fixed_width': 260,
@@ -53,7 +54,7 @@ class TestImageTools:
     def test_set_output_conf(self):
         """Test set_output_conf method"""
         output_conf = {
-            'path': os.path.join('.', 'tests', 'dummy_output'),
+            'path': HelperTest.get_output_path(),
             'output_formats': [
                 {
                     'formats': [
@@ -83,13 +84,15 @@ class TestImageTools:
         with pytest.raises(SettingInvalidException):
             self.obj.set_output_conf(output_conf)
 
-    def test_run_(self):
+    def test_run(self):
         """Test run method"""
         tst = self.obj.run()
         # unable to upscale bad_image.jpg
         assert tst is False
         self.obj.set_source_path(
-            source_path=os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
+            source_path=os.path.join(
+                HelperTest.get_source_path(),
+                'recien_llegado.jpg')
         )
         output_conf = self.obj.output_conf
         output_conf.update({
@@ -120,10 +123,13 @@ class TestImageTools:
 
     def test_run_only_quality(self):
         """Test run method"""
-        # test: Resize specific image in dummy_dir
+        # test: Resize specific image in sources_test
         # 50% jpg quality
+
         self.obj.set_source_path(
-            source_path=os.path.join('.', 'tests', 'dummy_dir', 'mar.jpg')
+            source_path=os.path.join(
+                HelperTest.get_source_path(),
+                'mar.jpg')
         )
         output_conf = self.obj.output_conf
         output_conf.update({
@@ -156,26 +162,34 @@ class TestImageTools:
     def test_is_source_path():
         """Test is_source_path method."""
         assert ImageTools.is_source_path(
-            source_path=os.path.join('.', 'tests', 'dummy_dir')
+            source_path=HelperTest.get_source_path()
         ) is True
         assert ImageTools.is_source_path(
-            source_path=os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg')
+            source_path=os.path.join(
+                HelperTest.get_source_path(),
+                'recien_llegado.jpg')
         ) is True
         assert ImageTools.is_source_path(
-            source_path=os.path.join('.', 'tests', 'dummy_dir', 'bad_file')
+            source_path=os.path.join(
+                HelperTest.get_source_path(),
+                'bad_file')
         ) is False
         assert ImageTools.is_source_path(
-            source_path=os.path.join('.', 'tests', 'bad_dir')
+            source_path=os.path.join(
+                HelperTest.get_source_path(),
+                'bad_dir')
         ) is False
 
     @staticmethod
     def test_write_images_by_format():
         """Test write_images_by_format method"""
-        source_path = os.path.join('.', 'tests', 'dummy_dir', 'mar.jpg')
+        source_path = os.path.join(
+            HelperTest.get_source_path(),
+            'mar.jpg')
         image = ImageTools.read_image(source_path)
         assert ImageTools.write_images_by_format(
             image=image,
-            output_path=os.path.join('.', 'tests', 'dummy_output'),
+            output_path=HelperTest.get_output_path(),
             file_name="bad",
             output_format=[
                 {'ext_bad': '.webp', 'quality_bad': 80}
@@ -195,14 +209,18 @@ class TestImageTools:
     @staticmethod
     def test_read_image():
         """Test read_image method"""
-        image = ImageTools.read_image(os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg'))
+        image = ImageTools.read_image(os.path.join(
+            HelperTest.get_source_path(),
+            'recien_llegado.jpg'))
         assert image is not None
         assert image.shape[:2] == (216, 340)
 
     @staticmethod
     def test_get_image_size():
         """Test get_image_size method"""
-        image = ImageTools.read_image(os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg'))
+        image = ImageTools.read_image(os.path.join(
+            HelperTest.get_source_path(),
+            'recien_llegado.jpg'))
         size = ImageToolsHelper.get_image_size(image)
         assert size == (216, 340)
 
@@ -224,7 +242,9 @@ class TestImageTools:
     @staticmethod
     def test_image_resize():
         """Test image_resize method"""
-        image = ImageTools.read_image(os.path.join('.', 'tests', 'dummy_dir', 'recien_llegado.jpg'))
+        image = ImageTools.read_image(os.path.join(
+            HelperTest.get_source_path(),
+            'recien_llegado.jpg'))
         resized = ImageTools.image_resize(image, width=200)
         assert image.shape[:2] == (216, 340)
         assert resized.shape[:2] == (127, 200)

@@ -7,8 +7,7 @@ import logging
 import argparse
 import sys
 from imgtools_m8 import configure_logging
-from imgtools_m8.img_tools import ImageTools
-
+from imgtools_m8.multiprocess import MultiProcessImage
 
 logging.basicConfig()
 logger = logging.getLogger("imgtools_m8")
@@ -19,6 +18,7 @@ __deprecated__ = False
 __license__ = "MIT"
 __status__ = "Production"
 __version__ = "1.0.0"
+
 
 def parse_args(args):
     """
@@ -79,8 +79,8 @@ if __name__ == '__main__':
         ]
 
     }
-    i_tool = ImageTools(
+    i_tool = MultiProcessImage(
         source_path=source_path,
         output_conf=output_conf
     )
-    i_tool.run()
+    i_tool.run_multiple()
