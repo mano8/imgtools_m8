@@ -2,6 +2,6 @@ codecov:
     require_ci_to_pass: true
 
 ignore:
-  - "**/examples/**/*"
-  - "**/imgtools_m8/setup.py"
-  - "**/imgtools_m8/__init__.py"
+    - "examples/**/*"
+    - "imgtools_m8/setup.py"
+    - "imgtools_m8/__init__.py"
