@@ -1,4 +1,4 @@
 ignore:
-	- "examples/*"
+  - "examples/**/*"
   - "imgtools_m8/setup.py"
   - "imgtools_m8/__init__.py"
