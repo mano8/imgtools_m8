@@ -30,8 +30,8 @@ def parse_args(args):
     """
     # create arguments
     arg_parser = argparse.ArgumentParser(description='imgtools_m8 example')
-    arg_parser.add_argument('--source', help='Source file or directory')
-    arg_parser.add_argument('--output_path', help='Output path directory')
+    arg_parser.add_argument('--source', help='Source file or directory', required=True, type=str)
+    arg_parser.add_argument('--output_path', help='Output path directory', required=True, type=str)
     arg_parser.add_argument('--debug', action='store_true', help='Show debug output')
 
     # parse arguments from script parameters
