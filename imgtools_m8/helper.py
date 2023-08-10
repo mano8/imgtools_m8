@@ -154,7 +154,8 @@ class ImageToolsHelper:
                 counter = max(counter, tmp)
                 result['stats'].append({
                     'key': key,
-                    'nb_upscale': tmp
+                    'nb_upscale': tmp,
+                    'x_scale': x_scale
                 })
             result['stats'] = sorted(
                 result.get('stats'),
