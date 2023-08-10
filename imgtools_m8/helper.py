@@ -66,15 +66,18 @@ class ImageToolsHelper:
         Count nb max of upscale needed
         """
         result = 0
-        while ImageToolsHelper.need_upscale(
-                width=width,
-                height=height,
-                fixed_width=fixed_width,
-                fixed_height=fixed_height,
-                fixed_size=fixed_size):
-            width = width * model_scale
-            height = height * model_scale
-            result += 1
+        if model_scale > 0 \
+                and height > 0 \
+                and width > 0:
+            while ImageToolsHelper.need_upscale(
+                    width=width,
+                    height=height,
+                    fixed_width=fixed_width,
+                    fixed_height=fixed_height,
+                    fixed_size=fixed_size):
+                width = width * model_scale
+                height = height * model_scale
+                result += 1
         return result
 
     @staticmethod
