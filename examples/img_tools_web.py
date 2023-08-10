@@ -31,8 +31,8 @@ def parse_args(args):
     """
     # create arguments
     arg_parser = argparse.ArgumentParser(description='imgtools_m8 example')
-    arg_parser.add_argument('--source', help='Source file or directory', required=True, type=str)
-    arg_parser.add_argument('--output_path', help='Output path directory', required=True, type=str)
+    arg_parser.add_argument('--source', help='Source file or directory', type=str)
+    arg_parser.add_argument('--output_path', help='Output path directory', type=str)
     arg_parser.add_argument('--debug', action='store_true', help='Show debug output')
 
     # parse arguments from script parameters
@@ -46,8 +46,14 @@ if __name__ == '__main__':
     configure_logging(parser.debug)
 
     source_path = parser.source
+    if source_path is None:
+        source_path = path.join(path.dirname(__file__), 'source')
+    output_path = parser.output_path
+    if output_path is None:
+        output_path = path.join(path.dirname(__file__), 'output')
+
     output_conf = {
-        'path': parser.output_path,
+        'path': output_path,
         'output_formats': [
             {
                 'fixed_width': 2500,
@@ -80,6 +86,7 @@ if __name__ == '__main__':
         ]
 
     }
+
     i_tool = ImageTools(
         source_path=source_path,
         output_conf=output_conf
