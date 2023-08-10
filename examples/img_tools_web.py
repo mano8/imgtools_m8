@@ -6,6 +6,7 @@ Use pytest package.
 import logging
 import argparse
 import sys
+from os import path
 from imgtools_m8 import configure_logging
 from imgtools_m8.img_tools import ImageTools
 
