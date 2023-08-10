@@ -145,6 +145,12 @@ class ImageToolsHelper:
                         fixed_width=fixed_width,
                         fixed_height=fixed_height,
                         fixed_size=fixed_size)
+                x_scale = ImageToolsHelper.get_model_scale_needed(
+                        width=w,
+                        height=h,
+                        fixed_width=fixed_width,
+                        fixed_height=fixed_height,
+                        fixed_size=fixed_size)
                 counter = max(counter, tmp)
                 result['stats'].append({
                     'key': key,
