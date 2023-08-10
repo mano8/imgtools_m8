@@ -56,31 +56,15 @@ if __name__ == '__main__':
         'path': output_path,
         'output_formats': [
             {
-                'fixed_width': 2500,
+                'fixed_width': 2800,
                 'formats': [
-                    {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1},
-                    {'ext': '.webp', 'quality': 80}
-                ]
-            },
-            {
-                'fixed_width': 2240,
-                'formats': [
-                    {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1},
-                    {'ext': '.webp', 'quality': 80}
-                ]
-            },
-            {
-                'fixed_width': 1920,
-                'formats': [
-                    {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1},
-                    {'ext': '.webp', 'quality': 80}
+                    {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1}
                 ]
             },
             {
                 'fixed_width': 1280,
                 'formats': [
-                    {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1},
-                    {'ext': '.webp', 'quality': 80}
+                    {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1}
                 ]
             }
         ]
