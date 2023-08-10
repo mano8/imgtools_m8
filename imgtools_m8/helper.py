@@ -55,6 +55,43 @@ class ImageToolsHelper:
         return result
 
     @staticmethod
+    def get_model_scale_needed(height: int,
+                               width: int,
+                               fixed_height: int or None = None,
+                               fixed_width: int or None = None,
+                               fixed_size: int or None = None
+                               ) -> int:
+        """
+        Get model scale to load
+        """
+        result, scale = 0, 2
+        if height > 0 and width > 0:
+            if Ut.is_int(fixed_height, not_null=True) \
+                    and Ut.is_int(fixed_width, not_null=True) \
+                    and fixed_height > height \
+                    and fixed_width > width:
+                scale_w = math.ceil(fixed_width / width)
+                scale_h = math.ceil(fixed_height / height)
+                result = min(scale_w, scale_h)
+
+            elif Ut.is_int(fixed_width, not_null=True) \
+                    and fixed_width > width:
+                result = math.ceil(fixed_width / width)
+
+            elif Ut.is_int(fixed_height, not_null=True) \
+                    and fixed_height > height:
+                result = math.ceil(fixed_height / height)
+
+            elif Ut.is_int(fixed_size, not_null=True) \
+                    and fixed_size > width \
+                    and fixed_size > height:
+                scale_w = math.ceil(fixed_size / width)
+                scale_h = math.ceil(fixed_size / height)
+                result = min(scale_w, scale_h)
+
+        return result
+
+    @staticmethod
     def count_upscale(height: int,
                       width: int,
                       model_scale: int,
