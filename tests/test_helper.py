@@ -103,6 +103,24 @@ class TestImageToolsHelper:
             )
 
     @staticmethod
+    def test_get_model_scale_needed():
+        """Test get_model_scale_needed method"""
+        height, width = (200, 400)
+        output_formats = [
+            {'height': 200, 'width': 400, 'fixed_width': 1900},
+            {'height': 200, 'width': 500, 'fixed_width': 1600, 'fixed_height': 1600},
+            {'height': 200, 'width': 300, 'fixed_width': 1200, 'fixed_height': 800},
+            {'height': 200, 'width': 400, 'fixed_size': 900},
+            {'height': 200, 'width': 500, 'fixed_height': 600},
+            {'height': 200, 'width': 400, 'fixed_width': 200}
+        ]
+        results = []
+        for params in output_formats:
+            scale = ImageToolsHelper.get_model_scale_needed(**params)
+            results.append(scale)
+        assert results == [5, 4, 4, 3, 3, 0]
+
+    @staticmethod
     def test_get_upscale_stats():
         """Test get_upscale_stats method"""
         size = (200, 400)
