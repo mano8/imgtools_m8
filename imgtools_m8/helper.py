@@ -257,6 +257,7 @@ class ImageToolsHelper:
                 ext = "".join(ext_list)
             else:
                 ext = "".join(pathlib.Path(path).suffixes)
+            ext = ext.lower()
         return ext
 
     @staticmethod
