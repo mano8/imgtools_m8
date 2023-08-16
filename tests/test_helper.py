@@ -171,6 +171,8 @@ class TestImageToolsHelper:
         assert len(files) == 3
         files = ImageToolsHelper.get_files_list(sources, ext=['.jpg', '.txt'])
         assert len(files) == 5
+        files = ImageToolsHelper.get_files_list(sources, ext='.jpg', content_name="bad_")
+        assert len(files) == 1 and files[0] == "bad_image.jpg"
 
     @staticmethod
     def test_is_valid_image_ext():
@@ -201,11 +203,13 @@ class TestImageToolsHelper:
     def test_get_extension():
         """Test get_extension method"""
         assert ImageToolsHelper.get_extension(path='EDSR_x2.pb') == '.pb'
+        assert ImageToolsHelper.get_extension(path='EDSR_x2.Pb') == '.pb'
         assert ImageToolsHelper.get_extension(path='img.jpg') == '.jpg'
         assert ImageToolsHelper.get_extension(path='img') == ''
         assert ImageToolsHelper.get_extension(path='img.tar.gz') == '.gz'
         assert ImageToolsHelper.get_extension(path='img.back.tar.gz', ext_len=2) == '.tar.gz'
         assert ImageToolsHelper.get_extension(path='img.tar.gz.sav', ext_len=3) == '.tar.gz.sav'
+        assert ImageToolsHelper.get_extension(path='img.tAr.gZ.sAv', ext_len=3) == '.tar.gz.sav'
         assert ImageToolsHelper.get_extension(path='img.tar.gz', ext_len=3) == '.tar.gz'
 
     @staticmethod
