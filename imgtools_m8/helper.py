@@ -183,17 +183,32 @@ class ImageToolsHelper:
         return ImageToolsHelper.get_files_list(path, ext=ImageToolsHelper.get_valid_images_ext())
 
     @staticmethod
-    def get_files_list(path: str, ext: str or None = None):
-        """List files from path."""
-        return [
-            f
-            for f in os.listdir(path)
-            if os.path.isfile(os.path.join(path, f))
-            and (ext is None
-                 or (Ut.is_list(ext, not_null=True) and ImageToolsHelper.get_extension(f) in ext)
-                 or (Ut.is_str(ext, not_null=True) and ImageToolsHelper.get_extension(f) == ext)
-                 )
-        ]
+    def get_files_list(path: str,
+                       ext: str or list or None = None,
+                       content_name: str or None = None
+                       ) -> list or None:
+        """
+        List files from path.
+        Can extract files names by:
+          - extension(s)
+          - file name content
+        """
+        result = None
+        if Ut.is_str(path, not_null=True) \
+                and os.path.isdir(path):
+            result = [
+                f
+                for f in os.listdir(path)
+                if os.path.isfile(os.path.join(path, f))
+                and (ext is None
+                     or (Ut.is_list(ext, not_null=True) and ImageToolsHelper.get_extension(f) in ext)
+                     or (Ut.is_str(ext, not_null=True) and ImageToolsHelper.get_extension(f) == ext)
+                     )
+                and (content_name is None
+                     or (Ut.is_str(content_name, not_null=True) and content_name in f)
+                     )
+            ]
+        return result
 
     @staticmethod
     def get_valid_images_ext():
