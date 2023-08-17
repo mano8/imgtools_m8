@@ -52,6 +52,10 @@ class ModelConf:
             result = True
         return result
 
+    def get_path(self) -> str:
+        """Get model path"""
+        return self.model_path
+
     def has_model_name(self) -> bool:
         """Test if instance has valid model name"""
         return ModelConf.is_model_name(self.model_name)
@@ -64,6 +68,10 @@ class ModelConf:
             self.model_name = value
             result = True
         return result
+
+    def get_model_name(self) -> str:
+        """Get model_name"""
+        return self.model_name
 
     def has_scale(self) -> bool:
         """Test if instance has valid model name"""
@@ -93,6 +101,18 @@ class ModelConf:
             result = True
 
         return result
+
+    def get_scale(self) -> int:
+        """Get scale"""
+        return self.scale
+
+    def get_file_name(self) -> str:
+        """Get scale"""
+        return ModelConf.get_model_file_name(
+            path=self.model_path,
+            model_name=self.model_name,
+            scale=self.scale
+        )
 
     @staticmethod
     def get_valid_model_names() -> list:
