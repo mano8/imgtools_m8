@@ -187,6 +187,19 @@ class ModelConf:
         return result
 
     @staticmethod
+    def is_model_file_name(model_path: str or None,
+                           file_name: str or None
+                           ) -> bool:
+        """Test if valid model file_name"""
+        return Ut.is_str(file_name, not_null=True) \
+            and ImageToolsHelper.get_extension(
+                path=file_name) == '.pb' \
+            and Ut.is_str(model_path, not_null=True) \
+            and Path.isfile(
+                Path.join(model_path, file_name)
+            )
+
+    @staticmethod
     def is_scale_in_list(scale_list: list,
                          scale: int
                          ) -> bool:
