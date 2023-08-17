@@ -42,6 +42,7 @@ class TestModelConf:
         assert self.obj.set_model_path(
             ImageToolsHelper.get_package_models_path()
         ) is True
+        assert self.obj.get_path() == ImageToolsHelper.get_package_models_path()
         assert self.obj.has_model_path() is True
         assert self.obj.set_model_path('/bad_path') is False
         assert self.obj.has_model_path() is False
@@ -51,6 +52,7 @@ class TestModelConf:
         self.obj.model_name = None
         assert self.obj.has_model_name() is False
         assert self.obj.set_model_name('edsr') is True
+        assert self.obj.get_model_name() == 'edsr'
         assert self.obj.has_model_name() is True
         assert self.obj.set_model_name('bad_model') is False
         assert self.obj.has_model_name() is False
@@ -65,6 +67,8 @@ class TestModelConf:
         assert self.obj.has_scale() is False
         assert self.obj.set_scale(0, set_default=True) is True
         assert self.obj.has_scale() is True
+        assert self.obj.get_scale() == 2
+        assert self.obj.get_file_name() == "EDSR_x2.pb"
 
     @staticmethod
     def test_get_valid_model_names():
@@ -133,12 +137,20 @@ class TestModelConf:
             scale=2
         )
         assert file_name == "EDSR_x2.pb"
+        assert ModelConf.is_model_file_name(
+            model_path=ImageToolsHelper.get_package_models_path(),
+            file_name=file_name
+        ) is True
         file_name = ModelConf.get_model_file_name(
             path='/bad/path',
             model_name='edsr',
             scale=2
         )
         assert file_name is None
+        assert ModelConf.is_model_file_name(
+            model_path=ImageToolsHelper.get_package_models_path(),
+            file_name=file_name
+        ) is False
 
     @staticmethod
     def test_is_scale():
