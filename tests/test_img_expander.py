@@ -30,90 +30,14 @@ class TestImageExpander:
         """Test has_conf method"""
         assert self.obj.set_model_conf({
             'path': ImageToolsHelper.get_package_models_path(),
-            'file_name': 'EDSR_x2.pb',
             'model_name': 'edsr',
             'scale': 2
         }) is True
         assert self.obj.set_model_conf() is True
         assert self.obj.set_model_conf({
-            'file_name': 'EDSR_x2.pb'
+            'scale': 3
         }) is True
         assert self.obj.set_model_conf({
             'path': ImageToolsHelper.get_package_models_path(),
-            'file_name': 'EDSR_x4.pb'
+            'scale': 4
         }) is True
-
-        with pytest.raises(SettingInvalidException):
-            self.obj.set_model_conf({
-                'file_name': 'EDSR_x4'
-            })
-
-    @staticmethod
-    def test_get_models_list():
-        """Test get_models_list method"""
-        models_list = ImageExpander.get_models_list(
-            ImageToolsHelper.get_package_models_path()
-        )
-        assert len(models_list) > 0
-        assert 'EDSR_x2.pb' in models_list
-
-    @staticmethod
-    def test_get_model_scale():
-        """Test get_model_scale method"""
-        assert ImageExpander.get_model_scale("") == 0
-        assert ImageExpander.get_model_scale('EDSR_x2.pb') == 2
-        assert ImageExpander.get_model_scale('EDSR_x6.pb') == 6
-
-    @staticmethod
-    def test_get_model_name():
-        """Test get_model_name method"""
-        assert ImageExpander.get_model_name("") is None
-        assert ImageExpander.get_model_name('EDSR_x2.pb') == 'edsr'
-        assert ImageExpander.get_model_name('sb2_x6.pb') == 'sb2'
-
-    @staticmethod
-    def test_is_model_conf():
-        """Test is_model_conf method"""
-        assert ImageExpander.is_model_conf({
-            'path': ImageToolsHelper.get_package_models_path(),
-            'file_name': 'EDSR_x2.pb',
-            'model_name': 'edsr',
-            'scale': 2
-        }) is True
-        assert ImageExpander.is_model_conf({
-            'path': '/bad_path',  # bad path
-            'file_name': 'EDSR_x2.pb',
-            'model_name': 'edsr',
-            'scale': 2
-        }) is False
-        assert ImageExpander.is_model_conf({
-            'path': ImageToolsHelper.get_package_models_path(),
-            'file_name': 'EDSR_x2',  # bad file_name without extension
-            'model_name': 'edsr',
-            'scale': 2
-        }) is False
-        assert ImageExpander.is_model_conf({}) is False
-        assert ImageExpander.is_model_conf({
-            'path': ImageToolsHelper.get_package_models_path(),
-            'file_name': 'EDSR_x2.pb',
-            'model_name': 'edsrBad',  # bad model_name must be part of file_name
-            'scale': 2
-        }) is False
-        assert ImageExpander.is_model_conf({
-            'path': ImageToolsHelper.get_package_models_path(),
-            'file_name': 'EDSR_x2.pb',
-            'model_name': 'edsr',
-            'scale': 3  # bad scale != of file_name
-        }) is False
-        assert ImageExpander.is_model_conf({
-            'path': ImageToolsHelper.get_package_models_path(),
-            'file_name': 'EDSR_x12.pb',
-            'model_name': 'edsr',
-            'scale': 12  # bad scale > 8 (2 >= scale <= 8)
-        }) is False
-        assert ImageExpander.is_model_conf({
-            'path': ImageToolsHelper.get_package_models_path(),
-            'file_name': 'EDSR_x1.pb',
-            'model_name': 'edsr',
-            'scale': 1  # bad scale < 2 (2 >= scale <= 8)
-        }) is False
