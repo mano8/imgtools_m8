@@ -2,9 +2,15 @@ from cv2 import dnn_superres
 from numpy import ndarray
 import os
 from ve_utils.utils import UType as Ut
+from imgtools_m8.model_conf import ModelConf
 from imgtools_m8.helper import ImageToolsHelper
-from imgtools_m8.exceptions import ImgToolsException
-from imgtools_m8.exceptions import SettingInvalidException
+
+__author__ = "Eli Serra"
+__copyright__ = "Copyright 2020, Eli Serra"
+__deprecated__ = False
+__license__ = "MIT"
+__status__ = "Production"
+__version__ = "1.0.0"
 
 
 class ImageExpander:
@@ -25,53 +31,35 @@ class ImageExpander:
 
     def has_model_conf(self) -> bool:
         """Test if instance has model_conf"""
-        return self.is_model_conf(self.model_conf)
+        return self.model_conf.is_ready()
 
     def set_model_conf(self,
                        model_conf: dict or None = None
                        ) -> bool:
         """Set model configuration"""
-        test = False
-        if self.is_model_conf(model_conf):
-            self.model_conf = model_conf
-        elif Ut.is_dict(model_conf, not_null=True):
-            if ImageExpander.is_model_path(model_conf.get('path')):
-                self.model_conf = {
-                    'path': model_conf.get('path')
-                }
-            else:
-                self.model_conf = {
-                    'path': os.path.join('.', 'imgtools_m8', 'models')
-                }
-            if ImageExpander.is_file_name(
-                    model_path=self.model_conf.get('path'),
-                    file_name=model_conf.get('file_name')):
-                self.model_conf.update({
-                    'file_name': model_conf.get('file_name'),
-                    'model_name': ImageExpander.get_model_name(
-                        model_conf.get('file_name')
-                    ),
-                    'scale': ImageExpander.get_model_scale(
-                        model_conf.get('file_name')
-                    )
-                })
-        else:
-            self.model_conf = {
-                'path': ImageToolsHelper.get_package_models_path(),
-                'file_name': 'EDSR_x2.pb',
-                'model_name': 'edsr',
-                'scale': 2
-            }
+        model_path = ImageToolsHelper.get_package_models_path()
+        model_name = 'edsr'
+        scale = 2
+        if Ut.is_dict(model_conf, not_null=True):
 
-        if (Ut.is_dict(model_conf, not_null=True) \
-                and not self.has_model_conf())\
-                or not self.has_model_conf():
-            raise SettingInvalidException(
-                "[ImageExpander::set_model_conf] "
-                "Error: Invalid model configuration."
-            )
-        else:
-            test = True
+            if ModelConf.is_model_path(model_conf.get('path')):
+                model_path = model_conf.get('path')
+
+            if ModelConf.is_model_name(model_conf.get('model_name')):
+                model_name = model_conf.get('model_name')
+
+            if ModelConf.is_scale(
+                    model_path=model_path,
+                    model_name=model_name,
+                    scale=model_conf.get('scale')):
+                scale = model_conf.get('scale')
+
+        self.model_conf = ModelConf(
+            model_path=model_path,
+            model_name=model_name,
+            scale=scale
+        )
+        test = self.model_conf.is_ready()
         return test
 
     def init_sr(self):
@@ -83,15 +71,15 @@ class ImageExpander:
         test = False
         if self.has_model_conf():
             mod_path = os.path.join(
-                self.model_conf.get('path'),
-                self.model_conf.get('file_name')
+                self.model_conf.get_path(),
+                self.model_conf.get_file_name()
             )
             if os.path.isfile(mod_path):
                 self.sr.readModel(mod_path)
                 # Set the desired model and scale to get correct pre- and post-processing
                 self.sr.setModel(
-                    self.model_conf.get('model_name'),
-                    self.model_conf.get('scale')
+                    self.model_conf.get_model_name(),
+                    self.model_conf.get_scale()
                 )
                 test = True
         return test
