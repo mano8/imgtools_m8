@@ -21,6 +21,7 @@ __license__ = "MIT"
 __status__ = "Production"
 __version__ = "1.0.0"
 
+
 def parse_args(args):
     """
     Parsing function.
