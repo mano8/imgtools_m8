@@ -1,3 +1,4 @@
+"""Image Expander class"""
 from cv2 import dnn_superres
 from numpy import ndarray
 import os
