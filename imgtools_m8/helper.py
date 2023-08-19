@@ -64,7 +64,7 @@ class ImageToolsHelper:
         """
         Get model scale to load
         """
-        result, scale = 0, 2
+        result = 0
         if height > 0 and width > 0:
             if Ut.is_int(fixed_height, not_null=True) \
                     and Ut.is_int(fixed_width, not_null=True) \
