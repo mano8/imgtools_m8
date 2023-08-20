@@ -106,6 +106,13 @@ class ModelConf:
         """Get scale"""
         return self.scale
 
+    def get_available_scales(self) -> list:
+        """Get scale"""
+        return ModelConf.get_model_scales_available(
+            path=self.model_path,
+            model_name=self.model_name
+        )
+
     def get_file_name(self) -> str:
         """Get scale"""
         return ModelConf.get_model_file_name(
