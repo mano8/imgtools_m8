@@ -1,7 +1,12 @@
 """
-ImageTools unittest class.
+ImageTools Example.
+Resize all images from source path to sizes:
+  - 1280px width
+  - 1920px width
+All images are converted to JPEG and WEBP format with 95% quality,
+and saved to output path.
 
-Use pytest package.
+Depending on source files, images sizes will be upscale and/or downscale.
 """
 import logging
 import argparse
@@ -53,27 +58,26 @@ if __name__ == '__main__':
     if output_path is None:
         output_path = path.join(path.dirname(__file__), 'output')
 
-    output_conf = {
-        'path': output_path,
-        'output_formats': [
-            {
-                'fixed_width': 2800,
-                'formats': [
-                    {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1}
-                ]
-            },
-            {
-                'fixed_width': 1280,
-                'formats': [
-                    {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1}
-                ]
-            }
-        ]
-
-    }
+    output_formats = [
+        {
+            'fixed_width': 1920,
+            'formats': [
+                {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1},
+                {'ext': '.webp', 'quality': 95}
+            ]
+        },
+        {
+            'fixed_width': 1280,
+            'formats': [
+                {'ext': '.jpg', 'quality': 95, 'progressive': 1, 'optimize': 1},
+                {'ext': '.webp', 'quality': 95}
+            ]
+        }
+    ]
 
     i_tool = ImageTools(
         source_path=source_path,
-        output_conf=output_conf
+        output_path=output_path,
+        output_formats=output_formats
     )
     i_tool.run()
