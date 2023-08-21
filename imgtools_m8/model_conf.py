@@ -143,7 +143,10 @@ class ModelConf:
     @staticmethod
     def get_models_list(path: str) -> list:
         """List directory files"""
-        return ImageToolsHelper.get_files_list(path, ext='.pb')
+        result = ImageToolsHelper.get_files_list(path, ext='.pb')
+        if Ut.is_list(result, not_null=True):
+            result.sort()
+        return result
 
     @staticmethod
     def get_model_scale(file_name: str) -> int:
@@ -169,6 +172,7 @@ class ModelConf:
                     scale = ModelConf.get_model_scale(file_name)
                     if scale > 0:
                         result.append(scale)
+            result.sort()
         else:
             result = None
         return result
