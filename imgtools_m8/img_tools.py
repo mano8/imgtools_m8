@@ -17,7 +17,7 @@ __copyright__ = "Copyright 2020, Eli Serra"
 __deprecated__ = False
 __license__ = "MIT"
 __status__ = "Production"
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 logging.basicConfig()
 logger = logging.getLogger("imgTools_m8")
@@ -126,49 +126,17 @@ class ImageTools:
         """Set image output path file"""
         result = None
         if image is not None:
-            (h, w) = ImageToolsHelper.get_image_size(image)
-            fixed_height = output_format.get('fixed_height')
-            fixed_width = output_format.get('fixed_width')
-            fixed_size = output_format.get('fixed_size')
-            if Ut.is_int(fixed_width, not_null=True) \
-                    and Ut.is_int(fixed_height, not_null=True) \
-                    and (fixed_width < w
-                         or fixed_height < h):
-                if fixed_width >= fixed_height:
-                    result = self.image_resize(
-                        image=image,
-                        height=fixed_height
-                    )
-                elif fixed_width <= fixed_height:
-                    result = self.image_resize(
-                        image=image,
-                        width=fixed_width
-                    )
-            elif Ut.is_int(fixed_height, not_null=True) \
-                    and fixed_height < h:
+            size = ImageToolsHelper.get_image_size(image)
+            params = ImageTools.get_downscale_size(
+                size=size,
+                fixed_height=output_format.get('fixed_height'),
+                fixed_width=output_format.get('fixed_width')
+            )
+            if params is not None:
                 result = self.image_resize(
                     image=image,
-                    height=fixed_height
+                    **params
                 )
-            elif Ut.is_int(fixed_width, not_null=True) \
-                    and fixed_width < w:
-                result = self.image_resize(
-                    image=image,
-                    width=fixed_width
-                )
-            elif Ut.is_int(fixed_size, not_null=True) \
-                    and (fixed_size < w
-                         or fixed_size < h):
-                if w >= h:
-                    result = self.image_resize(
-                        image=image,
-                        height=fixed_size
-                    )
-                elif w <= h:
-                    result = self.image_resize(
-                        image=image,
-                        width=fixed_size
-                    )
             else:
                 return image
         return result
@@ -199,7 +167,7 @@ class ImageTools:
                             "[ImageTools] Image upscale %s / %s -> %sx",
                             upscale_counter,
                             nb_upscale,
-                            self.get_expander_model_scale()
+                            self.get_model_scale()
                         )
                         nb_upscale_needed = nb_upscale - upscale_counter
                         image = self.expander.many_image_upscale(
@@ -266,7 +234,7 @@ class ImageTools:
                 logger.debug(
                     "[ImageTools] Image need upscale %s times (%sx)",
                     upscale_stats.get('max_upscale'),
-                    self.get_expander_model_scale()
+                    self.get_model_scale()
                 )
                 result = self.upscale_image(
                     image=image,
@@ -286,11 +254,35 @@ class ImageTools:
                 )
         return result
 
-    def get_output_images(self,
-                          source_path: str,
-                          file_name: str
-                          ) -> bool:
-        """Get output Images"""
+    def simple_upscale_image(self,
+                             source_path: str,
+                             file_name: str,
+                             nb_upscale: int
+                             ) -> bool:
+        """Open and upscale image"""
+        result = False
+        if self.is_ready() \
+                and Ut.is_str(file_name):
+            image = ImageTools.read_image(source_path)
+            logger.debug(
+                "[ImageTools] Open image : %s (size: %s)",
+                source_path,
+                ImageToolsHelper.get_string_file_size(
+                    source_path=source_path
+                )
+            )
+            if image is not None:
+                image = self.expander.many_image_upscale(
+                    image=image,
+                    nb_upscale=nb_upscale
+                )
+        return result
+
+    def process_image(self,
+                      source_path: str,
+                      file_name: str
+                      ) -> bool:
+        """Process Image"""
         result = False
         if self.is_ready() \
                 and os.path.isfile(source_path) \
@@ -351,82 +343,60 @@ class ImageTools:
         return result
 
     @staticmethod
-    def is_source_path(source_path: str) -> bool:
-        """Test if valid source path"""
-        return Ut.is_str(source_path, not_null=True) \
-            and (os.path.isdir(source_path)
-                 or os.path.isfile(source_path))
+    def get_downscale_size(size: tuple,
+                           fixed_height: int,
+                           fixed_width: int,
+                           ) -> dict or None:
+        """Get downscale image size"""
+        result = None
+        if Ut.is_tuple(size, not_null=True) \
+                and Ut.is_int(size[0], mini=1) \
+                and Ut.is_int(size[1], mini=1):
+            h, w = size
+            if Ut.is_int(fixed_width, not_null=True) \
+                    and Ut.is_int(fixed_height, not_null=True) \
+                    and (fixed_width < w
+                         or fixed_height < h):
+                percent_w = ((w-fixed_width) * 100) / w
+                percent_h = ((h-fixed_height) * 100) / h
+                if fixed_width < w  \
+                        and fixed_height >= h:
+                    result = {'width': fixed_width}
+                elif fixed_height < h \
+                        and fixed_width >= w:
+                    result = {'height': fixed_height}
+                elif fixed_height < h \
+                        and fixed_width < w \
+                        and percent_w <= percent_h:
+                    result = {'height': fixed_height}
+                elif fixed_height < h \
+                        and fixed_width < w \
+                        and percent_w >= percent_h:
+                    result = {'width': fixed_width}
+            elif Ut.is_int(fixed_height, not_null=True) \
+                    and fixed_height < h:
+                result = {'height': fixed_height}
+            elif Ut.is_int(fixed_width, not_null=True) \
+                    and fixed_width < w:
+                result = {'width': fixed_width}
 
-    @staticmethod
-    def is_output_conf(output_conf: dict) -> bool:
-        """Test if valid output global configuration"""
-        return Ut.is_dict(output_conf) \
-            and Ut.is_str(output_conf.get('path'))\
-            and os.path.isdir(output_conf.get('path')) \
-            and Ut.is_list(output_conf.get('output_formats'), not_null=True)
-
-    @staticmethod
-    def is_output_write_jpg_format(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return Ut.is_str(data.get('ext'))\
-            and ImageToolsHelper.is_valid_jpg_ext(data.get('ext')) \
-            and (Ut.is_int(data.get('quality'), mini=0, maxi=100)
-                 or data.get('quality') is None
-                 or Ut.is_int(data.get('progressive'), mini=0, maxi=1)
-                 or data.get('progressive') is None
-                 or Ut.is_int(data.get('optimize'), mini=0, maxi=1)
-                 or data.get('optimize') is None
-                 )
-
-    @staticmethod
-    def is_output_write_webp_format(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return Ut.is_str(data.get('ext')) \
-            and data.get('ext').lower() == '.webp' \
-            and (Ut.is_int(data.get('quality'), mini=0, maxi=100)
-                 or data.get('quality') is None)
-
-    @staticmethod
-    def is_output_write_png_format(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return Ut.is_str(data.get('ext'))\
-            and data.get('ext').lower() == '.png' \
-            and (Ut.is_int(data.get('compression'), mini=0, maxi=9)
-                 or data.get('compression') is None)
-
-    @staticmethod
-    def is_output_write_formats(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return ImageToolsHelper.is_valid_image_ext(data.get('ext')) \
-            or ImageTools.is_output_write_jpg_format(data)\
-            or ImageTools.is_output_write_webp_format(data) \
-            or ImageTools.is_output_write_png_format(data)
-
-    @staticmethod
-    def is_output_formats(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return Ut.is_list(data.get('formats'), not_null=True)\
-            and (Ut.is_int(data.get('fixed_height'), not_null=True)
-                 or data.get('fixed_height') is None
-                 or Ut.is_int(data.get('fixed_width'), not_null=True)
-                 or data.get('fixed_width') is None
-                 or Ut.is_int(data.get('fixed_size'), not_null=True)
-                 or data.get('fixed_size') is None)
+        return result
 
     @staticmethod
     def read_image(source_path: str) -> ndarray or None:
         """Init sr"""
         img_src = None
-        if os.path.isfile(source_path):
+        if Ut.is_str(source_path, not_null=True) \
+                and os.path.isfile(source_path):
             img_src = cv2.imread(source_path)
         return img_src
 
     @staticmethod
-    def set_output_path(output_path: str,
-                        file_name: str,
-                        ext: str,
-                        size: tuple
-                        ):
+    def set_write_path(output_path: str,
+                       file_name: str,
+                       ext: str,
+                       size: tuple
+                       ):
         """Set image output path file name"""
         result = None
         name, old_ext = ImageToolsHelper.cut_file_name(file_name)
@@ -538,7 +508,7 @@ class ImageTools:
                     options: list or None = None
                     ) -> ndarray or None:
         """Init sr"""
-        out_path = ImageTools.set_output_path(
+        out_path = ImageTools.set_write_path(
             output_path=output_path,
             file_name=file_name,
             ext=ext,
