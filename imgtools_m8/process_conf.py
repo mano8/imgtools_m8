@@ -45,7 +45,10 @@ class ProcessConf:
         return ProcessConf.is_source_path(self.source_path)
 
     def set_source_path(self, value: str) -> bool:
-        """Set source_path"""
+        """
+        Set source_path
+        Can be a directory or image path.
+        """
         result = False
         self.source_path = None
         if ProcessConf.is_source_path(value):
