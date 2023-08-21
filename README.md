@@ -25,22 +25,10 @@ To install from PypI :
 ## How to use
 
 This package automatically covert, downscale and/or upscale
-an image file or a list of images from directory defined in source_path property.   
+an image file or a list of images from directory defined in source_path property,
+to output_path directory.   
+See [examples](https://github.com/mano8/imgtools_m8/tree/main/examples) for more use case.
 (See accepted extensions from [cv2 documentation](https://docs.opencv.org/4.8.0/d4/da8/group__imgcodecs.html#ga288b8b3da0892bd651fce07b3bbd3a56))
-
-Example :   
-```plaintext
-    >>> # Set source as an image file 
-    >>> source_path = /path/to/image.png
-    >>> # Or set source as a directory containing your images
-    >>> source_path = /path/to/directory
-```   
-
-Next you will need to define output configuration:
-  - path: The output path
-  - output_formats: The list of output formats,  
-    who contains optional output sizes and output image format   
-    (extension and compression options)
 
 It is possible to resize images with different options:
  - fixed_width: resize image to exact width (in pixel)
@@ -59,11 +47,7 @@ The source file is 340px width and 216px height.
 We want resized output file to exact width of 1900px and 1200px.
 And we need output formats as JPEG (with 80% quality) and WEBP (with 70% quality)
 ```plaintext
-    >>> source_path = "./tests/dummy_dir/recien_llegado.jpg"
-    >>> output_conf = {
-            # Output path
-            'path': /my/output/path/directory, 
-            'output_formats': [
+    >>> output_formats = [
                 {  # Get resized output file to exact width of 1600px
                     'fixed_width': 1900,
                     'formats': [
@@ -80,11 +64,10 @@ And we need output formats as JPEG (with 80% quality) and WEBP (with 70% quality
                     ]
                 }
             ]
-
-        }
         >>> imgtools = ImageTools(
-            source_path=source_path,
-            output_conf=output_conf
+            source_path="./tests/dummy_dir/recien_llegado.jpg",
+            output_path="/my/output/path/directory",
+            output_formats=output_formats
         )
         >>> imgtools.run()
 ```   
@@ -121,18 +104,20 @@ deep learning model, to improve quality.
 To load any compatible model of your choice to upscale the images,
 you can define model_conf property.
 
-The imgtools_m8 only contain EDSR (x2, x3, x4) and FSRCNN(x2, x3, x4) [models](https://github.com/mano8/imgtools_m8/tree/main/models).
+The imgtools_m8 only contain EDSR (x2, x3, x4) [models](https://github.com/mano8/imgtools_m8/tree/main/imgtools_m8/models).
 
 If you want uses one of them set model_conf property as:
 
 ```plaintext
     >>> # Set EDSR_x4 model to upscale images
     >>> model_conf = {
-        'file_name': 'EDSR_x4.pb',
+        'model_name': 'edsr',
+        'scale': 4,
     }
     >>> # Or set FSRCNN_x2 model to upscale images
     >>> model_conf = {
-        'file_name': 'FSRCNN_x2.pb',
+        'model_name': 'edsr',
+        'scale': 2,
     }
 ```   
 
@@ -145,7 +130,8 @@ and set model_conf property as:
     >>> # Set TF-ESPCN_x2 model to upscale images
     >>> model_conf = {
         'path': "/path/to/your/downloaded/model/directory",
-        'file_name': 'TF-ESPCN_x2.pb',
+        'model_name': 'espcn',
+        'scale': 2,
     }
 ```   
 
@@ -154,18 +140,15 @@ Here a complete example using TF-ESPCN_x2 model to upscale images :
     >>> # Set TF-ESPCN_x2 model to upscale images
     >>> model_conf = {
         'path': "/path/to/your/downloaded/model/directory",
-        'file_name': 'TF-ESPCN_x2.pb',
+        'model_name': 'espcn',
+        'scale': 2,
     }
-    >>> source_path = "./tests/dummy_dir"
-    >>> output_conf = {
-            # Output path
-            'path': /my/output/path/directory, 
-            'output_formats': [
+    >>> output_formats = [
                 {  # Get resized output file to exact width of 1600px
                     'fixed_width': 1900,
                     'formats': [
-                        {'ext': '.jpg', 'quality': 80},
-                        {'ext': '.webp', 'quality': 70}
+                        # JPEg defauts are 'quality': 95, 'progressive': 0, 'optimize': 0
+                        {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1},
                     ]
                 },
                 {  # Get resized output file to exact width of 800px
@@ -173,14 +156,14 @@ Here a complete example using TF-ESPCN_x2 model to upscale images :
                     'formats': [
                         {'ext': '.jpg', 'quality': 80},
                         {'ext': '.webp', 'quality': 70}
+                        {'ext': '.png', 'compression': 2}
                     ]
                 }
             ]
-
-        }
         >>> imgtools = ImageTools(
-            source_path=source_path,
-            output_conf=output_conf,
+            source_path="./tests/dummy_dir/recien_llegado.jpg",
+            output_path="/my/output/path/directory",
+            output_formats=output_formats,
             model_conf=model_conf
         )
         >>> imgtools.run()
