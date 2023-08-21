@@ -9,7 +9,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name='imgtools_m8',
-    version='0.0.5',
+    version='1.0.0',
     packages=['tests', 'imgtools_m8'],
     package_dir={
         'imgtools_m8': 'imgtools_m8',
