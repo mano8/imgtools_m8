@@ -169,6 +169,7 @@ class ModelConf:
                     scale = ModelConf.get_model_scale(file_name)
                     if scale > 0:
                         result.append(scale)
+            result.sort()
         else:
             result = None
         return result
