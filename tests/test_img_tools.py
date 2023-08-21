@@ -78,6 +78,8 @@ class TestImageTools:
         with pytest.raises(SettingInvalidException):
             self.obj.set_conf(**conf)
 
+        assert self.obj.set_output_path(HelperTest.get_output_path()) is True
+
     def test_get_available_model_scales(self):
         """Test get_available_model_scales method"""
         assert self.obj.get_available_model_scales() == [2, 3, 4]
