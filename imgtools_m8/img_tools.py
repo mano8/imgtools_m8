@@ -66,12 +66,20 @@ class ImageTools:
             self.expander.init_sr()
             self.expander.load_model()
 
-    def get_expander_model_scale(self) -> bool:
-        """Test if is_ready"""
+    def get_model_scale(self) -> int:
+        """Get model scale value"""
         result = 0
         self.init_expander()
         if self.has_expander():
             result = self.expander.model_conf.get_scale()
+        return result
+
+    def get_available_model_scales(self) -> list:
+        """Get model scale value"""
+        result = []
+        self.init_expander()
+        if self.has_expander():
+            result = self.expander.model_conf.get_available_scales()
         return result
 
     def has_conf(self) -> bool:
