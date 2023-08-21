@@ -254,30 +254,6 @@ class ImageTools:
                 )
         return result
 
-    def simple_upscale_image(self,
-                             source_path: str,
-                             file_name: str,
-                             nb_upscale: int
-                             ) -> bool:
-        """Open and upscale image"""
-        result = False
-        if self.is_ready() \
-                and Ut.is_str(file_name):
-            image = ImageTools.read_image(source_path)
-            logger.debug(
-                "[ImageTools] Open image : %s (size: %s)",
-                source_path,
-                ImageToolsHelper.get_string_file_size(
-                    source_path=source_path
-                )
-            )
-            if image is not None:
-                image = self.expander.many_image_upscale(
-                    image=image,
-                    nb_upscale=nb_upscale
-                )
-        return result
-
     def process_image(self,
                       source_path: str,
                       file_name: str
@@ -359,27 +335,24 @@ class ImageTools:
                          or fixed_height < h):
                 percent_w = ((w-fixed_width) * 100) / w
                 percent_h = ((h-fixed_height) * 100) / h
-                if fixed_width < w  \
-                        and fixed_height >= h:
+                is_resize_all = fixed_height < h \
+                    and fixed_width < w
+                if (fixed_width < w
+                        and fixed_height >= h) \
+                        or (is_resize_all
+                            and percent_w >= percent_h):
                     result = {'width': fixed_width}
-                elif fixed_height < h \
-                        and fixed_width >= w:
+                elif (fixed_height < h
+                        and fixed_width >= w) \
+                        or (is_resize_all
+                            and percent_w <= percent_h):
                     result = {'height': fixed_height}
-                elif fixed_height < h \
-                        and fixed_width < w \
-                        and percent_w <= percent_h:
-                    result = {'height': fixed_height}
-                elif fixed_height < h \
-                        and fixed_width < w \
-                        and percent_w >= percent_h:
-                    result = {'width': fixed_width}
             elif Ut.is_int(fixed_height, not_null=True) \
                     and fixed_height < h:
                 result = {'height': fixed_height}
             elif Ut.is_int(fixed_width, not_null=True) \
                     and fixed_width < w:
                 result = {'width': fixed_width}
-
         return result
 
     @staticmethod
