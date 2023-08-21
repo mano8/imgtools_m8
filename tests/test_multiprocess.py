@@ -23,24 +23,19 @@ class TestImageTools:
 
         Invoked for every test function in the module.
         """
-        source_path = HelperTest.get_source_path()
-        output_conf = {
-            'path': HelperTest.get_output_path(),
-            'output_formats': [
-                {
-                    'fixed_width': 260,
-                    'fixed_height': 200,
-                    'formats': [
-                        {'ext': '.jpg', 'quality': 80}
-                    ]
-                }
-            ]
-
-        }
-
+        output_formats = [
+            {
+                'fixed_width': 260,
+                'fixed_height': 200,
+                'formats': [
+                    {'ext': '.jpg', 'quality': 80}
+                ]
+            }
+        ]
         self.obj = MultiProcessImage(
-            source_path=source_path,
-            output_conf=output_conf
+            source_path=HelperTest.get_source_path(),
+            output_path=HelperTest.get_output_path(),
+            output_formats=output_formats
         )
 
     def test_run_multiple(self):

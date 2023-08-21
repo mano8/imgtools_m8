@@ -6,6 +6,7 @@ Use pytest package.
 import pytest
 import os
 from .helper import HelperTest
+from imgtools_m8.process_conf import ProcessConf
 from imgtools_m8.img_tools import ImageTools
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.exceptions import ImgToolsException
@@ -27,10 +28,7 @@ class TestImageTools:
 
         Invoked for every test function in the module.
         """
-        source_path = HelperTest.get_source_path()
-        output_conf = {
-            'path': HelperTest.get_output_path(),
-            'output_formats': [
+        output_formats = [
                 {
                     'fixed_width': 260,
                     'fixed_height': 200,
@@ -40,21 +38,21 @@ class TestImageTools:
                 }
             ]
 
-        }
-
         self.obj = ImageTools(
-            source_path=source_path,
-            output_conf=output_conf
+            source_path=HelperTest.get_source_path(),
+            output_path=HelperTest.get_output_path(),
+            output_formats=output_formats
         )
 
     def test_has_conf(self):
         """Test has_conf method"""
         assert self.obj.has_conf() is True
 
-    def test_set_output_conf(self):
-        """Test set_output_conf method"""
-        output_conf = {
-            'path': HelperTest.get_output_path(),
+    def test_set_conf(self):
+        """Test set_conf method"""
+        conf = {
+            'source_path': HelperTest.get_source_path(),
+            'output_path': HelperTest.get_output_path(),
             'output_formats': [
                 {
                     'formats': [
@@ -64,25 +62,27 @@ class TestImageTools:
                 }
             ]
         }
-        assert self.obj.set_output_conf(output_conf) is True
+        assert self.obj.set_conf(**conf) is True
         # test bad formats values
-        output_conf['output_formats'][0]['formats'] = [{'bad': 0}]
+        conf['output_formats'][0]['formats'] = [{'bad': 0}]
         with pytest.raises(SettingInvalidException):
-            self.obj.set_output_conf(output_conf)
+            self.obj.set_conf(**conf)
 
         # test bad formats values
-        output_conf['output_formats'][0]['formats'] = None
+        conf['output_formats'][0]['formats'] = None
         with pytest.raises(SettingInvalidException):
-            self.obj.set_output_conf(output_conf)
+            self.obj.set_conf(**conf)
 
         # test bad output_formats
-        output_conf['output_formats'] = None
+        conf['output_formats'] = None
         with pytest.raises(SettingInvalidException):
-            self.obj.set_output_conf(output_conf)
-        # test bad output_conf
-        output_conf = {}
-        with pytest.raises(SettingInvalidException):
-            self.obj.set_output_conf(output_conf)
+            self.obj.set_conf(**conf)
+
+        assert self.obj.set_output_path(HelperTest.get_output_path()) is True
+
+    def test_get_available_model_scales(self):
+        """Test get_available_model_scales method"""
+        assert self.obj.get_available_model_scales() == [2, 3, 4]
 
     def test_run(self):
         """Test run method"""
@@ -94,30 +94,27 @@ class TestImageTools:
                 HelperTest.get_source_path(),
                 'recien_llegado.jpg')
         )
-        output_conf = self.obj.output_conf
-        output_conf.update({
-            'output_formats': [
-                {
-                    'fixed_height': 381,
-                    'formats': [
-                        {'ext': '.jpg'}
-                    ]
-                },
-                {
-                    'fixed_width': 220,
-                    'formats': [
-                        {'ext': '.png', 'compression': 3}
-                    ]
-                },
-                {
-                    'fixed_size': 200,
-                    'formats': [
-                        {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
-                    ]
-                }
-            ]
-        })
-        self.obj.set_output_conf(output_conf)
+        output_formats = [
+            {
+                'fixed_height': 381,
+                'formats': [
+                    {'ext': '.jpg'}
+                ]
+            },
+            {
+                'fixed_width': 220,
+                'formats': [
+                    {'ext': '.png', 'compression': 3}
+                ]
+            },
+            {
+                'fixed_size': 200,
+                'formats': [
+                    {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
+                ]
+            }
+        ]
+        self.obj.set_output_formats(output_formats)
         tst = self.obj.run()
         assert tst is True
 
@@ -131,50 +128,73 @@ class TestImageTools:
                 HelperTest.get_source_path(),
                 'mar.jpg')
         )
-        output_conf = self.obj.output_conf
-        output_conf.update({
-            'output_formats': [
-                {
-                    'formats': [
-                        {'ext': '.webp', 'quality': 80}
-                    ]
-                },
-                {
-                    'fixed_width': 250,
-                    'fixed_height': 300,
-                    'formats': [
-                        {'ext': '.webp', 'quality': 80}
-                    ]
-                },
-                {
-                    'fixed_size': 100,
-                    'formats': [
-                        {'ext': '.webp', 'quality': 80}
-                    ]
-                }
-            ]
-        })
-        self.obj.set_output_conf(output_conf)
+        output_formats = [
+            {
+                'formats': [
+                    {'ext': '.webp', 'quality': 80}
+                ]
+            },
+            {
+                'fixed_width': 250,
+                'fixed_height': 300,
+                'formats': [
+                    {'ext': '.webp', 'quality': 80}
+                ]
+            },
+            {
+                'fixed_size': 100,
+                'formats': [
+                    {'ext': '.webp', 'quality': 80}
+                ]
+            }
+        ]
+        self.obj.set_output_formats(output_formats)
         tst = self.obj.run()
         assert tst is True
 
     @staticmethod
+    def test_is_resize_need():
+        """Test resize_need method"""
+
+        assert ImageTools.get_downscale_size(
+            size=(139, 200),
+            fixed_height=140,
+            fixed_width=180
+        ) == {'width': 180}
+
+        assert ImageTools.get_downscale_size(
+            size=(139, 200),
+            fixed_height=138,
+            fixed_width=180
+        ) == {'width': 180}
+        assert ImageTools.get_downscale_size(
+            size=(139, 200),
+            fixed_height=100,
+            fixed_width=180
+        ) == {'height': 100}
+        assert ImageTools.get_downscale_size(
+            size=(139, 200),
+            fixed_height=100,
+            fixed_width=100
+        ) == {'width': 100}
+
+    @staticmethod
     def test_is_source_path():
         """Test is_source_path method."""
-        assert ImageTools.is_source_path(
+        assert ProcessConf.is_source_path(
             source_path=HelperTest.get_source_path()
         ) is True
-        assert ImageTools.is_source_path(
+        assert ProcessConf.is_source_path(
             source_path=os.path.join(
                 HelperTest.get_source_path(),
                 'recien_llegado.jpg')
         ) is True
-        assert ImageTools.is_source_path(
+        assert ProcessConf.is_source_path(
             source_path=os.path.join(
                 HelperTest.get_source_path(),
                 'bad_file')
         ) is False
-        assert ImageTools.is_source_path(
+        assert ProcessConf.is_source_path(
             source_path=os.path.join(
                 HelperTest.get_source_path(),
                 'bad_dir')
@@ -195,6 +215,7 @@ class TestImageTools:
                 {'ext_bad': '.webp', 'quality_bad': 80}
             ]
         ) is False
+
     @staticmethod
     def test_write_image():
         """Test write_image method"""

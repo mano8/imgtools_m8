@@ -55,6 +55,43 @@ class ImageToolsHelper:
         return result
 
     @staticmethod
+    def get_model_scale_needed(height: int,
+                               width: int,
+                               fixed_height: int or None = None,
+                               fixed_width: int or None = None,
+                               fixed_size: int or None = None
+                               ) -> int:
+        """
+        Get model scale to load
+        """
+        result = 0
+        if height > 0 and width > 0:
+            if Ut.is_int(fixed_height, not_null=True) \
+                    and Ut.is_int(fixed_width, not_null=True) \
+                    and fixed_height > height \
+                    and fixed_width > width:
+                scale_w = math.ceil(fixed_width / width)
+                scale_h = math.ceil(fixed_height / height)
+                result = min(scale_w, scale_h)
+
+            elif Ut.is_int(fixed_width, not_null=True) \
+                    and fixed_width > width:
+                result = math.ceil(fixed_width / width)
+
+            elif Ut.is_int(fixed_height, not_null=True) \
+                    and fixed_height > height:
+                result = math.ceil(fixed_height / height)
+
+            elif Ut.is_int(fixed_size, not_null=True) \
+                    and fixed_size > width \
+                    and fixed_size > height:
+                scale_w = math.ceil(fixed_size / width)
+                scale_h = math.ceil(fixed_size / height)
+                result = min(scale_w, scale_h)
+
+        return result
+
+    @staticmethod
     def count_upscale(height: int,
                       width: int,
                       model_scale: int,
@@ -66,15 +103,18 @@ class ImageToolsHelper:
         Count nb max of upscale needed
         """
         result = 0
-        while ImageToolsHelper.need_upscale(
-                width=width,
-                height=height,
-                fixed_width=fixed_width,
-                fixed_height=fixed_height,
-                fixed_size=fixed_size):
-            width = width * model_scale
-            height = height * model_scale
-            result += 1
+        if model_scale > 0 \
+                and height > 0 \
+                and width > 0:
+            while ImageToolsHelper.need_upscale(
+                    width=width,
+                    height=height,
+                    fixed_width=fixed_width,
+                    fixed_height=fixed_height,
+                    fixed_size=fixed_size):
+                width = width * model_scale
+                height = height * model_scale
+                result += 1
         return result
 
     @staticmethod
@@ -105,10 +145,17 @@ class ImageToolsHelper:
                         fixed_width=fixed_width,
                         fixed_height=fixed_height,
                         fixed_size=fixed_size)
+                x_scale = ImageToolsHelper.get_model_scale_needed(
+                        width=w,
+                        height=h,
+                        fixed_width=fixed_width,
+                        fixed_height=fixed_height,
+                        fixed_size=fixed_size)
                 counter = max(counter, tmp)
                 result['stats'].append({
                     'key': key,
-                    'nb_upscale': tmp
+                    'nb_upscale': tmp,
+                    'x_scale': x_scale
                 })
             result['stats'] = sorted(
                 result.get('stats'),
@@ -136,17 +183,32 @@ class ImageToolsHelper:
         return ImageToolsHelper.get_files_list(path, ext=ImageToolsHelper.get_valid_images_ext())
 
     @staticmethod
-    def get_files_list(path: str, ext: str or None = None):
-        """List files from path."""
-        return [
-            f
-            for f in os.listdir(path)
-            if os.path.isfile(os.path.join(path, f))
-            and (ext is None
-                 or (Ut.is_list(ext, not_null=True) and ImageToolsHelper.get_extension(f) in ext)
-                 or (Ut.is_str(ext, not_null=True) and ImageToolsHelper.get_extension(f) == ext)
-                 )
-        ]
+    def get_files_list(path: str,
+                       ext: str or list or None = None,
+                       content_name: str or None = None
+                       ) -> list or None:
+        """
+        List files from path.
+        Can extract files names by:
+          - extension(s)
+          - file name content
+        """
+        result = None
+        if Ut.is_str(path, not_null=True) \
+                and os.path.isdir(path):
+            result = [
+                f
+                for f in os.listdir(path)
+                if os.path.isfile(os.path.join(path, f))
+                and (ext is None
+                     or (Ut.is_list(ext, not_null=True) and ImageToolsHelper.get_extension(f) in ext)
+                     or (Ut.is_str(ext, not_null=True) and ImageToolsHelper.get_extension(f) == ext)
+                     )
+                and (content_name is None
+                     or (Ut.is_str(content_name, not_null=True) and content_name in f)
+                     )
+            ]
+        return result
 
     @staticmethod
     def get_valid_images_ext():
@@ -210,6 +272,7 @@ class ImageToolsHelper:
                 ext = "".join(ext_list)
             else:
                 ext = "".join(pathlib.Path(path).suffixes)
+            ext = ext.lower()
         return ext
 
     @staticmethod

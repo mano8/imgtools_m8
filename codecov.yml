@@ -3,7 +3,8 @@ codecov:
 
 ignore:
     - "examples/*"
-    - "examples/img_tools_web.py"
+    - "examples/imgtools_web.py"
+    - "examples/imgtools_perf.py"
     - "examples/multiprocess.py"
     - "setup.py"
     - "imgtools_m8/__init__.py"

@@ -27,12 +27,14 @@ class MultiProcessImage(ImageTools):
 
     def __init__(self,
                  source_path: str,
-                 output_conf: dict,
+                 output_path: str,
+                 output_formats: list,
                  model_conf: dict or None = None,
                  ):
         ImageTools.__init__(self,
                             source_path=source_path,
-                            output_conf=output_conf,
+                            output_path=output_path,
+                            output_formats=output_formats,
                             model_conf=model_conf
                             )
 
@@ -40,21 +42,21 @@ class MultiProcessImage(ImageTools):
         """Run from directory with multiprocessing"""
         result = False
         start_time = time.time()
-        files = ImageToolsHelper.get_images_list(self.source_path)
+        files = ImageToolsHelper.get_images_list(self.conf.get_source_path())
         if self.has_conf() \
                 and Ut.is_list(files, not_null=True) \
-                and os.path.isdir(self.source_path):
+                and os.path.isdir(self.conf.get_source_path()):
             cpu_count = multiprocessing.cpu_count()
             pool = multiprocessing.Pool(processes=cpu_count)
             try:
                 prms = list()
                 for file in files:
                     prms.append((
-                        os.path.join(self.source_path, file),
+                        os.path.join(self.conf.get_source_path(), file),
                         file
                     ))
                 # Multi Process Images
-                result = pool.starmap(self.get_output_images, prms)
+                result = pool.starmap(self.process_image, prms)
                 if False in result:
                     result = False
                 else:

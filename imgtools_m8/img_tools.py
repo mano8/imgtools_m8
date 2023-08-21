@@ -7,6 +7,7 @@ import os
 import logging
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
+from imgtools_m8.process_conf import ProcessConf
 from imgtools_m8.img_expander import ImageExpander
 from imgtools_m8.exceptions import ImgToolsException
 from imgtools_m8.exceptions import SettingInvalidException
@@ -16,7 +17,7 @@ __copyright__ = "Copyright 2020, Eli Serra"
 __deprecated__ = False
 __license__ = "MIT"
 __status__ = "Production"
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 logging.basicConfig()
 logger = logging.getLogger("imgTools_m8")
@@ -28,15 +29,18 @@ class ImageTools:
     """
     def __init__(self,
                  source_path: str,
-                 output_conf: dict,
+                 output_path: str,
+                 output_formats: list,
                  model_conf: dict or None = None,
                  ):
         self.expander = None
         self.model_conf = model_conf
-        self.source_path = None
-        self.output_conf = None
-        self.set_source_path(source_path)
-        self.set_output_conf(output_conf)
+        self.conf = None
+        self.set_conf(
+            source_path=source_path,
+            output_path=output_path,
+            output_formats=output_formats
+        )
 
     def is_ready(self) -> bool:
         """Test if is_ready"""
@@ -62,64 +66,58 @@ class ImageTools:
             self.expander.init_sr()
             self.expander.load_model()
 
-    def get_expander_model_scale(self) -> bool:
-        """Test if is_ready"""
+    def get_model_scale(self) -> int:
+        """Get model scale value"""
         result = 0
         self.init_expander()
         if self.has_expander():
-            result = self.expander.model_conf.get('scale')
+            result = self.expander.model_conf.get_scale()
+        return result
+
+    def get_available_model_scales(self) -> list:
+        """Get model scale value"""
+        result = []
+        self.init_expander()
+        if self.has_expander():
+            result = self.expander.model_conf.get_available_scales()
         return result
 
     def has_conf(self) -> bool:
         """Test if instance has valid configuration"""
-        return self.has_source_path() \
-            and self.has_output_conf()
-
-    def has_source_path(self) -> bool:
-        """Test if instance has source_path property"""
-        return self.is_source_path(self.source_path)
+        return isinstance(self.conf, ProcessConf) \
+            and self.conf.is_ready()
 
     def set_source_path(self, source_path: str) -> bool:
         """
         Set source_path property.
         Can be a directory or image path.
         """
-        test = False
-        if self.is_source_path(source_path):
-            self.source_path = source_path
-            test = True
-        return test
+        return self.conf.set_source_path(source_path)
 
-    def has_output_conf(self) -> bool:
-        """Test if instance has output_conf"""
-        return self.is_output_conf(self.output_conf)
+    def set_output_path(self, output_path: str) -> bool:
+        """
+        Set output_path property.
+        """
+        return self.conf.set_output_path(output_path)
 
-    def set_output_conf(self, output_conf: dict) -> bool:
-        """Set output_conf property."""
-        if self.is_output_conf(output_conf):
-            for output_format in output_conf.get('output_formats'):
-                if not ImageTools.is_output_formats(output_format):
-                    raise SettingInvalidException(
-                        "[ImageTools::set_output_conf] "
-                        "Error: Invalid output format configuration. %s",
-                        output_format
-                    )
-                for write_format in output_format.get('formats'):
-                    if not ImageTools.is_output_write_formats(write_format):
-                        raise SettingInvalidException(
-                            "[ImageTools::set_output_conf] "
-                            "Error: Invalid output format configuration. "
-                            "Bad extensions or output options: %s",
-                            output_format
-                        )
-            self.output_conf = output_conf
-            test = True
-        else:
-            raise SettingInvalidException(
-                "[ImageTools::set_output_conf] "
-                "Error: Invalid output configuration."
-            )
-        return test
+    def set_output_formats(self, output_formats: list) -> bool:
+        """
+        Set output_formats property.
+        """
+        return self.conf.set_output_formats(output_formats)
+
+    def set_conf(self,
+                 source_path: str,
+                 output_path: str,
+                 output_formats: list
+                 ) -> bool:
+        """Set process configuration."""
+        self.conf = ProcessConf(
+            source_path=source_path,
+            output_path=output_path,
+            output_formats=output_formats
+        )
+        return self.conf.is_ready()
 
     def resize_need(self,
                     image: ndarray,
@@ -128,49 +126,17 @@ class ImageTools:
         """Set image output path file"""
         result = None
         if image is not None:
-            (h, w) = ImageToolsHelper.get_image_size(image)
-            fixed_height = output_format.get('fixed_height')
-            fixed_width = output_format.get('fixed_width')
-            fixed_size = output_format.get('fixed_size')
-            if Ut.is_int(fixed_width, not_null=True) \
-                    and Ut.is_int(fixed_height, not_null=True) \
-                    and (fixed_width < w
-                         or fixed_height < h):
-                if fixed_width >= fixed_height:
-                    result = self.image_resize(
-                        image=image,
-                        height=fixed_height
-                    )
-                elif fixed_width <= fixed_height:
-                    result = self.image_resize(
-                        image=image,
-                        width=fixed_width
-                    )
-            elif Ut.is_int(fixed_height, not_null=True) \
-                    and fixed_height < h:
+            size = ImageToolsHelper.get_image_size(image)
+            params = ImageTools.get_downscale_size(
+                size=size,
+                fixed_height=output_format.get('fixed_height'),
+                fixed_width=output_format.get('fixed_width')
+            )
+            if params is not None:
                 result = self.image_resize(
                     image=image,
-                    height=fixed_height
+                    **params
                 )
-            elif Ut.is_int(fixed_width, not_null=True) \
-                    and fixed_width < w:
-                result = self.image_resize(
-                    image=image,
-                    width=fixed_width
-                )
-            elif Ut.is_int(fixed_size, not_null=True) \
-                    and (fixed_size < w
-                         or fixed_size < h):
-                if w >= h:
-                    result = self.image_resize(
-                        image=image,
-                        height=fixed_size
-                    )
-                elif w <= h:
-                    result = self.image_resize(
-                        image=image,
-                        width=fixed_size
-                    )
             else:
                 return image
         return result
@@ -187,7 +153,7 @@ class ImageTools:
                 and Ut.is_tuple(size) \
                 and Ut.is_dict(upscale_stats, not_null=True) \
                 and Ut.is_list(upscale_stats.get('stats'), not_null=True):
-            output_formats = self.output_conf.get('output_formats')
+            output_formats = self.conf.get_output_formats()
             upscale_counter = 0
             result = True
             self.init_expander_model()
@@ -201,7 +167,7 @@ class ImageTools:
                             "[ImageTools] Image upscale %s / %s -> %sx",
                             upscale_counter,
                             nb_upscale,
-                            self.get_expander_model_scale()
+                            self.get_model_scale()
                         )
                         nb_upscale_needed = nb_upscale - upscale_counter
                         image = self.expander.many_image_upscale(
@@ -221,7 +187,7 @@ class ImageTools:
 
                 if not ImageTools.write_images_by_format(
                         image=resized,
-                        output_path=self.output_conf.get('path'),
+                        output_path=self.conf.get_output_path(),
                         file_name=file_name,
                         output_format=output_format.get('formats')):
                     result = False
@@ -238,14 +204,14 @@ class ImageTools:
                 and Ut.is_tuple(size):
             resized = image
             result = True
-            for output_format in self.output_conf.get('output_formats'):
+            for output_format in self.conf.get_output_formats():
                 resized = self.resize_need(
                     image=resized,
                     output_format=output_format
                 )
                 if not ImageTools.write_images_by_format(
                         image=resized,
-                        output_path=self.output_conf.get('path'),
+                        output_path=self.conf.get_output_path(),
                         file_name=file_name,
                         output_format=output_format.get('formats')):
                     result = False
@@ -268,7 +234,7 @@ class ImageTools:
                 logger.debug(
                     "[ImageTools] Image need upscale %s times (%sx)",
                     upscale_stats.get('max_upscale'),
-                    self.get_expander_model_scale()
+                    self.get_model_scale()
                 )
                 result = self.upscale_image(
                     image=image,
@@ -288,11 +254,11 @@ class ImageTools:
                 )
         return result
 
-    def get_output_images(self,
-                          source_path: str,
-                          file_name: str
-                          ) -> bool:
-        """Get output Images"""
+    def process_image(self,
+                      source_path: str,
+                      file_name: str
+                      ) -> bool:
+        """Process Image"""
         result = False
         if self.is_ready() \
                 and os.path.isfile(source_path) \
@@ -309,8 +275,9 @@ class ImageTools:
                 size = ImageToolsHelper.get_image_size(image)
                 upscale_stats = ImageToolsHelper.get_upscale_stats(
                     size=size,
-                    output_formats=self.output_conf.get('output_formats'),
-                    model_scale=self.get_expander_model_scale()
+                    output_formats=self.conf.get_output_formats(),
+                    model_scale=self.get_model_scale(),
+                    # available_scales=self.get_available_model_scales()
                 )
                 result = self.resize_image_from_conf(
                     image=image,
@@ -331,103 +298,78 @@ class ImageTools:
     def run(self):
         """Run image enlarger"""
         result = False
-        if self.has_conf():
-            if os.path.isfile(self.source_path):
-                file = os.path.basename(self.source_path)
-                if self.get_output_images(
-                        source_path=self.source_path,
+        if self.is_ready():
+            if os.path.isfile(self.conf.get_source_path()):
+                file = os.path.basename(self.conf.get_source_path())
+                if self.process_image(
+                        source_path=self.conf.get_source_path(),
                         file_name=file
                         ):
                     result = True
-            elif os.path.isdir(self.source_path):
-                files = ImageToolsHelper.get_images_list(self.source_path)
+            elif os.path.isdir(self.conf.get_source_path()):
+                files = ImageToolsHelper.get_images_list(self.conf.get_source_path())
                 if Ut.is_list(files, not_null=True):
                     result = True
                     for file in files:
-                        if not self.get_output_images(
-                                    source_path=os.path.join(self.source_path, file),
+                        if not self.process_image(
+                                    source_path=os.path.join(self.conf.get_source_path(), file),
                                     file_name=file
                                 ):
                             result = False
         return result
 
     @staticmethod
-    def is_source_path(source_path: str) -> bool:
-        """Test if valid source path"""
-        return Ut.is_str(source_path, not_null=True) \
-            and (os.path.isdir(source_path)
-                 or os.path.isfile(source_path))
-
-    @staticmethod
-    def is_output_conf(output_conf: dict) -> bool:
-        """Test if valid output global configuration"""
-        return Ut.is_dict(output_conf) \
-            and Ut.is_str(output_conf.get('path'))\
-            and os.path.isdir(output_conf.get('path')) \
-            and Ut.is_list(output_conf.get('output_formats'), not_null=True)
-
-    @staticmethod
-    def is_output_write_jpg_format(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return Ut.is_str(data.get('ext'))\
-            and ImageToolsHelper.is_valid_jpg_ext(data.get('ext')) \
-            and (Ut.is_int(data.get('quality'), mini=0, maxi=100)
-                 or data.get('quality') is None
-                 or Ut.is_int(data.get('progressive'), mini=0, maxi=1)
-                 or data.get('progressive') is None
-                 or Ut.is_int(data.get('optimize'), mini=0, maxi=1)
-                 or data.get('optimize') is None
-                 )
-
-    @staticmethod
-    def is_output_write_webp_format(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return Ut.is_str(data.get('ext')) \
-            and data.get('ext').lower() == '.webp' \
-            and (Ut.is_int(data.get('quality'), mini=0, maxi=100)
-                 or data.get('quality') is None)
-
-    @staticmethod
-    def is_output_write_png_format(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return Ut.is_str(data.get('ext'))\
-            and data.get('ext').lower() == '.png' \
-            and (Ut.is_int(data.get('compression'), mini=0, maxi=9)
-                 or data.get('compression') is None)
-
-    @staticmethod
-    def is_output_write_formats(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return ImageToolsHelper.is_valid_image_ext(data.get('ext')) \
-            or ImageTools.is_output_write_jpg_format(data)\
-            or ImageTools.is_output_write_webp_format(data) \
-            or ImageTools.is_output_write_png_format(data)
-
-    @staticmethod
-    def is_output_formats(data: dict) -> bool:
-        """Test if valid output configuration options"""
-        return Ut.is_list(data.get('formats'), not_null=True)\
-            and (Ut.is_int(data.get('fixed_height'), not_null=True)
-                 or data.get('fixed_height') is None
-                 or Ut.is_int(data.get('fixed_width'), not_null=True)
-                 or data.get('fixed_width') is None
-                 or Ut.is_int(data.get('fixed_size'), not_null=True)
-                 or data.get('fixed_size') is None)
+    def get_downscale_size(size: tuple,
+                           fixed_height: int,
+                           fixed_width: int,
+                           ) -> dict or None:
+        """Get downscale image size"""
+        result = None
+        if Ut.is_tuple(size, not_null=True) \
+                and Ut.is_int(size[0], mini=1) \
+                and Ut.is_int(size[1], mini=1):
+            h, w = size
+            if Ut.is_int(fixed_width, not_null=True) \
+                    and Ut.is_int(fixed_height, not_null=True) \
+                    and (fixed_width < w
+                         or fixed_height < h):
+                percent_w = ((w-fixed_width) * 100) / w
+                percent_h = ((h-fixed_height) * 100) / h
+                is_resize_all = fixed_height < h \
+                    and fixed_width < w
+                if (fixed_width < w
+                        and fixed_height >= h) \
+                        or (is_resize_all
+                            and percent_w >= percent_h):
+                    result = {'width': fixed_width}
+                elif (fixed_height < h
+                        and fixed_width >= w) \
+                        or (is_resize_all
+                            and percent_w <= percent_h):
+                    result = {'height': fixed_height}
+            elif Ut.is_int(fixed_height, not_null=True) \
+                    and fixed_height < h:
+                result = {'height': fixed_height}
+            elif Ut.is_int(fixed_width, not_null=True) \
+                    and fixed_width < w:
+                result = {'width': fixed_width}
+        return result
 
     @staticmethod
     def read_image(source_path: str) -> ndarray or None:
         """Init sr"""
         img_src = None
-        if os.path.isfile(source_path):
+        if Ut.is_str(source_path, not_null=True) \
+                and os.path.isfile(source_path):
             img_src = cv2.imread(source_path)
         return img_src
 
     @staticmethod
-    def set_output_path(output_path: str,
-                        file_name: str,
-                        ext: str,
-                        size: tuple
-                        ):
+    def set_write_path(output_path: str,
+                       file_name: str,
+                       ext: str,
+                       size: tuple
+                       ):
         """Set image output path file name"""
         result = None
         name, old_ext = ImageToolsHelper.cut_file_name(file_name)
@@ -492,14 +434,14 @@ class ImageTools:
                            ) -> bool:
         """Write image to defined format"""
         result = False
-        if ImageTools.is_output_write_formats(output_format):
+        if ProcessConf.is_output_write_formats(output_format):
             ext = output_format.get('ext')
             options = None
-            if ImageTools.is_output_write_jpg_format(output_format):
+            if ProcessConf.is_output_write_jpg_format(output_format):
                 options = ImageTools.get_jpeg_write_options(output_format)
-            elif ImageTools.is_output_write_webp_format(output_format):
+            elif ProcessConf.is_output_write_webp_format(output_format):
                 options = ImageTools.get_webp_write_options(output_format)
-            elif ImageTools.is_output_write_png_format(output_format):
+            elif ProcessConf.is_output_write_png_format(output_format):
                 options = ImageTools.get_png_write_options(output_format)
 
             result = ImageTools.write_image(
@@ -539,7 +481,7 @@ class ImageTools:
                     options: list or None = None
                     ) -> ndarray or None:
         """Init sr"""
-        out_path = ImageTools.set_output_path(
+        out_path = ImageTools.set_write_path(
             output_path=output_path,
             file_name=file_name,
             ext=ext,
