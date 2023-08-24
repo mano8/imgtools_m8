@@ -3,6 +3,7 @@
 [![codecov](https://codecov.io/gh/mano8/imgtools_m8/branch/main/graph/badge.svg?token=0J31F62GB7)](https://codecov.io/gh/mano8/imgtools_m8)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/c401bed6812d4f9bb77bfaee16cf0abe)](https://www.codacy.com/gh/mano8/imgtools_m8/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=mano8/imgtools_m8&amp;utm_campaign=Badge_Grade)
 [![Downloads](https://static.pepy.tech/badge/imgtools-m8)](https://pepy.tech/project/imgtools-m8)
+[![Known Vulnerabilities](https://snyk.io/test/github/mano8/vedirect_m8/badge.svg)](https://snyk.io/test/github/mano8/imgtools_m8)
 # imgtools_m8
 Simple image tools package. Used to convert, downscale and/or upscale images.
 
