@@ -154,7 +154,7 @@ class TestImageTools:
 
     @staticmethod
     def test_is_resize_need():
-        """Test resize_need method"""
+        """Test resize_image_if_needed method"""
 
         assert ImageTools.get_downscale_size(
             size=(139, 200),

@@ -96,7 +96,7 @@ class TestExample:
                       ) -> ndarray:
         """Upscale image once"""
         start = time.perf_counter()
-        image_up = self.i_tool.expander.upscale_image(image)
+        image_up = self.i_tool.expander.upscale_and_write_images(image)
         logger.info(
             "[TestExample] Upscale image x%s in %s s",
             scale,
