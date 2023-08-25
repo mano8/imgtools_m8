@@ -332,7 +332,7 @@ class TestModelConf:
 
     @staticmethod
     def test_is_output_write_formats():
-        """Test is_output_write_formats method"""
+        """Test is_valid_output_format method"""
         true_values = [
             {'ext': '.png'},
             {'ext': '.pNg', 'compression': 0},
@@ -342,7 +342,7 @@ class TestModelConf:
             {'ext': '.jPeg', 'quality': 50, 'progressive': 1, 'optimize': 1},
         ]
         for data in true_values:
-            assert ProcessConf.is_output_write_formats(data) is True
+            assert ProcessConf.is_valid_output_format(data) is True
 
         false_values = [
             {'nop': '.webp'},
@@ -354,11 +354,11 @@ class TestModelConf:
             {'ext': '.jpeg', 'quality': 101},
         ]
         for data in false_values:
-            assert ProcessConf.is_output_write_formats(data) is False
+            assert ProcessConf.is_valid_output_format(data) is False
 
     @staticmethod
     def test_set_write_format():
-        """Test set_write_format method"""
+        """Test set_output_format method"""
         true_values = [
             {'ext': '.png'},
             {'ext': '.pNg', 'compression': 0},
@@ -367,9 +367,9 @@ class TestModelConf:
             {'ext': '.jPeg'},
             {'ext': '.jPeg', 'quality': 50, 'progressive': 1, 'optimize': 1},
         ]
-        assert ProcessConf.set_write_format(true_values) == {'formats': true_values}
+        assert ProcessConf.set_output_format(true_values) == {'formats': true_values}
 
-        assert ProcessConf.set_write_format([]) is None
+        assert ProcessConf.set_output_format([]) is None
 
         error_values = [
             {'nop': '.webp'},
@@ -382,4 +382,4 @@ class TestModelConf:
         ]
 
         with pytest.raises(SettingInvalidException):
-            ProcessConf.set_write_format(error_values)
+            ProcessConf.set_output_format(error_values)
