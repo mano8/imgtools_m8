@@ -165,7 +165,7 @@ class ImageExpander:
             >>> expander = ImageExpander(model_config)
             >>> expander.load_model()
             >>> input_image = ...  # Load or create your input image as a NumPy array
-            >>> upscaled_image = expander.upscale_image(input_image)
+            >>> upscaled_image = expander.upscale_and_write_images(input_image)
         """
         if image is not None:
             image = self.sr.upsample(image)
