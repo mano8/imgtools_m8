@@ -21,7 +21,9 @@ $ python3 -m pip install "git+https://github.com/mano8/imgtools_m8 --upgrade"
 
 To install from PypI :
 
-``python3 -m pip install imgtools_m8 --upgrade``
+```plaintext
+python3 -m pip install imgtools_m8 --upgrade
+```
 
 ## How to use
 
