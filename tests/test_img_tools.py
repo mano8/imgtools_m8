@@ -48,6 +48,11 @@ class TestImageTools:
         """Test has_conf method"""
         assert self.obj.has_conf() is True
 
+    def test_set_expander(self):
+        """Test set_expander method"""
+        assert self.obj.set_expander(model_conf=None) is False
+        assert self.obj.set_expander(model_conf={'scale': 2}) is True
+
     def test_set_conf(self):
         """Test set_conf method"""
         conf = {

@@ -54,8 +54,8 @@ class ImageTools:
                     >>> img_tools = ImageTools(source_path, output_path, output_formats, model_conf)
                 """
         self.expander = None
-        self.model_conf = model_conf
         self.conf = None
+        self.set_expander(model_conf)
         self.set_conf(
             source_path=source_path,
             output_path=output_path,
@@ -90,6 +90,28 @@ class ImageTools:
         """
         return isinstance(self.expander, ImageExpander)
 
+    def set_expander(self, model_conf: dict or None) -> bool:
+        """
+        Set the image expander using the provided model configuration.
+
+        :param model_conf: The model configuration dictionary.
+        :type model_conf: dict or None
+
+        :return: True if the expander was successfully set, False otherwise.
+        :rtype: bool
+
+        Example:
+            >>> model_configuration = {'scale': 2}
+            >>> tools = ImageTools(...)
+            >>> result = tools.set_expander(model_conf=model_configuration)
+            >>> print(result)  # Output: True
+        """
+        result = False
+        if Ut.is_dict(model_conf):
+            self.expander = ImageExpander(model_conf=model_conf)
+            result = True
+        return result
+
     def init_expander(self):
         """
         Initialize the ImageExpander if not already initialized.
@@ -99,7 +121,7 @@ class ImageTools:
             >>> tools.init_expander()
         """
         if not self.has_expander():
-            self.expander = ImageExpander(model_conf=self.model_conf)
+            self.expander = ImageExpander()
 
     def has_expander_model(self) -> bool:
         """
