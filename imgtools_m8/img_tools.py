@@ -7,6 +7,7 @@ import os
 import logging
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
+from imgtools_m8.model_scale_selector import ModelScaleSelector
 from imgtools_m8.process_conf import ProcessConf
 from imgtools_m8.img_expander import ImageExpander
 from imgtools_m8.exceptions import ImgToolsException
@@ -543,7 +544,7 @@ class ImageTools:
             )
             if image is not None:
                 size = ImageToolsHelper.get_image_size(image)
-                upscale_stats = ImageToolsHelper.get_upscale_stats(
+                upscale_stats = ModelScaleSelector.get_upscale_stats(
                     size=size,
                     output_formats=self.conf.get_output_formats(),
                     model_scale=self.get_model_scale(),

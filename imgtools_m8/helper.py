@@ -5,7 +5,6 @@ import os
 import pathlib
 import math
 from numpy import ndarray
-from typing import Optional
 from ve_utils.utils import UType as Ut
 from imgtools_m8.exceptions import ImgToolsException
 
@@ -23,206 +22,92 @@ class ImageToolsHelper:
     """
 
     @staticmethod
-    def need_upscale(height: int,
-                     width: int,
-                     fixed_height: Optional[int] = None,
-                     fixed_width: Optional[int] = None
-                     ) -> bool:
+    def find_best_combination(total: int,
+                              numbers: list
+                              ) -> list:
         """
-        Check if an image needs upscaling based on provided dimensions.
+        Find the best combination of numbers to achieve the given total.
 
-        :param height: The height of the original image.
-        :type height: int
-        :param width: The width of the original image.
-        :type width: int
-        :param fixed_height: The fixed height for upscaling. Default is None.
-        :type fixed_height: int, optional
-        :param fixed_width: The fixed width for upscaling. Default is None.
-        :type fixed_width: int, optional
-        :return: True if upscaling is needed, False otherwise.
-        :rtype: bool
+        :param total: The target total.
+        :type total: int
+        :param numbers: A list of numbers that can be added to achieve the total.
+        :type numbers: list
 
-        :raises ImgToolsException: If the input size values are not valid integers or less than 1.
-
-        Example:
-            >>> ImageToolsHelper.need_upscale(
-            >>>     height=250, width=320, fixed_width=350
-            >>> )
-            >>> True
-        """
-        result = False
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
-            raise ImgToolsException(
-                "Error: Bad image size values."
-            )
-        if Ut.is_int(fixed_width, mini=1) \
-                and Ut.is_int(fixed_height, mini=1) \
-                and fixed_width > width \
-                and fixed_height > height:
-            result = True
-        elif Ut.is_int(fixed_height, mini=1) \
-                and fixed_height > height:
-            result = True
-        elif Ut.is_int(fixed_width, mini=1) \
-                and fixed_width > width:
-            result = True
-        return result
-
-    @staticmethod
-    def get_model_scale_needed(height: int,
-                               width: int,
-                               fixed_height: Optional[int] = None,
-                               fixed_width: Optional[int] = None
-                               ) -> int:
-        """
-        Get the required model scale for optimal image upscaling.
-
-        :param height: The height of the original image.
-        :type height: int
-        :param width: The width of the original image.
-        :type width: int
-        :param fixed_height: The fixed height for the target image scale. Default is None.
-        :type fixed_height: int, optional
-        :param fixed_width: The fixed width for the target image scale. Default is None.
-        :type fixed_width: int, optional
-
-        :return: The optimal model scale factor for upscaling.
-        :rtype: int
-
-        :raises ImgToolsException: If the input size values are not valid positive integers.
-
-        Example:
-            >>> ImageToolsHelper.get_model_scale_needed(
-            >>>     height=250, width=320, fixed_width=350
-            >>> )
-            >>> 2
-        """
-        result = 0
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
-            raise ImgToolsException(
-                "Error: Bad image size values."
-            )
-        if Ut.is_int(fixed_height) \
-                and Ut.is_int(fixed_width) \
-                and fixed_height > height \
-                and fixed_width > width:
-            scale_w = math.ceil(fixed_width / width)
-            scale_h = math.ceil(fixed_height / height)
-            result = min(scale_w, scale_h)
-
-        elif Ut.is_int(fixed_width) \
-                and fixed_width > width:
-            result = math.ceil(fixed_width / width)
-
-        elif Ut.is_int(fixed_height) \
-                and fixed_height > height:
-            result = math.ceil(fixed_height / height)
-        return result
-
-    @staticmethod
-    def count_upscale(height: int,
-                      width: int,
-                      model_scale: int,
-                      fixed_height: Optional[int] = None,
-                      fixed_width: Optional[int] = None
-                      ) -> int:
-        """
-        Count the maximum number of upscaling operations needed to reach target dimensions.
-
-        :param height: The height of the original image.
-        :type height: int
-        :param width: The width of the original image.
-        :type width: int
-        :param model_scale: The model scale factor for upscaling.
-        :type model_scale: int
-        :param fixed_height: The fixed height for target dimensions. Default is None.
-        :type fixed_height: int, optional
-        :param fixed_width: The fixed width for target dimensions. Default is None.
-        :type fixed_width: int, optional
-
-        :return: The number of maximum upscaling operations required.
-        :rtype: int
+        :return: The best combination of numbers.
+        :rtype: list
 
         :raises ImgToolsException:
-            - If the input size values are not valid positive integers.
-            - If the model scale value is not a valid positive integer.
+         - If the total is not a non-negative integer
+         - if the numbers list is empty or not valid.
 
         Example:
-            >>> ImageToolsHelper.count_upscale(
-            >>>     height=250, width=320, model_scale=2, fixed_width=600
-            >>> )
-            >>> 3
+            >>> ImageToolsHelper.find_best_combination(total=10, numbers=[2, 3, 5])
+            [5, 5]
         """
-        result = 0
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
+        if not Ut.is_int(total, mini=0):
             raise ImgToolsException(
-                "Error: Bad image size values."
+                "Error: Unable to find the best combination, 'total' must be a non-negative integer."
             )
 
-        if not Ut.is_int(model_scale, mini=1):
+        if not Ut.is_list(numbers, not_null=True):
             raise ImgToolsException(
-                "Error: Bad model scale value. Must be > 0"
+                "Error: Unable to find the best combination, 'numbers' must be a non-empty list."
             )
+        dp = [None] * (total + 1)
+        dp[0] = []
 
-        while ImageToolsHelper.need_upscale(
-                width=width,
-                height=height,
-                fixed_width=fixed_width,
-                fixed_height=fixed_height):
-            width = width * model_scale
-            height = height * model_scale
-            result += 1
-        return result
+        for current_total in range(1, total + 1):
+            for num in numbers:
+                if current_total - num >= 0 and dp[current_total - num] is not None:
+                    if dp[current_total] is None or len(dp[current_total - num]) + 1 < len(dp[current_total]):
+                        dp[current_total] = dp[current_total - num] + [num]
+
+        return dp[total]
 
     @staticmethod
-    def get_upscale_stats(size: tuple,
-                          output_formats: list,
-                          model_scale: int
-                          ) -> dict:
+    def find_all_combinations(total: int, numbers: list) -> list:
         """
-        Get upscale stats from output configuration sizes
-        """
-        counter, result = 0, None
-        h, w = size
-        if Ut.is_list(output_formats, not_null=True)\
-                and Ut.is_int(model_scale, not_null=True):
-            result = {
-                'max_upscale': 0,
-                'stats': []
-            }
-            for key, output_format in enumerate(output_formats):
+        Find all combinations of numbers that add up to the given total.
 
-                fixed_height = output_format.get('fixed_height')
-                fixed_width = output_format.get('fixed_width')
-                fixed_size = output_format.get('fixed_size')
-                tmp = ImageToolsHelper.count_upscale(
-                        width=w,
-                        height=h,
-                        model_scale=model_scale,
-                        fixed_width=fixed_width,
-                        fixed_height=fixed_height,
-                        fixed_size=fixed_size)
-                x_scale = ImageToolsHelper.get_model_scale_needed(
-                        width=w,
-                        height=h,
-                        fixed_width=fixed_width,
-                        fixed_height=fixed_height,
-                        fixed_size=fixed_size)
-                counter = max(counter, tmp)
-                result['stats'].append({
-                    'key': key,
-                    'nb_upscale': tmp,
-                    'x_scale': x_scale
-                })
-            result['stats'] = sorted(
-                result.get('stats'),
-                key=lambda d: d['nb_upscale']
+        :param total: The target total.
+        :type total: int
+        :param numbers: A list of numbers that can be added to achieve the total.
+        :type numbers: list
+
+        :return: A list of lists containing all possible combinations.
+        :rtype: list[list[int]]
+
+        :raises ImgToolsException:
+            If the total is not a non-negative integer.
+            If the numbers list is empty or not valid.
+
+        Example:
+            >>> ImageToolsHelper.find_all_combinations(total=5, numbers=[1, 2, 3])
+            >>> [[1, 1, 1, 1, 1], [1, 1, 1, 2], [1, 2, 2], [1, 1, 3], [2, 3]]
+        """
+        if not Ut.is_int(total, mini=0):
+            raise ImgToolsException(
+                "Error: Unable to find combinations, 'total' must be a non-negative integer."
             )
-            result['max_upscale'] = counter
-        return result
+
+        if not Ut.is_list(numbers, not_null=True):
+            raise ImgToolsException(
+                "Error: Unable to find combinations, 'numbers' must be a non-empty list."
+            )
+        dp = [None] * (total + 1)
+        dp[0] = [[]]
+
+        for current_total in range(1, total + 1):
+            all_combinations = []
+            for num in numbers:
+                if current_total - num >= 0 and dp[current_total - num] is not None:
+                    for combination in dp[current_total - num]:
+                        new_combination = combination + [num]
+                        all_combinations.append(new_combination)
+
+            dp[current_total] = all_combinations
+
+        return dp[total]
 
     @staticmethod
     def is_image_size(size: tuple) -> bool:
