@@ -35,13 +35,18 @@ The package provides versatile resizing options, including:
    - fixed_width: Resizing images to an exact width in pixels.
    - fixed_height: Resizing images to an exact height in pixels.
    - fixed_size: Resizing images based on the first limitation reached (height or width).
-   - fixed_width and fixed_height: Resizing images based on the first limitation reached, while allowing different height and width values.
+   - fixed_width and fixed_height: Resizing images based on the highest limitation reached,
+     while allowing different height and width values.
 
 In cases where the original image size exceeds the specified output dimensions, the package automatically applies upscaling using pre-trained models.
 
 For more usage examples, refer to the [example's directory](https://github.com/mano8/imgtools_m8/tree/main/examples).
 
 (See accepted extensions from [cv2 documentation](https://docs.opencv.org/4.8.0/d4/da8/group__imgcodecs.html#ga288b8b3da0892bd651fce07b3bbd3a56))
+
+In all the examples provided, the source_path value is set to a single image file path.
+However, this package can also work with a directory path containing multiple image files.
+In this scenario, the processing will be applied to all images within the specified source_path directory.
 
 ### Example 1
 
