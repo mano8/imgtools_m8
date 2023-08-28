@@ -158,8 +158,8 @@ class TestImageTools:
         assert tst is True
 
     @staticmethod
-    def test_is_resize_need():
-        """Test resize_image_if_needed method"""
+    def test_get_downscale_size():
+        """Test get_downscale_size method"""
 
         assert ImageTools.get_downscale_size(
             size=(139, 200),
@@ -182,6 +182,11 @@ class TestImageTools:
             fixed_height=100,
             fixed_width=100
         ) == {'width': 100}
+        assert ImageTools.get_downscale_size(
+            size=(216, 340),
+            fixed_height=200,
+            fixed_width=300
+        ) == {'width': 300}
 
     @staticmethod
     def test_is_source_path():
