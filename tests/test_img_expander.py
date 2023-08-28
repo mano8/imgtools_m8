@@ -4,6 +4,7 @@ ImageExpander unittest class.
 Use pytest package.
 """
 import pytest
+from imgtools_m8.model_conf import ScaleSelector
 from imgtools_m8.img_expander import ImageExpander
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.exceptions import SettingInvalidException
@@ -31,7 +32,8 @@ class TestImageExpander:
         assert self.obj.set_model_conf({
             'path': ImageToolsHelper.get_package_models_path(),
             'model_name': 'edsr',
-            'scale': 2
+            'scale': 2,
+            'scale_selector': ScaleSelector.AUTO_SCALE
         }) is True
         assert self.obj.set_model_conf() is True
         assert self.obj.set_model_conf({

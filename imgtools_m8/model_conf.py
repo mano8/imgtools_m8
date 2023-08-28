@@ -34,17 +34,17 @@ class ModelConf:
     """
     Model configuration parameters.
 
-    :ivar model_name: The name of the model.
-    :vartype model_name: str
-    :ivar model_path: The path to the model directory.
-    :vartype model_path: str
-    :ivar scale: The scale of the model.
-    :vartype scale: int
+    Attributes:
+        model_name (str): The name of the model.
+        model_path (str): The path to the model directory.
+        scale (int): The scale of the model.
+        scale_selector (ScaleSelector): The scale selection strategy.
     """
     def __init__(self,
                  model_path: str or None = None,
                  model_name: str or None = None,
-                 scale: int or None = None
+                 scale: int or None = None,
+                 scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE
                  ):
         """
         Initialize the ModelConf instance.
@@ -55,13 +55,17 @@ class ModelConf:
         :type model_name: str, optional
         :param scale: The scale of the model.
         :type scale: int, optional
+        :param scale_selector: The scale selection strategy.
+        :type scale_selector: ScaleSelector, optional
         """
         self.model_name = None
         self.model_path = None
         self.scale = None
+        self.scale_selector = ScaleSelector.AUTO_SCALE
         self.set_model_path(model_path)
         self.set_model_name(model_name)
         self.set_scale(scale)
+        self.set_scale_selector(scale_selector)
 
     def is_ready(self) -> bool:
         """
@@ -246,6 +250,56 @@ class ModelConf:
             2
         """
         return self.scale
+
+    def has_scale_selector(self) -> bool:
+        """
+        Check if the ModelConf instance has a valid scale selection strategy.
+
+        :return: True if the scale selection strategy is valid, False otherwise.
+        :rtype: bool
+
+        Example:
+            >>> conf = ModelConf(scale_selector=ScaleSelector.AUTO_SCALE)
+            >>> conf.has_scale_selector()
+            True
+        """
+        return ModelConf.is_scale_selector(self.scale_selector)
+
+    def set_scale_selector(self, value: ScaleSelector) -> bool:
+        """
+        Set the scale selection strategy.
+
+        :param value: The scale selection strategy to be set.
+        :type value: ScaleSelector
+
+        :return: True if the scale selection strategy was set successfully, False otherwise.
+        :rtype: bool
+
+        Example:
+            >>> conf = ModelConf()
+            >>> conf.set_scale_selector(value=ScaleSelector.AUTO_SCALE)
+            True
+        """
+        result = False
+        self.scale_selector = 0
+        if ModelConf.is_scale_selector(value):
+            self.scale_selector = value
+            result = True
+        return result
+
+    def get_scale_selector(self) -> ScaleSelector:
+        """
+        Get the scale selection strategy.
+
+        :return: The scale selection strategy.
+        :rtype: ScaleSelector
+
+        Example:
+            >>> conf = ModelConf(scale_selector=ScaleSelector.AUTO_SCALE)
+            >>> conf.get_scale_selector()
+            ScaleSelector.AUTO_SCALE
+        """
+        return self.scale_selector
 
     def get_available_scales(self) -> list:
         """
@@ -533,3 +587,21 @@ class ModelConf:
                 scale=scale):
             result = True
         return result
+
+    @staticmethod
+    def is_scale_selector(value: ScaleSelector) -> bool:
+        """
+        Check if the given value is a valid ScaleSelector enumeration.
+
+        :param value: The value to check.
+        :type value: ScaleSelector
+
+        :return: True if the value is a valid ScaleSelector enumeration, False otherwise.
+        :rtype: bool
+
+        Example:
+            >>> value = ScaleSelector.AUTO_SCALE
+            >>> ModelConf.is_scale_selector(value)
+            True
+        """
+        return isinstance(value, ScaleSelector)

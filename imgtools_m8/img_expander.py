@@ -7,7 +7,7 @@ from cv2 import dnn_superres
 from numpy import ndarray
 import os
 from ve_utils.utils import UType as Ut
-from imgtools_m8.model_conf import ModelConf
+from imgtools_m8.model_conf import ModelConf, ScaleSelector
 from imgtools_m8.helper import ImageToolsHelper
 
 __author__ = "Eli Serra"
@@ -89,6 +89,7 @@ class ImageExpander:
         model_path = ImageToolsHelper.get_package_models_path()
         model_name = 'edsr'
         scale = 2
+        scale_selector = ScaleSelector.AUTO_SCALE
         if Ut.is_dict(model_conf, not_null=True):
 
             if ModelConf.is_model_path(model_conf.get('path')):
@@ -102,11 +103,17 @@ class ImageExpander:
                     model_name=model_name,
                     scale=model_conf.get('scale')):
                 scale = model_conf.get('scale')
+                scale_selector = ScaleSelector.FIXED_SCALE
+
+            if ModelConf.is_scale_selector(
+                    model_conf.get('scale_selector')):
+                scale_selector = model_conf.get('scale_selector')
 
         self.model_conf = ModelConf(
             model_path=model_path,
             model_name=model_name,
-            scale=scale
+            scale=scale,
+            scale_selector=scale_selector
         )
         test = self.model_conf.is_ready()
         return test
