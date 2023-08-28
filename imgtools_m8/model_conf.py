@@ -1,5 +1,6 @@
 """Model Configuration class"""
 import logging
+from enum import Enum
 from os import path as Path
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
@@ -15,6 +16,18 @@ __version__ = "1.0.0"
 
 logging.basicConfig()
 logger = logging.getLogger("imgTools_m8")
+
+
+class ScaleSelector(Enum):
+    """
+    Enumeration class for selecting different scaling strategies.
+
+    Attributes:
+        AUTO_SCALE (int): Represents automatic scale selection.
+        FIXED_SCALE (int): Represents fixed scale selection.
+    """
+    AUTO_SCALE = 0
+    FIXED_SCALE = 1
 
 
 class ModelConf:
