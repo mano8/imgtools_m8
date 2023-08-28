@@ -230,6 +230,75 @@ class TestModelScaleSelector:
         assert results[4][2] == [4, 3, 3, 4]
 
     @staticmethod
+    def test_format_model_scale_stats():
+        """Test format_model_scale_stats method"""
+        args = [
+            {
+                'stats': [
+                    {'key': 3, 'x_scale': 0},
+                    {'key': 2, 'x_scale': 2},
+                    {'key': 1, 'x_scale': 5},
+                ],
+                'scale_analytics': [
+                    [0, 2, 3],
+                    [0, 1, 1],
+                    [0, 2, 5],
+                    [0, 0, 0]
+                ]
+            },
+            {
+                'stats': [
+                    {'key': 3, 'x_scale': 0},
+                    {'key': 2, 'x_scale': 5},
+                    {'key': 1, 'x_scale': 10},
+                ],
+                'scale_analytics': [
+                    [0, 4, 4, 2],
+                    [0, 1, 1, 1],
+                    [0, 4, 8, 10],
+                    [0, 0, 3, 0]
+                ]
+            }
+        ]
+        results = []
+        for params in args:
+            tmp = ModelScaleSelector.format_model_scale_stats(**params)
+            results.append(tmp)
+
+        assert results == [
+            [
+                {'key': 3, 'x_scale': 0, 'nb_scale': 0, 'scale': 0, 'actual_scale': 0, 'dif_scale': 0},
+                {'key': 2, 'x_scale': 2, 'nb_scale': 1, 'scale': 2, 'actual_scale': 2, 'dif_scale': 0},
+                {'key': 1, 'x_scale': 5, 'nb_scale': 1, 'scale': 3, 'actual_scale': 5, 'dif_scale': 0}
+            ],
+            [
+                {'key': 3, 'x_scale': 0, 'nb_scale': 0, 'scale': 0, 'actual_scale': 0, 'dif_scale': 0},
+                {'key': -1, 'x_scale': 4, 'nb_scale': 1, 'scale': 4, 'actual_scale': 4, 'dif_scale': 0},
+                {'key': 2, 'x_scale': 5, 'nb_scale': 1, 'scale': 4, 'actual_scale': 8, 'dif_scale': 3},
+                {'key': 1, 'x_scale': 10, 'nb_scale': 1, 'scale': 2, 'actual_scale': 10, 'dif_scale': 0}
+            ]
+        ]
+
+        args = [
+            {'stats': [], 'scale_analytics': []},
+            {'stats': [1, 2, 3], 'scale_analytics': [[]]},
+            {'stats': [1, 2, 3], 'scale_analytics': [[1, 2]]},
+            {
+                'stats': [
+                    {'key': 3, 'x_scale': 0},
+                    {'key': 2, 'x_scale': 5},
+                    {'key': 1, 'x_scale': 10},
+                ],
+                'scale_analytics': [
+                    [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [20, 20, 20, 20, 20], [0, 0, 0, 0, 0]
+                ]
+            },
+        ]
+        for params in args:
+            with pytest.raises(ImgToolsException):
+                ModelScaleSelector.format_model_scale_stats(**params)
+
+    @staticmethod
     def test_define_model_scale():
         """Test define_model_scale method"""
         size = (200, 400)

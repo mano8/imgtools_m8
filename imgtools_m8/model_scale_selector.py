@@ -1,5 +1,10 @@
 """
-A helper class for model scale selection.
+A helper class for selecting model scales based on image dimensions.
+
+Author: Eli Serra
+Copyright: Copyright 2020, Eli Serra
+License: Apache 2 License
+Version: 1.0.0
 """
 import math
 import numpy as np
@@ -11,14 +16,14 @@ from imgtools_m8.exceptions import ImgToolsException
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
 __deprecated__ = False
-__license__ = "MIT"
+__license__ = "Apache 2"
 __status__ = "Production"
 __version__ = "1.0.0"
 
 
 class ModelScaleSelector:
     """
-
+    A helper class for selecting model scales based on image dimensions.
     """
 
     @staticmethod
@@ -451,19 +456,119 @@ class ModelScaleSelector:
                 min_stat = int(np.argmin(np_stats[1] + np_stats[2] + np_stats[3]))
                 key_sel = np_stats[0][min_stat]
                 best_combination = possibilities[key_sel]
-                best_combinations = np.where(
-                    [
-                        (np_stats[1] == np_stats[1].min()) &
-                        (np_stats[2] == np_stats[2].min()) &
-                        (np_stats[3] == np_stats[3].min())
-                    ]
-                )
+                # Other way to check all better combinations
+                # best_combinations = np.where(
+                #     [
+                #         (np_stats[1] == np_stats[1].min()) &
+                #         (np_stats[2] == np_stats[2].min()) &
+                #         (np_stats[3] == np_stats[3].min())
+                #     ]
+                # )
                 result, stats = ModelScaleSelector.get_scale_stats(
                     x_scales=x_scales,
                     combination=list(best_combination)
                 )
 
         return result, stats, best_combination
+
+    @staticmethod
+    def format_model_scale_stats(stats: list,
+                                 scale_analytics: list,
+                                 ) -> list:
+        """
+        Format model scale statistics with additional scale analytics.
+
+        :param stats: The original scale statistics.
+        :type stats: list
+        :param scale_analytics: The scale analytics computed using ModelScaleSelector methods.
+        :type scale_analytics: list
+
+        :return: Formatted scale statistics including additional scale analytics.
+        :rtype: list
+
+        :raises ImgToolsException:
+            If the provided parameters are not valid or have unexpected structures.
+
+        Example:
+            >>> original_stats = [
+            >>>     {'x_scale': 2, 'max_dif': 5},
+            >>>     {'x_scale': 4, 'max_dif': 7},
+            >>>     {'x_scale': 3, 'max_dif': 6}
+            >>> ]
+            >>> scale_analytics = [
+            >>>     [2, 4, 3],
+            >>>     [2, 3, 1],
+            >>>     [4, 5, 3],
+            >>>     [5, 2, 3]
+            >>> ]
+            >>> formatted_stats = ModelScaleSelector.format_model_scale_stats(
+            >>>     stats=original_stats,
+            >>>     scale_analytics=scale_analytics
+            >>> )
+            >>> print(formatted_stats)
+            >>> [
+            >>>     {'x_scale': 2, 'max_dif': 5, 'nb_scale': 2, 'scale': 2, 'actual_scale': 2, 'dif_scale': 2},
+            >>>     {'x_scale': 4, 'max_dif': 7, 'nb_scale': 3, 'scale': 4, 'actual_scale': 4, 'dif_scale': 1},
+            >>>     {'x_scale': 3, 'max_dif': 6, 'nb_scale': 1, 'scale': 3, 'actual_scale': 3, 'dif_scale': 0}
+            >>> ]
+        """
+        if Ut.is_list(stats, not_null=True) \
+                and Ut.is_list(scale_analytics, not_null=True) \
+                and Ut.is_list(scale_analytics[0], not_null=True):
+            nb_combination = len(scale_analytics[0])
+            nb_stats = len(stats)
+            if nb_combination == nb_stats:
+                for key, data in enumerate(stats):
+                    data.update(
+                        {
+                            'nb_scale': scale_analytics[1][key],
+                            'scale': scale_analytics[0][key],
+                            'actual_scale': scale_analytics[2][key],
+                            'dif_scale': scale_analytics[3][key],
+                        }
+                    )
+            elif nb_combination > nb_stats:
+                for key, actual_scale in enumerate(scale_analytics[2]):
+                    nb_stats = len(stats)
+                    if key < nb_stats:
+                        x_scale = stats[key].get('x_scale')
+
+                        if x_scale <= actual_scale:
+                            stats[key].update(
+                                {
+                                    'nb_scale': scale_analytics[1][key],
+                                    'scale': scale_analytics[0][key],
+                                    'actual_scale': scale_analytics[2][key],
+                                    'dif_scale': scale_analytics[3][key],
+                                }
+                            )
+                        else:
+                            tmp = {
+                                'key': -1,
+                                'x_scale': actual_scale,
+                                'nb_scale': scale_analytics[1][key],
+                                'scale': scale_analytics[0][key],
+                                'actual_scale': scale_analytics[2][key],
+                                'dif_scale': scale_analytics[3][key],
+                            }
+                            stats.insert(key, tmp)
+                    else:
+                        raise ImgToolsException(
+                            "Fatal error:  unable to format scale combination statistics. "
+                            "Scale statistics out of range"
+                        )
+
+            else:
+                raise ImgToolsException(
+                    "Fatal error:  unable to format scale combination statistics. "
+                    "Unexpected statistics rows"
+                )
+        else:
+            raise ImgToolsException(
+                "Fatal error:  unable to format scale combination statistics. "
+                "Bad parameters."
+            )
+        return stats
 
     @staticmethod
     def define_model_scale(upscale_stats: dict,
@@ -517,12 +622,9 @@ class ModelScaleSelector:
 
             if Ut.is_list(best_combination, not_null=True):
 
-                upscale_combination = [
-                    [x.get('key') for x in upscale_stats.get('stats')],
-                    [x.get('x_scale') for x in upscale_stats.get('stats')]
-                ]
+                x_scales = [x.get('x_scale') for x in upscale_stats.get('stats')]
                 combination, stats_apply, best_combination = ModelScaleSelector.scale_combination_analytics(
-                    x_scales=upscale_combination[1],
+                    x_scales=x_scales,
                     possibilities=best_combination
                 )
                 upscale_stats['used_scales'] = list(best_combination)
@@ -533,49 +635,10 @@ class ModelScaleSelector:
                         'total_scale': stats_apply[2],
                     }
                 )
-                nb_combination = len(combination[0])
-                nb_stats = len(upscale_stats.get('stats'))
-                if nb_combination == nb_stats:
-                    for key, data in enumerate(upscale_stats.get('stats')):
-                        data.update(
-                            {
-                                'nb_scale': combination[1][key],
-                                'scale': combination[0][key],
-                                'actual_scale': combination[2][key],
-                                'dif_scale': combination[3][key],
-                            }
-                        )
-                elif nb_combination > nb_stats:
-                    stats = upscale_stats.get('stats')
-                    for key, actual_scale in enumerate(combination[2]):
-                        nb_stats = len(stats)
-                        if key < nb_stats:
-                            x_scale = stats[key].get('x_scale')
-
-                            if x_scale <= actual_scale:
-                                stats[key].update(
-                                    {
-                                        'nb_scale': combination[1][key],
-                                        'scale': combination[0][key],
-                                        'actual_scale': combination[2][key],
-                                        'dif_scale': combination[3][key],
-                                    }
-                                )
-                            else:
-                                tmp = {
-                                    'key': -1,
-                                    'x_scale': actual_scale,
-                                    'nb_scale': combination[1][key],
-                                    'scale': combination[0][key],
-                                    'actual_scale': combination[2][key],
-                                    'dif_scale': combination[3][key],
-                                }
-                                stats.insert(key, tmp)
-                        else:
-                            a = 2
-
-                else:
-                    a = 2
+                ModelScaleSelector.format_model_scale_stats(
+                    stats=upscale_stats.get('stats'),
+                    scale_analytics=combination
+                )
 
             return upscale_stats
 
