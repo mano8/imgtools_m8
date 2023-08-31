@@ -190,6 +190,92 @@ class ImageTools:
             result = self.expander.model_conf.get_available_scales()
         return result
 
+    def get_scale_selector(self) -> ScaleSelector:
+        """
+        Get the scale selection strategy.
+
+        :return: The scale selection strategy.
+        :rtype: ScaleSelector
+
+        Example:
+            >>> tools = ImageTools(...)
+            >>> tools.get_scale_selector()
+            ScaleSelector.AUTO_SCALE
+        """
+        self.init_expander()
+        return self.expander.model_conf.scale_selector
+
+    def is_auto_scale(self) -> bool:
+        """
+        Check if the current scale selection strategy is automatic.
+
+        This method checks whether the current scale selection strategy being used by the
+        ImageTools instance is automatic scale selection. An automatic scale selection strategy
+        determines that the package will choose the appropriate upscale model scale based on the
+        input image and output dimensions.
+
+        :return: True if the scale selection strategy is automatic, False otherwise.
+        :rtype: bool
+
+        Example:
+            >>> tools = ImageTools(...)
+            >>> is_auto = tools.is_auto_scale()
+            >>> print(is_auto)
+            True
+        """
+        return self.get_scale_selector() == ScaleSelector.AUTO_SCALE
+
+    def set_auto_scale(self) -> bool:
+        """
+        Set the image expander to automatically determine the best model scale for upscaling.
+
+        :return: True if the auto scale selector was set successfully, False otherwise.
+        :rtype: bool
+
+        Example:
+            >>> imgtools = ImageTools(...)
+            >>> success = imgtools.set_auto_scale()
+            >>> if success:
+            >>>     print("Auto scale selector set successfully!")
+            >>> else:
+            >>>     print("Failed to set auto scale selector.")
+        """
+        self.init_expander()
+        self.expander.model_conf.set_scale(2, set_default=False)
+        self.expander.model_conf.set_scale_selector(ScaleSelector.AUTO_SCALE)
+        return self.is_auto_scale()
+
+    def set_fixed_scale(self, scale: int) -> bool:
+        """
+        Set a fixed upscale model scale for image processing.
+
+        This method allows you to set a specific upscale model scale for image processing. The provided
+        scale value must be a positive integer representing the upscale factor for the model.
+
+        :param scale: The fixed upscale model scale.
+        :type scale: int
+
+        :return: True if the fixed scale was successfully set, False otherwise.
+        :rtype: bool
+
+        :raises ImgToolsException:
+            If there is an issue setting the fixed scale.
+
+        Example:
+            >>> tools = ImageTools(...)
+            >>> success = tools.set_fixed_scale(scale=2)
+            >>> print(success)
+            True
+        """
+        self.init_expander()
+        if not self.expander.model_conf.set_scale(scale, set_default=False) \
+                or not self.expander.model_conf.set_scale_selector(ScaleSelector.FIXED_SCALE):
+            raise ImgToolsException(
+                "Fatal Error: Unable to fix model scale to %s",
+                scale
+            )
+        return True
+
     def has_conf(self) -> bool:
         """
         Check if the instance has a valid configuration.
