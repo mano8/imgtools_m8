@@ -1103,8 +1103,6 @@ class ImageTools:
         :return: True if the image is successfully written to the specified format, False otherwise.
         :rtype: bool
 
-        :raises ImgToolsException: If unable to resize the image or write it.
-
         Example:
             >>> image = ImageTools.read_image("input_image.jpg")
             >>> output_path = "output_dir"
@@ -1115,29 +1113,33 @@ class ImageTools:
             >>> print(result)
             >>> True
         """
+        result = False
         out_path = ImageTools.set_write_path(
             output_path=output_path,
             file_name=file_name,
             ext=ext,
             size=ImageToolsHelper.get_image_size(image)
         )
-        if image is not None and out_path is not None:
+        can_write = image is not None \
+            and out_path is not None
+        if can_write:
             # Save the image
             if Ut.is_list(options, not_null=True):
                 result = cv2.imwrite(out_path, image, options)
             else:
                 result = cv2.imwrite(out_path, image)
 
-            logger.debug(
+            logger.info(
                 "[ImageTools] Write image %s (size: %s)",
                 out_path,
                 ImageToolsHelper.get_string_file_size(
                     source_path=out_path
                 )
             )
-        else:
-            raise ImgToolsException(
-                "Unable to resize the image."
+        if not can_write \
+                or result is False:
+            logger.warning(
+                f"Unable to write image {file_name}."
             )
         return result
 
