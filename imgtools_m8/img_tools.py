@@ -1,6 +1,7 @@
 """
 ImgTools_m8 core class.
 """
+import time
 import cv2
 from numpy import ndarray
 import os
@@ -10,8 +11,8 @@ from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.model_scale_selector import ModelScaleSelector
 from imgtools_m8.process_conf import ProcessConf
 from imgtools_m8.img_expander import ImageExpander
+from imgtools_m8.model_conf import ScaleSelector
 from imgtools_m8.exceptions import ImgToolsException
-from imgtools_m8.exceptions import SettingInvalidException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
