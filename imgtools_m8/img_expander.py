@@ -180,13 +180,15 @@ class ImageExpander:
 
     def many_image_upscale(self,
                            image: ndarray,
-                           nb_upscale: int
+                           nb_upscale: int,
+                           scale: int or None = None
                            ) -> ndarray or None:
         """
         Upscale an image multiple times using the super-resolution model.
 
         :param image: The input image as a NumPy array.
         :param nb_upscale: The number of times to upscale the image.
+        :param scale: The model scale to use.
 
         :return: The final upscaled image after multiple upscaling operations.
         :rtype: ndarray or None
@@ -201,6 +203,24 @@ class ImageExpander:
         max_upscale = 10
         if image is not None\
                 and Ut.is_int(nb_upscale, mini=1, maxi=max_upscale):
+            is_scale = ModelConf.is_scale(
+                model_path=self.model_conf.model_path,
+                model_name=self.model_conf.model_name,
+                scale=scale
+            )
+            if Ut.is_int(scale)\
+                    and not is_scale:
+                raise ImgToolsException(
+                    "Fatal Error: Invalid model scale selected."
+                )
+
+            if is_scale \
+                    and self.model_conf.scale != scale:
+                self.model_conf.set_scale(scale)
+                if not self.is_ready():
+                    self.init_sr()
+                self.load_model()
+
             counter = 0
             while counter < nb_upscale and counter <= max_upscale:
                 image = self.upscale_image(image)
