@@ -98,18 +98,18 @@ class TestImageToolsHelper:
         files = ImageToolsHelper.get_images_list(
             HelperTest.get_source_path()
         )
-        assert len(files) == 3
+        assert len(files) == 4
 
     @staticmethod
     def test_get_files_list():
         """Test get_files_list method"""
         sources = HelperTest.get_source_path()
         files = ImageToolsHelper.get_files_list(sources)
-        assert len(files) == 5
+        assert len(files) == 6
         files = ImageToolsHelper.get_files_list(sources, ext='.jpg')
-        assert len(files) == 3
+        assert len(files) == 4
         files = ImageToolsHelper.get_files_list(sources, ext=['.jpg', '.txt'])
-        assert len(files) == 5
+        assert len(files) == 6
         files = ImageToolsHelper.get_files_list(sources, ext='.jpg', content_name="bad_")
         assert len(files) == 1 and files[0] == "bad_image.jpg"
 
