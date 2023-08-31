@@ -390,8 +390,8 @@ class ImageTools:
         :param output_format: The output format configuration dictionary.
         :type output_format: dict
 
-        :return: The resized image as a NumPy ndarray if resizing is needed, None otherwise.
-        :rtype: ndarray or None
+        :return: The resized image as a NumPy ndarray if resizing is needed.
+        :rtype: ndarray
 
         Example:
             >>> tools = ImageTools(...)
