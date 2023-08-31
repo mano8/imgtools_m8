@@ -10,7 +10,7 @@ from imgtools_m8.multiprocess import MultiProcessImage
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
 __deprecated__ = False
-__license__ = "MIT"
+__license__ = "Apache Software License"
 __status__ = "Production"
 __version__ = "1.0.0"
 
