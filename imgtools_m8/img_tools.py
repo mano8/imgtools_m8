@@ -381,7 +381,7 @@ class ImageTools:
     def resize_image_if_needed(self,
                                image: ndarray,
                                output_format: dict
-                               ) -> ndarray or None:
+                               ) -> ndarray:
         """
         Resize the image if necessary based on the output format configuration.
 
@@ -403,8 +403,8 @@ class ImageTools:
             >>> else:
             >>>     print("Image doesn't need resizing.")
         """
-        result = None
-        if image is not None:
+        if image is not None \
+                and Ut.is_dict(output_format, not_null=True):
             size = ImageToolsHelper.get_image_size(image)
             params = ImageTools.get_downscale_size(
                 size=size,
@@ -418,6 +418,8 @@ class ImageTools:
                 )
             else:
                 return image
+        else:
+            return image
         return result
 
     def upscale_and_write_images(self,
