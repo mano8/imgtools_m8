@@ -9,6 +9,7 @@ import os
 from ve_utils.utils import UType as Ut
 from imgtools_m8.model_conf import ModelConf, ScaleSelector
 from imgtools_m8.helper import ImageToolsHelper
+from imgtools_m8.exceptions import ImgToolsException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
