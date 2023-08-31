@@ -168,7 +168,7 @@ class TestModelScaleSelector:
         for params in args:
             tmp = ModelScaleSelector.set_scale_stats(**params)
             results.append(tmp)
-        assert results == [(2, 1, 4, 2, 1), (3, 2, 9, 3, 1), (3, 2, 6, 0, 0)]
+        assert results == [(2, 1, 4, 2), (3, 2, 9, 3), (3, 2, 6, 0)]
 
         args = [
             {'x_scale': 2, 'combination_key': 5, 'combinations': [2, 3, 4], 'actual_scale': 2, 'last_scale': 0},
@@ -178,6 +178,29 @@ class TestModelScaleSelector:
 
             with pytest.raises(ImgToolsException):
                 ModelScaleSelector.set_scale_stats(**params)
+
+    @staticmethod
+    def test_get_scale_stats():
+        """Test set_scale_stats method"""
+        args = [
+            {'x_scales': [4, 8], 'combination': [4, 4]},
+            {'x_scales': [2, 5], 'combination': [2, 3]},
+        ]
+        results = []
+        for params in args:
+            tmp = ModelScaleSelector.get_scale_stats(**params)
+            results.append(tmp)
+        assert results == [
+            ([[4, 4], [1, 1], [4, 8], [0, 0]], [0, 8, 2]),
+            ([[2, 3], [1, 1], [2, 5], [0, 0]], [0, 5, 2])
+        ]
+
+        args = [
+            {'x_scales': [4, 50], 'combination': [2 for x in range(2,50, 2)]}
+        ]
+        for params in args:
+            with pytest.raises(ImgToolsException):
+                ModelScaleSelector.get_scale_stats(**params)
 
     @staticmethod
     def test_scale_combination_analytics():
@@ -267,15 +290,15 @@ class TestModelScaleSelector:
 
         assert results == [
             [
-                {'key': 3, 'x_scale': 0, 'nb_scale': 0, 'scale': 0, 'actual_scale': 0, 'dif_scale': 0},
-                {'key': 2, 'x_scale': 2, 'nb_scale': 1, 'scale': 2, 'actual_scale': 2, 'dif_scale': 0},
-                {'key': 1, 'x_scale': 5, 'nb_scale': 1, 'scale': 3, 'actual_scale': 5, 'dif_scale': 0}
+                {'key': 3, 'x_scale': 0, 'nb_upscale': 0, 'scale': 0, 'actual_scale': 0, 'dif_scale': 0},
+                {'key': 2, 'x_scale': 2, 'nb_upscale': 1, 'scale': 2, 'actual_scale': 2, 'dif_scale': 0},
+                {'key': 1, 'x_scale': 5, 'nb_upscale': 1, 'scale': 3, 'actual_scale': 5, 'dif_scale': 0}
             ],
             [
-                {'key': 3, 'x_scale': 0, 'nb_scale': 0, 'scale': 0, 'actual_scale': 0, 'dif_scale': 0},
-                {'key': -1, 'x_scale': 4, 'nb_scale': 1, 'scale': 4, 'actual_scale': 4, 'dif_scale': 0},
-                {'key': 2, 'x_scale': 5, 'nb_scale': 1, 'scale': 4, 'actual_scale': 8, 'dif_scale': 3},
-                {'key': 1, 'x_scale': 10, 'nb_scale': 1, 'scale': 2, 'actual_scale': 10, 'dif_scale': 0}
+                {'key': 3, 'x_scale': 0, 'nb_upscale': 0, 'scale': 0, 'actual_scale': 0, 'dif_scale': 0},
+                {'key': -1, 'x_scale': 4, 'nb_upscale': 1, 'scale': 4, 'actual_scale': 4, 'dif_scale': 0},
+                {'key': 2, 'x_scale': 5, 'nb_upscale': 1, 'scale': 4, 'actual_scale': 8, 'dif_scale': 3},
+                {'key': 1, 'x_scale': 10, 'nb_upscale': 1, 'scale': 2, 'actual_scale': 10, 'dif_scale': 0}
             ]
         ]
 
@@ -354,7 +377,6 @@ class TestModelScaleSelector:
         stats = ModelScaleSelector.get_upscale_stats(
             size=size,
             output_formats=output_formats,
-            available_scales=[2, 3, 4],
             model_scale=2
         )
         assert stats.get('max_upscale') == 3
@@ -368,7 +390,6 @@ class TestModelScaleSelector:
         stats = ModelScaleSelector.get_upscale_stats(
             size=size,
             output_formats=output_formats,
-            available_scales=[2, 3, 4],
             model_scale=2
         )
         assert stats.get('max_upscale') == 0
