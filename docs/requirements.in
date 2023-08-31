@@ -1,0 +1,5 @@
+# requirements.in
+numpy>=1.25.2
+opencv-contrib-python>=4.8.0.74
+ve-utils>=2.5.3
+Sphinx==7.2.3

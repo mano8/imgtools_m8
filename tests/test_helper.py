@@ -22,136 +22,75 @@ __version__ = "1.0.0"
 class TestImageToolsHelper:
 
     @staticmethod
-    def test_need_upscale():
-        """Test need_upscale method"""
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22
-        ) is False
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_width=22
-        ) is False
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_width=18
-        ) is False
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_width=25
-        ) is True
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_height=22
-        ) is False
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_height=18
-        ) is False
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_width=25,
-            fixed_height=25
-        ) is True
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_height=25
-        ) is True
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_size=22
-        ) is False
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_size=18
-        ) is False
-
-        assert ImageToolsHelper.need_upscale(
-            width=22,
-            height=22,
-            fixed_size=25
-        ) is True
-
-        with pytest.raises(ImgToolsException):
-            ImageToolsHelper.need_upscale(
-                width=0,
-                height=22
-            )
-
-        with pytest.raises(ImgToolsException):
-            ImageToolsHelper.need_upscale(
-                width=22,
-                height=0
-            )
-
-    @staticmethod
-    def test_get_model_scale_needed():
-        """Test get_model_scale_needed method"""
-        height, width = (200, 400)
-        output_formats = [
-            {'height': 200, 'width': 400, 'fixed_width': 1900},
-            {'height': 200, 'width': 500, 'fixed_width': 1600, 'fixed_height': 1600},
-            {'height': 200, 'width': 300, 'fixed_width': 1200, 'fixed_height': 800},
-            {'height': 200, 'width': 400, 'fixed_size': 900},
-            {'height': 200, 'width': 500, 'fixed_height': 600},
-            {'height': 200, 'width': 400, 'fixed_width': 200}
+    def test_find_best_combination():
+        """Test find_best_combination method"""
+        args = [
+            {'total': 0, 'numbers': [2, 3, 4]},
+            {'total': 2, 'numbers': [2, 3, 4]},
+            {'total': 4, 'numbers': [2, 3, 4]},
+            {'total': 5, 'numbers': [2, 3, 4]},
+            {'total': 8, 'numbers': [2, 3, 4]},
+            {'total': 10, 'numbers': [2, 3, 4]},
+            {'total': 15, 'numbers': [2, 3, 4]},
         ]
         results = []
-        for params in output_formats:
-            scale = ImageToolsHelper.get_model_scale_needed(**params)
-            results.append(scale)
-        assert results == [5, 4, 4, 3, 3, 0]
+        for params in args:
+            tmp = ImageToolsHelper.find_best_combination(**params)
+            results.append(tmp)
+        assert results == [[], [2], [4], [3, 2], [4, 4], [4, 4, 2], [4, 4, 4, 3]]
+
+        with pytest.raises(ImgToolsException):
+            ImageToolsHelper.find_best_combination(
+                total=-1,
+                numbers=[2, 3, 4]
+            )
+
+        with pytest.raises(ImgToolsException):
+            ImageToolsHelper.find_best_combination(
+                total=0,
+                numbers=[]
+            )
 
     @staticmethod
-    def test_get_upscale_stats():
-        """Test get_upscale_stats method"""
-        size = (200, 400)
-        output_formats = [
-            {'fixed_width': 1900},
-            {'fixed_width': 1600},
-            {'fixed_width': 1200},
-            {'fixed_width': 900},
-            {'fixed_width': 600},
-            {'fixed_width': 200}
+    def test_find_all_combinations():
+        """Test find_all_combinations method"""
+        args = [
+            {'total': 5, 'numbers': [2, 3, 4]},
+            {'total': 7, 'numbers': [2, 3, 4]},
         ]
-        stats = ImageToolsHelper.get_upscale_stats(
-            size=size,
-            output_formats=output_formats,
-            model_scale=2
-        )
-        assert stats.get('max_upscale') == 3
-        assert len(stats.get('stats')) == len(output_formats)
-        output_formats = [
-            {'fixed_width': 350},
-            {'fixed_width': 200},
-            {'fixed_height': 150},
-            {'fixed_size': 100}
+        results = []
+        for params in args:
+            tmp = ImageToolsHelper.find_all_combinations(**params)
+            results.append(tmp)
+        assert results == [[[3, 2], [2, 3]], [[3, 2, 2], [2, 3, 2], [2, 2, 3], [4, 3], [3, 4]]]
+        with pytest.raises(ImgToolsException):
+            ImageToolsHelper.find_all_combinations(
+                total=-1,
+                numbers=[2, 3, 4]
+            )
+
+        with pytest.raises(ImgToolsException):
+            ImageToolsHelper.find_all_combinations(
+                total=0,
+                numbers=[]
+            )
+
+    @staticmethod
+    def test_is_image_size():
+        """Test is_image_size method"""
+        args = [
+            {'size': (-1, 220)},
+            {'size': (0, 220)},
+            {'size': (220, -1)},
+            {'size': (220, 0)},
+            {'size': (320, 220)},
         ]
-        stats = ImageToolsHelper.get_upscale_stats(
-            size=size,
-            output_formats=output_formats,
-            model_scale=2
-        )
-        assert stats.get('max_upscale') == 0
-        assert len(stats.get('stats')) == len(output_formats)
+        results = []
+        for params in args:
+            tmp = ImageToolsHelper.is_image_size(**params)
+            results.append(tmp)
+
+        assert results == [False, False, False, False, True]
 
     @staticmethod
     def test_get_images_list():
@@ -159,18 +98,18 @@ class TestImageToolsHelper:
         files = ImageToolsHelper.get_images_list(
             HelperTest.get_source_path()
         )
-        assert len(files) == 3
+        assert len(files) == 4
 
     @staticmethod
     def test_get_files_list():
         """Test get_files_list method"""
         sources = HelperTest.get_source_path()
         files = ImageToolsHelper.get_files_list(sources)
-        assert len(files) == 5
+        assert len(files) == 6
         files = ImageToolsHelper.get_files_list(sources, ext='.jpg')
-        assert len(files) == 3
+        assert len(files) == 4
         files = ImageToolsHelper.get_files_list(sources, ext=['.jpg', '.txt'])
-        assert len(files) == 5
+        assert len(files) == 6
         files = ImageToolsHelper.get_files_list(sources, ext='.jpg', content_name="bad_")
         assert len(files) == 1 and files[0] == "bad_image.jpg"
 

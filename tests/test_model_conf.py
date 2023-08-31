@@ -4,7 +4,7 @@ ModelConf unittest class.
 Use pytest package.
 """
 from ve_utils.utils import UType as Ut
-from imgtools_m8.model_conf import ModelConf
+from imgtools_m8.model_conf import ModelConf, ScaleSelector
 from imgtools_m8.helper import ImageToolsHelper
 
 __author__ = "Eli Serra"
@@ -67,6 +67,21 @@ class TestModelConf:
         assert self.obj.has_scale() is True
         assert self.obj.get_scale() == 2
         assert self.obj.get_file_name() == "EDSR_x2.pb"
+
+    def test_set_scale_selector(self):
+        """Test set_scale_selector method"""
+        assert self.obj.has_scale_selector() is True
+        self.obj.scale_selector = None
+        assert self.obj.has_scale_selector() is False
+        assert self.obj.set_scale_selector(
+            value=ScaleSelector.AUTO_SCALE
+        ) is True
+        assert self.obj.has_scale_selector() is True
+        assert self.obj.get_scale_selector() == ScaleSelector.AUTO_SCALE
+
+    def test_get_available_scales(self):
+        """Test set_scale_selector method"""
+        assert self.obj.get_available_scales() == [2, 3, 4]
 
     @staticmethod
     def test_get_valid_model_names():
