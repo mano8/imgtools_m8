@@ -25,8 +25,8 @@ class TestImageTools:
         """
         output_formats = [
             {
-                'fixed_width': 260,
-                'fixed_height': 200,
+                'fixed_width': 35,
+                'fixed_height': 22,
                 'formats': [
                     {'ext': '.jpg', 'quality': 80}
                 ]
