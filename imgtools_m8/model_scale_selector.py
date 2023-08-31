@@ -707,7 +707,6 @@ class ModelScaleSelector:
     @staticmethod
     def get_upscale_stats(size: tuple,
                           output_formats: list,
-                          available_scales: list,
                           model_scale: int,
                           ) -> dict:
         """
