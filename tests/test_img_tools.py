@@ -9,6 +9,7 @@ from .helper import HelperTest
 from imgtools_m8.process_conf import ProcessConf
 from imgtools_m8.img_tools import ImageTools
 from imgtools_m8.helper import ImageToolsHelper
+from imgtools_m8.model_scale_selector import ModelScaleSelector
 from imgtools_m8.exceptions import ImgToolsException
 from imgtools_m8.exceptions import SettingInvalidException
 
@@ -30,8 +31,8 @@ class TestImageTools:
         """
         output_formats = [
                 {
-                    'fixed_width': 260,
-                    'fixed_height': 200,
+                    'fixed_width': 35,
+                    'fixed_height': 22,
                     'formats': [
                         {'ext': '.jpg', 'quality': 80}
                     ]
@@ -89,6 +90,103 @@ class TestImageTools:
         """Test get_available_model_scales method"""
         assert self.obj.get_available_model_scales() == [2, 3, 4]
 
+    def test_change_scale_strategy(self):
+        """Test some methods to update and get model scale strategy"""
+        # fixed scale
+        assert self.obj.set_fixed_scale(3) is True
+        assert self.obj.get_model_scale() == 3
+        assert self.obj.is_auto_scale() is False
+        with pytest.raises(ImgToolsException):
+            self.obj.set_fixed_scale(-1)
+        # auto scale
+        assert self.obj.set_auto_scale() is True
+        assert self.obj.get_model_scale() == 2
+        assert self.obj.is_auto_scale() is True
+
+    def test_upscale_with_auto_scale(self):
+        """Test upscale_with_auto_scale method"""
+        image = self.obj.read_image(
+            os.path.join(
+                HelperTest.get_source_path(),
+                'recien_llegado_min.jpg'
+            )
+        )
+        size = ImageToolsHelper.get_image_size(image)
+        upscale_stats = ModelScaleSelector.get_upscale_stats(
+            size=size,
+            output_formats=self.obj.conf.get_output_formats(),
+            model_scale=self.obj.get_model_scale()
+        )
+        upscale_stats = ModelScaleSelector.define_model_scale(
+            upscale_stats=upscale_stats,
+            available_scales=self.obj.get_available_model_scales()
+        )
+        output_formats = [
+            {
+                'fixed_width': 80,
+                'formats': [
+                    {'ext': '.jpeg'}
+                ]
+            }
+        ]
+        self.obj.set_output_formats(output_formats)
+        assert self.obj.upscale_with_auto_scale(
+            image=image,
+            upscale_stats=upscale_stats,
+            file_name=''
+        ) is False
+
+
+    def test_upscale_with_fixed_scale(self):
+        """Test upscale_with_fixed_scale method"""
+        image = self.obj.read_image(
+            os.path.join(
+                HelperTest.get_source_path(),
+                'recien_llegado_min.jpg'
+            )
+        )
+        size = ImageToolsHelper.get_image_size(image)
+        output_formats = [
+            {
+                'fixed_width': 80,
+                'formats': [
+                    {'ext': '.jpeg'}
+                ]
+            }
+        ]
+        self.obj.set_output_formats(output_formats)
+        upscale_stats = ModelScaleSelector.get_upscale_stats(
+            size=size,
+            output_formats=self.obj.conf.get_output_formats(),
+            model_scale=self.obj.get_model_scale()
+        )
+
+        assert self.obj.upscale_with_fixed_scale(
+            image=image,
+            upscale_stats=upscale_stats,
+            file_name=''
+        ) is False
+
+        output_formats = [
+            {
+                'fixed_width': 35,
+                'formats': [
+                    {'ext': '.jpeg'}
+                ]
+            }
+        ]
+        self.obj.set_output_formats(output_formats)
+        upscale_stats = ModelScaleSelector.get_upscale_stats(
+            size=size,
+            output_formats=self.obj.conf.get_output_formats(),
+            model_scale=self.obj.get_model_scale()
+        )
+        assert self.obj.upscale_with_fixed_scale(
+            image=image,
+            upscale_stats=upscale_stats,
+            file_name=os.path.basename(self.obj.conf.get_source_path())
+        ) is True
+
     def test_run(self):
         """Test run method"""
         tst = self.obj.run()
@@ -116,6 +214,26 @@ class TestImageTools:
                 'fixed_size': 200,
                 'formats': [
                     {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
+                ]
+            }
+        ]
+        self.obj.set_output_formats(output_formats)
+        tst = self.obj.run()
+        assert tst is True
+
+    def test_fixed_scale(self):
+        """Test run method"""
+        self.obj.set_fixed_scale(2)
+        self.obj.set_source_path(
+            source_path=os.path.join(
+                HelperTest.get_source_path(),
+                'recien_llegado_min.jpg')
+        )
+        output_formats = [
+            {
+                'fixed_width': 80,
+                'formats': [
+                    {'ext': '.webp', 'quality': 80}
                 ]
             }
         ]
@@ -221,21 +339,10 @@ class TestImageTools:
             image=image,
             output_path=HelperTest.get_output_path(),
             file_name="bad",
-            output_format=[
+            output_formats=[
                 {'ext_bad': '.webp', 'quality_bad': 80}
             ]
         ) is False
-
-    @staticmethod
-    def test_write_image():
-        """Test write_image method"""
-        with pytest.raises(ImgToolsException):
-            ImageTools.write_image(
-                image=None,
-                output_path="bad",
-                file_name="bad",
-                ext=".jpeg"
-            )
 
     @staticmethod
     def test_read_image():
