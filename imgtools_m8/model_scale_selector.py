@@ -532,7 +532,7 @@ class ModelScaleSelector:
                 for key, data in enumerate(stats):
                     data.update(
                         {
-                            'nb_scale': scale_analytics[1][key],
+                            'nb_upscale': scale_analytics[1][key],
                             'scale': scale_analytics[0][key],
                             'actual_scale': scale_analytics[2][key],
                             'dif_scale': scale_analytics[3][key],
@@ -547,7 +547,7 @@ class ModelScaleSelector:
                         if x_scale <= actual_scale:
                             stats[key].update(
                                 {
-                                    'nb_scale': scale_analytics[1][key],
+                                    'nb_upscale': scale_analytics[1][key],
                                     'scale': scale_analytics[0][key],
                                     'actual_scale': scale_analytics[2][key],
                                     'dif_scale': scale_analytics[3][key],
@@ -557,7 +557,7 @@ class ModelScaleSelector:
                             tmp = {
                                 'key': -1,
                                 'x_scale': actual_scale,
-                                'nb_scale': scale_analytics[1][key],
+                                'nb_upscale': scale_analytics[1][key],
                                 'scale': scale_analytics[0][key],
                                 'actual_scale': scale_analytics[2][key],
                                 'dif_scale': scale_analytics[3][key],
