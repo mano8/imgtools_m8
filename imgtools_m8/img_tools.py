@@ -422,70 +422,106 @@ class ImageTools:
             return image
         return result
 
-    def upscale_and_write_images(self,
-                                 image: ndarray,
-                                 size: tuple,
-                                 upscale_stats: dict,
-                                 file_name: str
-                                 ) -> ndarray or None:
-        """
-        Upscale the image and write images based on the output configuration.
-
-        :param image: The input image as a NumPy ndarray.
-        :type image: ndarray
-        :param size: The original image size as a tuple (width, height).
-        :type size: tuple
-        :param upscale_stats: The upscale statistics dictionary.
-        :type upscale_stats: dict
-        :param file_name: The base file name for the output images.
-        :type file_name: str
-
-        :return: True if the upscale and write operations are successful, False otherwise.
-        :rtype: bool
-
-        Example:
-            >>> tools = ImageTools(...)
-            >>> input_image = ...  # Load your input image as a NumPy array
-            >>> image_size = (1920, 1080)  # Example original image size
-            >>> upscale_statistics = {
-            >>>     "stats": [
-            >>>         {"key": "format1", "nb_upscale": 2},
-            >>>         {"key": "format2", "nb_upscale": 0},
-            >>>         # ... other format statistics
-            >>>     ]
-            >>> }
-            >>> output_file_name = "output"
-            >>> success = tools.upscale_and_write_images(input_image, image_size, upscale_statistics, output_file_name)
-            >>> if success:
-            >>>     print("Images upscaled and written successfully.")
-            >>> else:
-            >>>     print("Error occurred while processing images.")
-        """
-        result = False
-        if image is not None \
-                and Ut.is_tuple(size) \
-                and Ut.is_dict(upscale_stats, not_null=True) \
+    def loop_on_upscale_stats(self,
+                              upscale_stats: dict
+                              ):
+        """"""
+        if Ut.is_dict(upscale_stats, not_null=True) \
                 and Ut.is_list(upscale_stats.get('stats'), not_null=True):
             output_formats = self.conf.get_output_formats()
-            upscale_counter = 0
-            result = True
-            self.init_expander_model()
+            nb_output_formats = len(self.conf.get_output_formats())
             for upscale in upscale_stats.get('stats'):
                 key = upscale.get('key')
+                output_format = None
+                if 0 <= key < nb_output_formats:
+                    output_format = output_formats[key]
+                scale = upscale.get('scale')
                 nb_upscale = upscale.get('nb_upscale')
-                output_format = output_formats[key]
+                yield key, output_format, scale, nb_upscale
+
+    def upscale_with_auto_scale(self,
+                                image: ndarray,
+                                upscale_stats: dict,
+                                file_name: str
+                                ) -> bool:
+        """"""
+        result = False
+        if image is not None \
+                and Ut.is_dict(upscale_stats, not_null=True) \
+                and Ut.is_list(upscale_stats.get('stats'), not_null=True):
+            self.init_expander_model()
+            result = True
+            for key, output_format, scale, nb_upscale in self.loop_on_upscale_stats(
+                    upscale_stats=upscale_stats):
+                if nb_upscale > 0:
+                    logger.debug(
+                        "[ImageTools] Image upscale with auto scale model-> %sx",
+                        scale
+                    )
+                    start_upscale = time.perf_counter()
+                    image = self.expander.many_image_upscale(
+                        image=image,
+                        nb_upscale=1,
+                        scale=scale
+                    )
+                    logger.debug(
+                        "[ImageTools] Upscale image with %sx model scale in %s s",
+                        scale,
+                        time.perf_counter() - start_upscale
+                    )
+                    resized = self.resize_image_if_needed(
+                        image=image,
+                        output_format=output_format
+                    )
+                else:
+                    resized = self.resize_image_if_needed(
+                        image=image,
+                        output_format=output_format
+                    )
+
+                if key >= 0:
+                    write_test = ImageTools.write_images_by_format(
+                        image=resized,
+                        output_path=self.conf.get_output_path(),
+                        file_name=file_name,
+                        output_formats=output_format.get('formats'))
+                    if write_test is False:
+                        result = False
+        return result
+
+    def upscale_with_fixed_scale(self,
+                                 image: ndarray,
+                                 upscale_stats: dict,
+                                 file_name: str
+                                 ) -> bool:
+        """"""
+        result = False
+        if image is not None \
+                and Ut.is_dict(upscale_stats, not_null=True) \
+                and Ut.is_list(upscale_stats.get('stats'), not_null=True):
+            self.init_expander_model()
+            result = True
+            upscale_counter = 0
+            for key, output_format, scale, nb_upscale in self.loop_on_upscale_stats(
+                    upscale_stats=upscale_stats):
                 if nb_upscale > 0:
                     if nb_upscale > upscale_counter:
                         logger.debug(
-                            "[ImageTools] Image upscale %s / %s -> %sx",
+                            "[ImageTools] Image upscale with fixed scale %s / %s -> %sx",
                             upscale_counter,
                             nb_upscale,
                             self.get_model_scale()
                         )
                         nb_upscale_needed = nb_upscale - upscale_counter
+                        start_upscale = time.perf_counter()
                         image = self.expander.many_image_upscale(
                             image=image,
                             nb_upscale=nb_upscale_needed
+                        )
+                        logger.debug(
+                            "[ImageTools] Upscale image with %sx model scale in %s s",
+                            self.get_model_scale(),
+                            time.perf_counter() - start_upscale
                         )
                         upscale_counter = nb_upscale
                     resized = self.resize_image_if_needed(
@@ -498,12 +534,14 @@ class ImageTools:
                         output_format=output_format
                     )
 
-                if not ImageTools.write_images_by_format(
+                if key >= 0:
+                    write_test = ImageTools.write_images_by_format(
                         image=resized,
                         output_path=self.conf.get_output_path(),
                         file_name=file_name,
-                        output_format=output_format.get('formats')):
-                    result = False
+                        output_formats=output_format.get('formats'))
+                    if write_test is False:
+                        result = False
         return result
 
     def downscale_or_convert_images(self,
@@ -549,7 +587,7 @@ class ImageTools:
                         image=resized,
                         output_path=self.conf.get_output_path(),
                         file_name=file_name,
-                        output_format=output_format.get('formats')):
+                        output_formats=output_format.get('formats')):
                     result = False
         return result
 
@@ -593,17 +631,31 @@ class ImageTools:
                 and Ut.is_list(upscale_stats.get('stats'), not_null=True):
             # if upscale needed
             if upscale_stats.get('max_upscale') > 0:
-                logger.debug(
-                    "[ImageTools] Image need upscale %s times (%sx)",
-                    upscale_stats.get('max_upscale'),
-                    self.get_model_scale()
-                )
-                result = self.upscale_and_write_images(
-                    image=image,
-                    size=size,
-                    upscale_stats=upscale_stats,
-                    file_name=file_name
-                )
+                if self.is_auto_scale():
+                    logger.debug(
+                        "[ImageTools] Image need upscale x%s with auto scale",
+                        upscale_stats.get('max_upscale')
+                    )
+                    upscale_stats = ModelScaleSelector.define_model_scale(
+                        upscale_stats=upscale_stats,
+                        available_scales=self.get_available_model_scales()
+                    )
+                    result = self.upscale_with_auto_scale(
+                        image=image,
+                        upscale_stats=upscale_stats,
+                        file_name=file_name
+                    )
+                else:
+                    logger.debug(
+                        "[ImageTools] Image need upscale x%s with fixed scale (%sx)",
+                        upscale_stats.get('max_upscale'),
+                        self.get_model_scale()
+                    )
+                    result = self.upscale_with_fixed_scale(
+                        image=image,
+                        upscale_stats=upscale_stats,
+                        file_name=file_name
+                    )
             # if only downscale or convert image needed
             else:
                 logger.debug(
@@ -658,9 +710,9 @@ class ImageTools:
                 upscale_stats = ModelScaleSelector.get_upscale_stats(
                     size=size,
                     output_formats=self.conf.get_output_formats(),
-                    model_scale=self.get_model_scale(),
-                    available_scales=self.get_available_model_scales()
+                    model_scale=self.get_model_scale()
                 )
+
                 result = self.resize_image(
                     image=image,
                     size=size,
@@ -987,7 +1039,7 @@ class ImageTools:
     def write_images_by_format(image: ndarray or None,
                                output_path: str,
                                file_name: str,
-                               output_format: list
+                               output_formats: list
                                ) -> bool:
         """
         Write images to the specified formats.
@@ -998,8 +1050,8 @@ class ImageTools:
         :type output_path: str
         :param file_name: The name of the output file.
         :type file_name: str
-        :param output_format: List of output format configuration dictionaries.
-        :type output_format: list
+        :param output_formats: List of output format configuration dictionaries.
+        :type output_formats: list
 
         :return: True if the images are successfully written to the specified formats, False otherwise.
         :rtype: bool
@@ -1015,9 +1067,9 @@ class ImageTools:
             >>> True
         """
         result = False
-        if Ut.is_list(output_format, not_null=True):
+        if Ut.is_list(output_formats, not_null=True):
             result = True
-            for write_format in output_format:
+            for write_format in output_formats:
                 if not ImageTools.write_image_format(
                         image=image,
                         output_path=output_path,
