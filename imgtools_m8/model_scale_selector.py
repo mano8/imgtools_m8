@@ -297,28 +297,32 @@ class ModelScaleSelector:
         Calculate the scale statistics for the upscale process.
 
         :param x_scales: A list of target upscale values.
-        :type x_scales: list
+        :type x_scales: list[int]
         :param combination: A list of scaling factor combinations.
-        :type combination: list
+        :type combination: list[int]
 
         :return: A tuple containing two lists:
                  - The first list contains the calculated scale factors for each target upscale.
                  - The second list contains the maximum difference, maximum scale, and total scale.
-        :rtype: tuple
+        :rtype: tuple[list[int], list[int]]
+
+        :raises ImgToolsException:
+            If the maximum number of iterations is reached.
 
         Example:
             >>> x_scales = [5, 7, 10]
             >>> combination = [2, 3]
             >>> ModelScaleSelector.get_scale_stats(x_scales, combination)
-            >>> (
-            >>>     [[2, 2, 3, 3, 3], [3, 3, 2, 2, 2], [2, 3, 6, 9, 12], [-1, 0, 2, 5, 8]],
-            >>>     [8, 12, 13]
-            >>> )
+            (
+                [[2, 2, 3, 3, 3], [3, 3, 2, 2, 2], [2, 3, 6, 9, 12], [-1, 0, 2, 5, 8]],
+                [8, 12, 13]
+            )
         """
         result, stats = None, None
         if Ut.is_list(x_scales, not_null=True) \
                 and Ut.is_list(combination, not_null=True):
             result = [[], [], [], []]
+            max_loop, loop_counter = 20, 0
             nb_combination, combination_key = len(combination), 0
             last_scale, actual_scale = 0, 0
             for key, x_scale in enumerate(x_scales):
@@ -330,32 +334,42 @@ class ModelScaleSelector:
                         actual_scale=actual_scale,
                         last_scale=last_scale
                     )
-                    combination_scale, combination_key, actual_scale, diff_scale, nb_scale = scale_stats
+                    combination_scale, combination_key, actual_scale, diff_scale = scale_stats
 
                     if diff_scale >= 0:
                         result[0].append(combination_scale)
-                        result[1].append(nb_scale)
+                        result[1].append(1)
                         result[2].append(actual_scale)
                         result[3].append(diff_scale)
+                        last_scale = actual_scale
                     else:
                         result[0].append(combination_scale)
                         result[1].append(1)
                         result[2].append(actual_scale)
                         result[3].append(diff_scale)
-                        scale_stats = ModelScaleSelector.set_scale_stats(
-                            x_scale=x_scale,
-                            combination_key=combination_key,
-                            combinations=combination,
-                            actual_scale=actual_scale,
-                            last_scale=last_scale
-                        )
-                        combination_scale, combination_key, actual_scale, diff_scale, nb_scale = scale_stats
-                        result[0].append(combination_scale)
-                        result[1].append(nb_scale)
-                        result[2].append(actual_scale)
-                        result[3].append(diff_scale)
+                        last_scale = actual_scale
+                        loop_counter = 0
+                        while actual_scale < x_scale:
+                            scale_stats = ModelScaleSelector.set_scale_stats(
+                                x_scale=x_scale,
+                                combination_key=combination_key,
+                                combinations=combination,
+                                actual_scale=actual_scale,
+                                last_scale=last_scale
+                            )
+                            combination_scale, combination_key, actual_scale, diff_scale = scale_stats
+                            result[0].append(combination_scale)
+                            result[1].append(1)
+                            result[2].append(actual_scale)
+                            result[3].append(diff_scale)
 
-                    last_scale = actual_scale
+                            loop_counter += 1
+                            if loop_counter > max_loop:
+                                raise ImgToolsException(
+                                    "Maximum of 20 scales reached between two fixed sizes. "
+                                    "Reduce upscale size, or use higher model scale."
+                                )
+                            last_scale = actual_scale
 
                 else:
                     result[0].append(0)
