@@ -250,7 +250,6 @@ class ModelScaleSelector:
                  - combination_key: The updated combination index.
                  - actual_scale: The updated accumulated scale.
                  - diff_scale: The difference between the accumulated scale and the target upscale.
-                 - nb_scale: The number of times to apply the current combination.
         :rtype: tuple
 
         :raises ImgToolsException: If the arguments are not valid.
@@ -262,7 +261,7 @@ class ModelScaleSelector:
             >>> actual_scale = 0
             >>> last_scale = 3
             >>> ModelScaleSelector.set_scale_stats(x_scale, combination_key, combinations, actual_scale, last_scale)
-            >>> (2, 1, 2, 3, 2)
+            >>> (2, 1, 2, 3)
         """
         if Ut.is_int(x_scale) \
                 and Ut.is_list(combinations, not_null=True) \
@@ -278,9 +277,7 @@ class ModelScaleSelector:
                 actual_scale += combination_scale
 
                 diff_scale = actual_scale - x_scale
-                nb_scale = math.ceil(x_scale / actual_scale)
-                if last_scale == actual_scale:
-                    nb_scale = 0
+
             else:
                 raise ImgToolsException(
                     "Fatal error:  unable to set scale combination statistics. Scale combination out of range"
@@ -290,7 +287,7 @@ class ModelScaleSelector:
                 "Fatal error:  unable to set scale combination statistics. Bad arguments"
             )
 
-        return combination_scale, combination_key, actual_scale, diff_scale, nb_scale
+        return combination_scale, combination_key, actual_scale, diff_scale
 
     @staticmethod
     def get_scale_stats(x_scales: list,
