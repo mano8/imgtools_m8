@@ -425,7 +425,28 @@ class ImageTools:
     def loop_on_upscale_stats(self,
                               upscale_stats: dict
                               ):
-        """"""
+        """
+        Loop through the upscale statistics.
+
+        :param upscale_stats: The upscale statistics dictionary.
+        :type upscale_stats: dict
+
+        :yield: A tuple containing:
+                - The key of the upscale.
+                - The output format configuration dictionary.
+                - The scale factor.
+                - The number of times the upscale is performed.
+
+        Example:
+            >>> upscale_stats = {
+            >>>     'stats': [
+            >>>         {'key': 0, 'scale': 2, 'nb_upscale': 5},
+            >>>         {'key': 1, 'scale': 3, 'nb_upscale': 7}
+            >>>     ]
+            >>> }
+            >>> for key, output_format, scale, nb_upscale in ImageTools.loop_on_upscale_stats(upscale_stats):
+            >>>     print(key, output_format, scale, nb_upscale)
+        """
         if Ut.is_dict(upscale_stats, not_null=True) \
                 and Ut.is_list(upscale_stats.get('stats'), not_null=True):
             output_formats = self.conf.get_output_formats()
@@ -444,7 +465,32 @@ class ImageTools:
                                 upscale_stats: dict,
                                 file_name: str
                                 ) -> bool:
-        """"""
+        """
+        Upscale the image using the auto scale model.
+
+        :param image: The image data as a NumPy ndarray.
+        :type image: ndarray
+        :param upscale_stats: The upscale statistics dictionary.
+        :type upscale_stats: dict
+        :param file_name: The name of the output file.
+        :type file_name: str
+
+        :return: True if the upscale process is successful, False otherwise.
+        :rtype: bool
+
+        Example:
+            >>> upscale_stats = {
+            >>>     'stats': [
+            >>>         {'key': 0, 'scale': 2, 'nb_upscale': 5},
+            >>>         {'key': 1, 'scale': 3, 'nb_upscale': 7}
+            >>>     ]
+            >>> }
+            >>> image = ImageTools.read_image("input_image.jpg")
+            >>> file_name = "output_image"
+            >>> result = ImageTools.upscale_with_auto_scale(image, upscale_stats, file_name)
+            >>> print(result)
+            >>> True
+        """
         result = False
         if image is not None \
                 and Ut.is_dict(upscale_stats, not_null=True) \

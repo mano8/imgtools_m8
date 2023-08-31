@@ -34,7 +34,7 @@ The package provides versatile resizing options, including:
 
    - fixed_width: Resizing images to an exact width in pixels.
    - fixed_height: Resizing images to an exact height in pixels.
-   - fixed_size: Resizing images based on the first limitation reached (height or width).
+   - fixed_size: Resizing images based on the highest limitation reached (height or width).
    - fixed_width and fixed_height: Resizing images based on the highest limitation reached,
      while allowing different height and width values.
 
@@ -278,9 +278,9 @@ progressive encoding, and optimization:
   <p>recien_llegado_1200x762.jpg by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a></p>
 </div>
 
-#License
+# License
 This project is licensed under the Apache 2 License - see the [LICENSE](https://github.com/mano8/imgtools_m8/blob/main/LICENCE) file for details.
 
-Authors
+# Authors
  - [Eli Serra](https://github.com/mano8)
  - pre-trained models by [Xavier Weber](https://towardsdatascience.com/deep-learning-based-super-resolution-with-opencv-4fd736678066).
