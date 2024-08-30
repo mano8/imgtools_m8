@@ -26,7 +26,7 @@ numpy==1.25.2
     # via
     #   -r requirements.in
     #   opencv-contrib-python
-opencv-contrib-python==4.8.0.76
+opencv-contrib-python==4.8.1.78
     # via -r requirements.in
 packaging==23.1
     # via sphinx
