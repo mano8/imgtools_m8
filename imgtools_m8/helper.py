@@ -67,11 +67,11 @@ class ImageToolsHelper:
             for num in numbers:
                 if current_total - num >= 0\
                         and dp[current_total - num] is not None:
-                    is_range = len(
-                        dp[current_total - num]
+                    is_range = dp[current_total] is None\
+                        or len(
+                            dp[current_total - num]
                         ) + 1 < len(dp[current_total])
-                    if dp[current_total] is None\
-                            or is_range:
+                    if is_range:
                         dp[current_total] = dp[current_total - num] + [num]
 
         return dp[total]
