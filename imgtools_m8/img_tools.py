@@ -2,10 +2,13 @@
 ImgTools_m8 core class.
 """
 import time
-import cv2
-from numpy import ndarray
+from typing import Optional, Union
 import os
 import logging
+
+import cv2
+from numpy import ndarray
+
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.model_scale_selector import ModelScaleSelector
@@ -23,6 +26,7 @@ __version__ = "2.0.0"
 
 logging.basicConfig()
 logger = logging.getLogger("imgTools_m8")
+# pylint: disable=no-member
 
 
 class ImageTools:
@@ -33,7 +37,7 @@ class ImageTools:
                  source_path: str,
                  output_path: str,
                  output_formats: list,
-                 model_conf: dict or None = None,
+                 model_conf: Optional[dict] = None,
                  ):
         """
                 Initialize the ImageTools instance.
@@ -51,8 +55,17 @@ class ImageTools:
                     >>> source_path = 'input_images'
                     >>> output_path = 'output_images'
                     >>> output_formats = [{'ext': '.jpg', 'quality': 90}]
-                    >>> model_conf = {'path': 'models', 'model_name': 'edsr', 'scale': 2}
-                    >>> img_tools = ImageTools(source_path, output_path, output_formats, model_conf)
+                    >>> model_conf = {
+                        'path': 'models',
+                        'model_name': 'edsr',
+                        'scale': 2
+                    }
+                    >>> img_tools = ImageTools(
+                        source_path,
+                        output_path,
+                        output_formats,
+                        model_conf
+                    )
                 """
         self.expander = None
         self.conf = None
@@ -91,7 +104,7 @@ class ImageTools:
         """
         return isinstance(self.expander, ImageExpander)
 
-    def set_expander(self, model_conf: dict or None) -> bool:
+    def set_expander(self, model_conf: Optional[dict]) -> bool:
         """
         Set the image expander using the provided model configuration.
 
@@ -128,7 +141,9 @@ class ImageTools:
         """
         Check if the ImageExpander instance is ready with a loaded model.
 
-        :return: True if the ImageExpander instance is ready with a loaded model, False otherwise.
+        :return:
+            True if the ImageExpander instance is ready with a loaded model,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -141,7 +156,8 @@ class ImageTools:
 
     def init_expander_model(self):
         """
-        Initialize the ImageExpander instance with model loading if not already initialized.
+        Initialize the ImageExpander instance with model loading
+        if not already initialized.
 
         Example:
             >>> tools = ImageTools(...)
@@ -209,12 +225,14 @@ class ImageTools:
         """
         Check if the current scale selection strategy is automatic.
 
-        This method checks whether the current scale selection strategy being used by the
-        ImageTools instance is automatic scale selection. An automatic scale selection strategy
-        determines that the package will choose the appropriate upscale model scale based on the
-        input image and output dimensions.
+        This method checks whether the current scale selection strategy
+        being used by the ImageTools instance is automatic scale selection.
+        An automatic scale selection strategy determines that the package
+        will choose the appropriate upscale model scale based on
+        the input image and output dimensions.
 
-        :return: True if the scale selection strategy is automatic, False otherwise.
+        :return:
+            True if the scale selection strategy is automatic, False otherwise.
         :rtype: bool
 
         Example:
@@ -227,9 +245,11 @@ class ImageTools:
 
     def set_auto_scale(self) -> bool:
         """
-        Set the image expander to automatically determine the best model scale for upscaling.
+        Set the image expander to automatically determine the best model scale
+        for upscaling.
 
-        :return: True if the auto scale selector was set successfully, False otherwise.
+        :return: True if the auto scale selector was set successfully,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -249,8 +269,9 @@ class ImageTools:
         """
         Set a fixed upscale model scale for image processing.
 
-        This method allows you to set a specific upscale model scale for image processing. The provided
-        scale value must be a positive integer representing the upscale factor for the model.
+        This method allows you to set a specific upscale model scale
+        for image processing. The provided scale value must be
+        a positive integer representing the upscale factor for the model.
 
         :param scale: The fixed upscale model scale.
         :type scale: int
@@ -269,10 +290,11 @@ class ImageTools:
         """
         self.init_expander()
         if not self.expander.model_conf.set_scale(scale, set_default=False) \
-                or not self.expander.model_conf.set_scale_selector(ScaleSelector.FIXED_SCALE):
+                or not self.expander.model_conf.set_scale_selector(
+                    ScaleSelector.FIXED_SCALE
+                ):
             raise ImgToolsException(
-                "Fatal Error: Unable to fix model scale to %s",
-                scale
+                f"Fatal Error: Unable to fix model scale to {scale}"
             )
         return True
 
@@ -329,15 +351,20 @@ class ImageTools:
         """
         Set the output_formats property.
 
-        :param output_formats: List of dictionaries containing output format configurations.
+        :param output_formats:
+            List of dictionaries containing output format configurations.
         :type output_formats: list[dict]
 
-        :return: True if the output formats are set successfully, False otherwise.
+        :return: True if the output formats are set successfully,
+            False otherwise.
         :rtype: bool
 
         Example:
             >>> tools = ImageTools(...)
-            >>> output_formats = [{"ext": ".jpg", "quality": 80}, {"ext": ".png", "compression": 5}]
+            >>> output_formats = [
+                {"ext": ".jpg", "quality": 80},
+                {"ext": ".png", "compression": 5}
+            ]
             >>> result = tools.set_output_formats(output_formats)
             >>> print(result)
             True
@@ -356,18 +383,28 @@ class ImageTools:
         :type source_path: str
         :param output_path: The path to the output directory.
         :type output_path: str
-        :param output_formats: List of dictionaries containing output format configurations.
+        :param output_formats:
+            List of dictionaries containing output format configurations.
         :type output_formats: list[dict]
 
-        :return: True if the configuration is set successfully, False otherwise.
+        :return:
+            True if the configuration is set successfully,
+            False otherwise.
         :rtype: bool
 
         Example:
             >>> tools = ImageTools(...)
             >>> source_path = "input.jpg"
             >>> output_path = "output"
-            >>> output_formats = [{"ext": ".jpg", "quality": 80}, {"ext": ".png", "compression": 5}]
-            >>> result = tools.set_conf(source_path, output_path, output_formats)
+            >>> output_formats = [
+                {"ext": ".jpg", "quality": 80},
+                {"ext": ".png", "compression": 5}
+            ]
+            >>> result = tools.set_conf(
+                source_path,
+                output_path,
+                output_formats
+            )
             >>> print(result)
             True
         """
@@ -397,7 +434,10 @@ class ImageTools:
             >>> tools = ImageTools(...)
             >>> input_image = ...  # Load your input image as a NumPy array
             >>> output_format = {"fixed_width": 800, "ext": ".jpg"}
-            >>> resized_image = tools.resize_image_if_needed(input_image, output_format)
+            >>> resized_image = tools.resize_image_if_needed(
+                input_image,
+                output_format
+            )
             >>> if resized_image is not None:
             >>>     print("Image resized.")
             >>> else:
@@ -444,7 +484,9 @@ class ImageTools:
             >>>         {'key': 1, 'scale': 3, 'nb_upscale': 7}
             >>>     ]
             >>> }
-            >>> for key, output_format, scale, nb_upscale in ImageTools.loop_on_upscale_stats(upscale_stats):
+            >>> for (
+                    key, output_format, scale, nb_upscale
+                ) in ImageTools.loop_on_upscale_stats(upscale_stats):
             >>>     print(key, output_format, scale, nb_upscale)
         """
         if Ut.is_dict(upscale_stats, not_null=True) \
@@ -487,7 +529,11 @@ class ImageTools:
             >>> }
             >>> image = ImageTools.read_image("input_image.jpg")
             >>> file_name = "output_image"
-            >>> result = ImageTools.upscale_with_auto_scale(image, upscale_stats, file_name)
+            >>> result = ImageTools.upscale_with_auto_scale(
+                image,
+                upscale_stats,
+                file_name
+            )
             >>> print(result)
             >>> True
         """
@@ -497,11 +543,14 @@ class ImageTools:
                 and Ut.is_list(upscale_stats.get('stats'), not_null=True):
             self.init_expander_model()
             result = True
-            for key, output_format, scale, nb_upscale in self.loop_on_upscale_stats(
-                    upscale_stats=upscale_stats):
+            for (
+                    key, output_format, scale, nb_upscale
+                    ) in self.loop_on_upscale_stats(
+                        upscale_stats=upscale_stats):
                 if nb_upscale > 0:
                     logger.debug(
-                        "[ImageTools] Image upscale with auto scale model-> %sx",
+                        "[ImageTools] Image upscale with auto scale model-> "
+                        "%sx",
                         scale
                     )
                     start_upscale = time.perf_counter()
@@ -511,7 +560,8 @@ class ImageTools:
                         scale=scale
                     )
                     logger.debug(
-                        "[ImageTools] Upscale image with %sx model scale in %s s",
+                        "[ImageTools] Upscale image with %sx model "
+                        "scale in %s s",
                         scale,
                         time.perf_counter() - start_upscale
                     )
@@ -540,7 +590,7 @@ class ImageTools:
                                  upscale_stats: dict,
                                  file_name: str
                                  ) -> bool:
-        """"""
+        """Upscale the image using fixed scale."""
         result = False
         if image is not None \
                 and Ut.is_dict(upscale_stats, not_null=True) \
@@ -548,12 +598,15 @@ class ImageTools:
             self.init_expander_model()
             result = True
             upscale_counter = 0
-            for key, output_format, scale, nb_upscale in self.loop_on_upscale_stats(
-                    upscale_stats=upscale_stats):
+            for (
+                key, output_format, _, nb_upscale
+                    ) in self.loop_on_upscale_stats(
+                        upscale_stats=upscale_stats):
                 if nb_upscale > 0:
                     if nb_upscale > upscale_counter:
                         logger.debug(
-                            "[ImageTools] Image upscale with fixed scale %s / %s -> %sx",
+                            "[ImageTools] Image upscale with fixed scale "
+                            "%s / %s -> %sx",
                             upscale_counter,
                             nb_upscale,
                             self.get_model_scale()
@@ -565,7 +618,8 @@ class ImageTools:
                             nb_upscale=nb_upscale_needed
                         )
                         logger.debug(
-                            "[ImageTools] Upscale image with %sx model scale in %s s",
+                            "[ImageTools] Upscale image with %sx model scale "
+                            "in %s s",
                             self.get_model_scale(),
                             time.perf_counter() - start_upscale
                         )
@@ -594,9 +648,10 @@ class ImageTools:
                                     image: ndarray,
                                     size: tuple,
                                     file_name: str
-                                    ) -> ndarray or None:
+                                    ) -> Optional[ndarray]:
         """
-        Downscale or convert the image based on the output configuration and write images.
+        Downscale or convert the image based on the
+        output configuration and write images.
 
         :param image: The input image as a NumPy ndarray.
         :type image: ndarray
@@ -605,7 +660,9 @@ class ImageTools:
         :param file_name: The base file name for the output images.
         :type file_name: str
 
-        :return: True if the downscale or convert and write operations are successful, False otherwise.
+        :return:
+            True if the downscale or convert and write operations
+            are successful, False otherwise.
         :rtype: bool
 
         Example:
@@ -613,9 +670,13 @@ class ImageTools:
             >>> input_image = ...  # Load your input image as a NumPy array
             >>> image_size = (1920, 1080)  # Example original image size
             >>> output_file_name = "output"
-            >>> success = tools.downscale_or_convert_images(input_image, image_size, output_file_name)
+            >>> success = tools.downscale_or_convert_images(
+                input_image, image_size, output_file_name)
             >>> if success:
-            >>>     print("Images downscaled or converted and written successfully.")
+            >>>     print(
+                        "Images downscaled or converted "
+                        "and written successfully."
+                    )
             >>> else:
             >>>     print("Error occurred while processing images.")
         """
@@ -642,7 +703,7 @@ class ImageTools:
                      size: tuple,
                      upscale_stats: dict,
                      file_name: str
-                     ) -> ndarray or None:
+                     ) -> Optional[ndarray]:
         """
         Resize the image based on the output configuration.
 
@@ -655,16 +716,25 @@ class ImageTools:
         :param file_name: The base file name for the output images.
         :type file_name: str
 
-        :return: True if the image is resized and processed successfully, False otherwise.
+        :return: True if the image is resized and processed successfully,
+            False otherwise.
         :rtype: bool
 
         Example:
             >>> tools = ImageTools(...)
             >>> input_image = ...  # Load your input image as a NumPy array
             >>> image_size = (1920, 1080)  # Example original image size
-            >>> upscale_info = {'max_upscale': 2, 'stats': [{'key': 'webp', 'nb_upscale': 1}]}
+            >>> upscale_info = {
+                'max_upscale': 2,
+                'stats': [{'key': 'webp', 'nb_upscale': 1}]
+            }
             >>> output_file_name = "output"
-            >>> success = tools.resize_image(input_image, image_size, upscale_info, output_file_name)
+            >>> success = tools.resize_image(
+                input_image,
+                image_size,
+                upscale_info,
+                output_file_name
+            )
             >>> if success:
             >>>     print("Image resized and processed successfully.")
             >>> else:
@@ -693,7 +763,8 @@ class ImageTools:
                     )
                 else:
                     logger.debug(
-                        "[ImageTools] Image need upscale x%s with fixed scale (%sx)",
+                        "[ImageTools] Image need upscale x%s "
+                        "with fixed scale (%sx)",
                         upscale_stats.get('max_upscale'),
                         self.get_model_scale()
                     )
@@ -777,12 +848,16 @@ class ImageTools:
 
     def run(self):
         """
-        Run the image processing operation, including upscale, downscale, and/or format conversion.
+        Run the image processing operation, including upscale, downscale,
+        and/or format conversion.
 
-        This method initiates the image processing operation based on the configured settings.
-        It handles both individual image files and all image files in a directory.
+        This method initiates the image processing operation
+        based on the configured settings.
+        It handles both individual image files
+        and all image files in a directory.
 
-        :return: True if the image(s) processing completes successfully, False otherwise.
+        :return: True if the image(s) processing completes successfully,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -803,12 +878,17 @@ class ImageTools:
                         ):
                     result = True
             elif os.path.isdir(self.conf.get_source_path()):
-                files = ImageToolsHelper.get_images_list(self.conf.get_source_path())
+                files = ImageToolsHelper.get_images_list(
+                    self.conf.get_source_path())
                 if Ut.is_list(files, not_null=True):
                     result = True
                     for file in files:
+                        source_path = os.path.join(
+                            self.conf.get_source_path(),
+                            file
+                        )
                         if not self.process_image(
-                                    source_path=os.path.join(self.conf.get_source_path(), file),
+                                    source_path=source_path,
                                     file_name=file
                                 ):
                             result = False
@@ -818,7 +898,7 @@ class ImageTools:
     def get_downscale_size(size: tuple,
                            fixed_height: int,
                            fixed_width: int,
-                           ) -> dict or None:
+                           ) -> Optional[dict]:
         """
         Calculate the dimensions for downscaling an image.
 
@@ -829,7 +909,8 @@ class ImageTools:
         :param fixed_width: The desired fixed width for downscaled image.
         :type fixed_width: int
 
-        :return: A dictionary containing dimensions for downscaling, either 'width' or 'height'.
+        :return: A dictionary containing dimensions for downscaling,
+            either 'width' or 'height'.
         :rtype: dict[str, int] or None
 
         Example:
@@ -840,7 +921,8 @@ class ImageTools:
             >>> {'height': 300}
 
         Note:
-            If both fixed_height and fixed_width are provided, the function calculates the most appropriate
+            If both fixed_height and fixed_width are provided,
+            the function calculates the most appropriate
             dimension to maintain the original aspect ratio.
         """
         result = None
@@ -875,7 +957,7 @@ class ImageTools:
         return result
 
     @staticmethod
-    def read_image(source_path: str) -> ndarray or None:
+    def read_image(source_path: str) -> Optional[ndarray]:
         """
         Read and load an image from the specified source path.
 
@@ -909,7 +991,8 @@ class ImageTools:
         :type output_path: str
         :param file_name: The original file name of the image.
         :type file_name: str
-        :param ext: The desired file extension for the resized image (e.g., '.jpg', '.png').
+        :param ext: The desired file extension for the resized image
+            (e.g., '.jpg', '.png').
         :type ext: str
         :param size: The dimensions (height, width) of the resized image.
         :type size: tuple
@@ -922,30 +1005,35 @@ class ImageTools:
             >>> file_name = "image.jpg"
             >>> ext = ".png"
             >>> size = (800, 600)
-            >>> result = ImageTools.set_write_path(output_path, file_name, ext, size)
+            >>> result = ImageTools.set_write_path(
+                output_path,
+                file_name,
+                ext, size
+            )
             >>> print(result)
             >>> "/path/to/output/image_800x600.png"
         """
         result = None
-        name, old_ext = ImageToolsHelper.cut_file_name(file_name)
+        name, _ = ImageToolsHelper.cut_file_name(file_name)
         if Ut.is_str(name, not_null=True) \
                 and Ut.is_tuple(size) \
                 and len(size) == 2 \
                 and Ut.is_str(ext, not_null=True)\
                 and os.path.isdir(output_path):
-            image_name = "%s_%sx%s%s" % (name, size[1], size[0], ext)
+            image_name = f"{name}_{size[1]}x{size[0]}{ext}"
             result = os.path.join(output_path, image_name)
         return result
 
     @staticmethod
-    def get_jpeg_write_options(output_format: dict) -> list or None:
+    def get_jpeg_write_options(output_format: dict) -> Optional[list]:
         """
         Get the options for writing images in JPEG format.
 
         :param output_format: The output format configuration dictionary.
         :type output_format: dict
 
-        :return: A list of options for writing images in JPEG format, or None if no options are specified.
+        :return: A list of options for writing images in JPEG format,
+            or None if no options are specified.
         :rtype: list or None
 
         Example:
@@ -956,7 +1044,14 @@ class ImageTools:
             >>> }
             >>> result = ImageTools.get_jpeg_write_options(output_format)
             >>> print(result)
-            >>> [cv2.IMWRITE_JPEG_QUALITY, 90, cv2.IMWRITE_JPEG_PROGRESSIVE, 1, cv2.IMWRITE_JPEG_OPTIMIZE, 1]
+            >>> [
+                cv2.IMWRITE_JPEG_QUALITY,
+                90,
+                cv2.IMWRITE_JPEG_PROGRESSIVE,
+                1,
+                cv2.IMWRITE_JPEG_OPTIMIZE,
+                1
+            ]
         """
         result = []
         if Ut.is_int(output_format.get('quality')):
@@ -976,14 +1071,15 @@ class ImageTools:
         return result
 
     @staticmethod
-    def get_webp_write_options(output_format: dict) -> list or None:
+    def get_webp_write_options(output_format: dict) -> Optional[list]:
         """
         Get the options for writing images in WebP format.
 
         :param output_format: The output format configuration dictionary.
         :type output_format: dict
 
-        :return: A list of options for writing images in WebP format, or None if no options are specified.
+        :return: A list of options for writing images in WebP format,
+            or None if no options are specified.
         :rtype: list or None
 
         Example:
@@ -1004,14 +1100,15 @@ class ImageTools:
         return result
 
     @staticmethod
-    def get_png_write_options(output_format: dict) -> list or None:
+    def get_png_write_options(output_format: dict) -> Optional[list]:
         """
         Get the options for writing images in PNG format.
 
         :param output_format: The output format configuration dictionary.
         :type output_format: dict
 
-        :return: A list of options for writing images in PNG format, or None if no options are specified.
+        :return: A list of options for writing images in PNG format,
+            or None if no options are specified.
         :rtype: list or None
 
         Example:
@@ -1032,7 +1129,7 @@ class ImageTools:
         return result
 
     @staticmethod
-    def write_image_format(image: ndarray or None,
+    def write_image_format(image: Optional[ndarray],
                            output_path: str,
                            file_name: str,
                            output_format: dict
@@ -1049,7 +1146,9 @@ class ImageTools:
         :param output_format: The output format configuration dictionary.
         :type output_format: dict
 
-        :return: True if the image is successfully written to the specified format, False otherwise.
+        :return:
+            True if the image is successfully written to the specified format,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -1057,7 +1156,12 @@ class ImageTools:
             >>>     'ext': '.jpg',
             >>>     'quality': 90
             >>> }
-            >>> result = ImageTools.write_image_format(image, 'output_dir', 'output_image', output_format)
+            >>> result = ImageTools.write_image_format(
+                image,
+                'output_dir',
+                'output_image',
+                output_format
+            )
             >>> print(result)
             >>> True
         """
@@ -1082,7 +1186,7 @@ class ImageTools:
         return result
 
     @staticmethod
-    def write_images_by_format(image: ndarray or None,
+    def write_images_by_format(image: Optional[ndarray],
                                output_path: str,
                                file_name: str,
                                output_formats: list
@@ -1096,10 +1200,13 @@ class ImageTools:
         :type output_path: str
         :param file_name: The name of the output file.
         :type file_name: str
-        :param output_formats: List of output format configuration dictionaries.
+        :param output_formats:
+            List of output format configuration dictionaries.
         :type output_formats: list
 
-        :return: True if the images are successfully written to the specified formats, False otherwise.
+        :return:
+            True if the images are successfully written
+            to the specified formats, False otherwise.
         :rtype: bool
 
         Example:
@@ -1108,7 +1215,12 @@ class ImageTools:
             >>>     {'ext': '.jpg', 'quality': 90},
             >>>     {'ext': '.webp', 'quality': 80}
             >>> ]
-            >>> result = ImageTools.write_images_by_format(image, 'output_dir', 'output_image', output_formats)
+            >>> result = ImageTools.write_images_by_format(
+                image,
+                'output_dir',
+                'output_image',
+                output_formats
+            )
             >>> print(result)
             >>> True
         """
@@ -1126,12 +1238,12 @@ class ImageTools:
         return result
 
     @staticmethod
-    def write_image(image: ndarray or None,
+    def write_image(image: Optional[ndarray],
                     output_path: str,
                     file_name: str,
                     ext: str,
-                    options: list or None = None
-                    ) -> ndarray or None:
+                    options: Optional[list] = None
+                    ) -> Optional[ndarray]:
         """
         Write an image to the specified format.
 
@@ -1146,7 +1258,9 @@ class ImageTools:
         :param options: List of image write options for the chosen format.
         :type options: list or None
 
-        :return: True if the image is successfully written to the specified format, False otherwise.
+        :return:
+            True if the image is successfully written to the specified format,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -1155,7 +1269,12 @@ class ImageTools:
             >>> file_name = "output_image"
             >>> ext = ".jpg"
             >>> options = [cv2.IMWRITE_JPEG_QUALITY, 90]
-            >>> result = ImageTools.write_image(image, output_path, file_name, ext, options)
+            >>> result = ImageTools.write_image(
+                image,
+                output_path,
+                file_name, ext,
+                options
+            )
             >>> print(result)
             >>> True
         """
@@ -1185,16 +1304,16 @@ class ImageTools:
         if not can_write \
                 or result is False:
             logger.warning(
-                f"Unable to write image {file_name}."
+                "Unable to write image %s.", file_name
             )
         return result
 
     @staticmethod
     def image_resize(image: ndarray,
-                     width: int or float or None = None,
-                     height: int or float or None = None,
+                     width: Optional[Union[int, float]] = None,
+                     height: Optional[Union[int, float]] = None,
                      inter=cv2.INTER_AREA
-                     ) -> ndarray or None:
+                     ) -> Optional[ndarray]:
         """
         Resize an image.
 
@@ -1210,7 +1329,8 @@ class ImageTools:
         :return: The resized image as a NumPy ndarray.
         :rtype: ndarray or None
 
-        :raises ImgToolsException: If unable to resize the image due to bad sizes.
+        :raises ImgToolsException:
+            If unable to resize the image due to bad sizes.
 
         Example:
             >>> image = ImageTools.read_image("input_image.jpg")
