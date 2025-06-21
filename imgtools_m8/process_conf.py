@@ -1,9 +1,9 @@
 """Process Configuration class"""
 import logging
 from os import path as Path
+from typing import Optional
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
-from imgtools_m8.exceptions import ImgToolsException
 from imgtools_m8.exceptions import SettingInvalidException
 
 __author__ = "Eli Serra"
@@ -23,9 +23,11 @@ class ProcessConf:
 
     :param source_path: The path to the source directory containing images.
     :type source_path: str, optional
-    :param output_formats: A list of output image formats to be used for saving.
+    :param output_formats:
+        A list of output image formats to be used for saving.
     :type output_formats: list, optional
-    :param output_path: The path to the output directory where processed images will be saved.
+    :param output_path:
+        The path to the output directory where processed images will be saved.
     :type output_path: str, optional
     """
 
@@ -39,9 +41,12 @@ class ProcessConf:
 
         :param source_path: The path to the source directory containing images.
         :type source_path: str
-        :param output_formats: A list of output image formats to be used for saving.
+        :param output_formats:
+            A list of output image formats to be used for saving.
         :type output_formats: list
-        :param output_path: The path to the output directory where processed images will be saved.
+        :param output_path:
+            The path to the output directory
+            where processed images will be saved.
         :type output_path: str
         """
         self.source_path = None
@@ -60,7 +65,9 @@ class ProcessConf:
 
         Example:
             >>> config = ProcessConf(
-            >>> source_path='path/to/source', output_formats=['jpg', 'png'], output_path='path/to/output'
+                source_path='path/to/source',
+                output_formats=['jpg', 'png'],
+                output_path='path/to/output'
             >>> )
             >>> config.is_ready()
             True
@@ -77,7 +84,10 @@ class ProcessConf:
         :rtype: bool
 
         Example:
-            >>> config = ProcessConf(source_path="/path/to/images", output_formats=["jpg", "png"])
+            >>> config = ProcessConf(
+                source_path="/path/to/images",
+                output_formats=["jpg", "png"]
+            )
             >>> config.has_source_path()
             True
         """
@@ -113,7 +123,10 @@ class ProcessConf:
         :rtype: str
 
         Example:
-            >>> config = ProcessConf(source_path="/path/to/images", output_formats=["jpg", "png"])
+            >>> config = ProcessConf(
+                source_path="/path/to/images",
+                output_formats=["jpg", "png"]
+            )
             >>> config.get_source_path()
             '/path/to/images'
         """
@@ -127,7 +140,10 @@ class ProcessConf:
         :rtype: bool
 
         Example:
-            >>> config = ProcessConf(source_path="/path/to/images", output_formats=["jpg", "png"])
+            >>> config = ProcessConf(
+                source_path="/path/to/images",
+                output_formats=["jpg", "png"]
+            )
             >>> config.has_output_formats()
             True
         """
@@ -138,17 +154,23 @@ class ProcessConf:
         """
         Set the output formats and configuration.
 
-        :param data: A list of dictionaries containing output format configurations.
+        :param data:
+            A list of dictionaries containing output format configurations.
         :type data: list
 
-        :return: True if the output formats were set successfully, False otherwise.
+        :return:
+            True if the output formats were set successfully, False otherwise.
         :rtype: bool
 
-        :raises SettingInvalidException: If the provided data contains invalid configuration.
+        :raises SettingInvalidException:
+            If the provided data contains invalid configuration.
 
         Example:
             >>> config = ProcessConf(source_path="/path/to/images")
-            >>> output_formats = [{"formats": "jpg", "output_size": (800, 600)}, {"formats": "png"}]
+            >>> output_formats = [
+                {"formats": "jpg", "output_size": (800, 600)},
+                {"formats": "png"}
+            ]
             >>> config.set_output_formats(output_formats)
             True
         """
@@ -156,14 +178,15 @@ class ProcessConf:
         if ProcessConf.is_output_formats(data):
             self.output_formats = []
             for output_format in data:
-                conf = ProcessConf.set_output_format(output_format.get('formats'))
+                conf = ProcessConf.set_output_format(
+                    output_format.get('formats'))
                 if Ut.is_dict(conf):
                     conf.update(ProcessConf.set_output_size(output_format))
                 else:
                     raise SettingInvalidException(
                         "[ImageTools::set_output_conf] "
-                        "Error: Invalid output format configuration. %s",
-                        output_format
+                        "Error: Invalid output format configuration. "
+                        f"{output_format}"
                     )
                 self.output_formats.append(conf)
             self.output_formats = data
@@ -171,8 +194,8 @@ class ProcessConf:
         else:
             raise SettingInvalidException(
                 "[ImageTools::set_output_conf] "
-                "Error: Invalid output formats configuration [{}]. %s ",
-                data
+                "Error: Invalid output formats configuration [{}]. "
+                f"{data}"
             )
         return result
 
@@ -180,15 +203,22 @@ class ProcessConf:
         """
         Get the list of output format configurations.
 
-        :return: A list of dictionaries containing output format configurations.
+        :return:
+            A list of dictionaries containing output format configurations.
         :rtype: list
 
         Example:
             >>> config = ProcessConf(source_path="/path/to/images")
-            >>> output_formats = [{"formats": "jpg", "output_size": (800, 600)}, {"formats": "png"}]
+            >>> output_formats = [
+                {"formats": "jpg", "output_size": (800, 600)},
+                {"formats": "png"}
+            ]
             >>> config.set_output_formats(output_formats)
             >>> config.get_output_formats()
-            [{'formats': 'jpg', 'output_size': (800, 600)}, {'formats': 'png'}]
+            [
+                {'formats': 'jpg', 'output_size': (800, 600)},
+                {'formats': 'png'}
+            ]
         """
         return self.output_formats
 
@@ -200,7 +230,10 @@ class ProcessConf:
         :rtype: bool
 
         Example:
-            >>> config = ProcessConf(source_path="/path/to/images", output_formats=["jpg", "png"])
+            >>> config = ProcessConf(
+                source_path="/path/to/images",
+                output_formats=["jpg", "png"]
+            )
             >>> config.set_output_path("/path/to/output")
             >>> config.has_output_path()
             True
@@ -218,7 +251,10 @@ class ProcessConf:
         :rtype: bool
 
         Example:
-            >>> config = ProcessConf(source_path="/path/to/images", output_formats=["jpg", "png"])
+            >>> config = ProcessConf(
+                source_path="/path/to/images",
+                output_formats=["jpg", "png"]
+            )
             >>> config.set_output_path("/path/to/output")
             True
         """
@@ -237,7 +273,10 @@ class ProcessConf:
         :rtype: str
 
         Example:
-            >>> config = ProcessConf(source_path="/path/to/images", output_formats=["jpg", "png"])
+            >>> config = ProcessConf(
+                source_path="/path/to/images",
+                output_formats=["jpg", "png"]
+            )
             >>> config.set_output_path("/path/to/output")
             >>> config.get_output_path()
             '/path/to/output'
@@ -301,15 +340,20 @@ class ProcessConf:
     @staticmethod
     def is_fixed_width_or_height(data: dict) -> bool:
         """
-        Check if a given output configuration contains valid fixed width or height settings.
+        Check if a given output configuration contains valid fixed width
+        or height settings.
 
         :param data: The output configuration data.
         :type data: dict
 
-        :return: True if the configuration contains valid fixed width or height settings, False otherwise.
+        :return:
+            True if the configuration contains valid fixed width or height
+            settings, False otherwise.
         :rtype: bool
 
-        :raises SettingInvalidException: If the fixed_width or fixed_height values are invalid or mixed with other settings.
+        :raises SettingInvalidException:
+            If the fixed_width or fixed_height values are invalid
+            or mixed with other settings.
 
         Example:
             >>> config_data = {'fixed_width': 800, 'fixed_height': 600}
@@ -319,8 +363,9 @@ class ProcessConf:
         is_not_fixed_width_or_height = data.get('fixed_height') is None \
             and data.get('fixed_width') is None
 
-        is_fixed_width_or_height = (Ut.is_int(data.get('fixed_width'), mini=1)
-                                    and Ut.is_int(data.get('fixed_height'), mini=1)) \
+        is_fixed_width_or_height = (
+            Ut.is_int(data.get('fixed_width'), mini=1)
+            and Ut.is_int(data.get('fixed_height'), mini=1)) \
             or (Ut.is_int(data.get('fixed_width'), mini=1)
                 and data.get('fixed_height') is None) \
             or (Ut.is_int(data.get('fixed_height'), mini=1)
@@ -342,22 +387,27 @@ class ProcessConf:
                 and not is_not_fixed_width_or_height:
             raise SettingInvalidException(
                 "[ImageTools] Invalid output configuration: "
-                "fixed_width and/or fixed_height can't be mixed with fixed_size and fixed_scale."
+                "fixed_width and/or fixed_height can't be mixed "
+                "with fixed_size and fixed_scale."
             )
         return not is_not_fixed_width_or_height
 
     @staticmethod
     def is_fixed_size(data: dict) -> bool:
         """
-        Check if a given output configuration contains a valid fixed size setting.
+        Check if a given output configuration
+        contains a valid fixed size setting.
 
         :param data: The output configuration data.
         :type data: dict
 
-        :return: True if the configuration contains a valid fixed size setting, False otherwise.
+        :return:
+            True if the configuration contains a valid fixed size setting,
+            False otherwise.
         :rtype: bool
 
-        :raises SettingInvalidException: If the fixed_size value is invalid or mixed with other settings.
+        :raises SettingInvalidException:
+            If the fixed_size value is invalid or mixed with other settings.
 
         Example:
             >>> config_data = {'fixed_size': 800}
@@ -393,12 +443,15 @@ class ProcessConf:
     @staticmethod
     def is_fixed_scale_value(data: dict) -> bool:
         """
-        Check if a given output configuration contains a valid fixed scale setting.
+        Check if a given output configuration contains
+        a valid fixed scale setting.
 
         :param data: The output configuration data.
         :type data: dict
 
-        :return: True if the configuration contains a valid fixed scale setting, False otherwise.
+        :return:
+            True if the configuration contains a valid fixed scale setting,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -411,12 +464,15 @@ class ProcessConf:
     @staticmethod
     def is_fixed_scale(data: dict) -> bool:
         """
-        Check if a given output configuration contains a valid fixed scale setting.
+        Check if a given output configuration contains
+        a valid fixed scale setting.
 
         :param data: The output configuration data.
         :type data: dict
 
-        :return: True if the configuration contains a valid fixed scale setting, False otherwise.
+        :return:
+            True if the configuration contains a valid fixed scale setting,
+            False otherwise.
         :rtype: bool
 
         :raises SettingInvalidException:
@@ -460,7 +516,8 @@ class ProcessConf:
     @staticmethod
     def set_output_size(output_format: dict) -> dict:
         """
-        Set the output size configuration based on the provided output format data.
+        Set the output size configuration
+        based on the provided output format data.
 
         :param output_format: The output format data.
         :type output_format: dict
@@ -497,12 +554,15 @@ class ProcessConf:
     @staticmethod
     def is_output_write_jpg_format(data: dict) -> bool:
         """
-        Check if a given output configuration contains valid options for writing JPEG format.
+        Check if a given output configuration contains
+        valid options for writing JPEG format.
 
         :param data: The output configuration data.
         :type data: dict
 
-        :return: True if the configuration contains valid JPEG format options, False otherwise.
+        :return:
+            True if the configuration contains valid JPEG format options,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -522,12 +582,15 @@ class ProcessConf:
     @staticmethod
     def is_output_write_webp_format(data: dict) -> bool:
         """
-        Check if a given output configuration contains valid options for writing WebP format.
+        Check if a given output configuration contains
+        valid options for writing WebP format.
 
         :param data: The output configuration data.
         :type data: dict
 
-        :return: True if the configuration contains valid WebP format options, False otherwise.
+        :return:
+            True if the configuration contains valid WebP format options,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -543,12 +606,15 @@ class ProcessConf:
     @staticmethod
     def is_output_write_png_format(data: dict) -> bool:
         """
-        Check if a given output configuration contains valid options for writing PNG format.
+        Check if a given output configuration contains
+        valid options for writing PNG format.
 
         :param data: The output configuration data.
         :type data: dict
 
-        :return: True if the configuration contains valid PNG format options, False otherwise.
+        :return:
+            True if the configuration contains valid PNG format options,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -564,12 +630,15 @@ class ProcessConf:
     @staticmethod
     def is_valid_output_format(data: dict) -> bool:
         """
-        Check if a given output configuration contains valid options for writing image formats.
+        Check if a given output configuration
+        contains valid options for writing image formats.
 
         :param data: The output configuration data.
         :type data: dict
 
-        :return: True if the configuration contains valid image format options, False otherwise.
+        :return:
+            True if the configuration contains valid image format options,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -583,7 +652,7 @@ class ProcessConf:
                  or ProcessConf.is_output_write_png_format(data))
 
     @staticmethod
-    def set_output_format(write_formats: list) -> dict or None:
+    def set_output_format(write_formats: list) -> Optional[dict]:
         """
         Set the write_format configuration.
 
@@ -594,9 +663,15 @@ class ProcessConf:
         :rtype: dict or None
 
         Example:
-            >>> format_list = [{'ext': '.jpg', 'quality': 90}, {'ext': '.png', 'compression': 6}]
+            >>> format_list = [
+                {'ext': '.jpg', 'quality': 90},
+                {'ext': '.png', 'compression': 6}
+            ]
             >>> ProcessConf.set_output_format(format_list)
-            >>> {'formats': [{'ext': '.jpg', 'quality': 90}, {'ext': '.png', 'compression': 6}]}
+            >>> {'formats': [
+                {'ext': '.jpg', 'quality': 90},
+                {'ext': '.png', 'compression': 6}
+            ]}
         """
         result = None
         if Ut.is_list(write_formats, not_null=True):
@@ -605,8 +680,8 @@ class ProcessConf:
                     raise SettingInvalidException(
                         "[ImageTools::set_output_format] "
                         "Error: Invalid output format configuration. "
-                        "Bad extensions or write output options: %s",
-                        write_format
+                        "Bad extensions or write output options: "
+                        f"{write_format}"
                     )
             result = {'formats': write_formats}
         return result
