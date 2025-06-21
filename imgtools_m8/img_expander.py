@@ -1,11 +1,14 @@
 """
 Image Expander class
 
-This module provides a tool for expanding images using Super-Resolution techniques.
+This module provides a tool for expanding images
+using Super-Resolution techniques.
 """
+import os
+from typing import Optional
 from cv2 import dnn_superres
 from numpy import ndarray
-import os
+
 from ve_utils.utils import UType as Ut
 from imgtools_m8.model_conf import ModelConf, ScaleSelector
 from imgtools_m8.helper import ImageToolsHelper
@@ -18,15 +21,18 @@ __license__ = "Apache Software License"
 __status__ = "Production"
 __version__ = "1.0.0"
 
+# pylint: disable=no-member, c-extension-no-member
+
 
 class ImageExpander:
     """
     Image Expander Tool
 
-    This class provides methods for expanding images using Super-Resolution techniques.
+    This class provides methods for expanding images
+    using Super-Resolution techniques.
     """
     def __init__(self,
-                 model_conf: dict or None = None,
+                 model_conf: Optional[dict] = None,
                  ):
         """
         Initialize the ImageExpander instance.
@@ -46,7 +52,11 @@ class ImageExpander:
         :rtype: bool
 
         Example:
-            >>> model_config = {'model_path': 'path/to/models', 'model_name': 'edsr', 'scale': 2}
+            >>> model_config = {
+                'model_path': 'path/to/models',
+                'model_name': 'edsr',
+                'scale': 2
+            }
             >>> expander = ImageExpander(model_config)
             >>> expander.is_ready()
             True
@@ -62,7 +72,11 @@ class ImageExpander:
         :rtype: bool
 
         Example:
-            >>> model_config = {'model_path': 'path/to/models', 'model_name': 'edsr', 'scale': 2}
+            >>> model_config = {
+                'model_path': 'path/to/models',
+                'model_name': 'edsr',
+                'scale': 2
+            }
             >>> expander = ImageExpander(model_config)
             >>> expander.has_model_conf()
             True
@@ -70,7 +84,7 @@ class ImageExpander:
         return self.model_conf.is_ready()
 
     def set_model_conf(self,
-                       model_conf: dict or None = None
+                       model_conf: Optional[dict] = None
                        ) -> bool:
         """
         Set the model configuration for the ImageExpander.
@@ -78,11 +92,17 @@ class ImageExpander:
         :param model_conf: The model configuration dictionary.
         :type model_conf: dict, optional
 
-        :return: True if the model configuration is set successfully, False otherwise.
+        :return:
+            True if the model configuration is set successfully,
+            False otherwise.
         :rtype: bool
 
         Example:
-            >>> model_config = {'model_path': 'path/to/models', 'model_name': 'edsr', 'scale': 2}
+            >>> model_config = {
+                'model_path': 'path/to/models',
+                'model_name': 'edsr',
+                'scale': 2
+            }
             >>> expander = ImageExpander()
             >>> expander.set_model_conf(model_config)
             True
@@ -124,7 +144,11 @@ class ImageExpander:
         Initialize the Super-Resolution model.
 
         Example:
-            >>> model_config = {'model_path': 'path/to/models', 'model_name': 'edsr', 'scale': 2}
+            >>> model_config = {
+                'model_path': 'path/to/models',
+                'model_name': 'edsr',
+                'scale': 2
+            }
             >>> expander = ImageExpander(model_config)
             >>> expander.init_sr()
         """
@@ -132,13 +156,18 @@ class ImageExpander:
 
     def load_model(self):
         """
-        Load the super-resolution model using the configured model configuration.
+        Load the super-resolution model using
+        the configured model configuration.
 
         :return: True if the model is loaded successfully, False otherwise.
         :rtype: bool
 
         Example:
-            >>> model_config = {'model_path': 'path/to/models', 'model_name': 'edsr', 'scale': 2}
+            >>> model_config = {
+                'model_path': 'path/to/models',
+                'model_name': 'edsr',
+                'scale': 2
+            }
             >>> expander = ImageExpander(model_config)
             >>> expander.load_model()
             True
@@ -151,7 +180,8 @@ class ImageExpander:
             )
             if os.path.isfile(mod_path):
                 self.sr.readModel(mod_path)
-                # Set the desired model and scale to get correct pre- and post-processing
+                # Set the desired model and scale
+                # to get correct pre- and post-processing
                 self.sr.setModel(
                     self.model_conf.get_model_name(),
                     self.model_conf.get_scale()
@@ -169,10 +199,15 @@ class ImageExpander:
         :rtype: ndarray
 
         Example:
-            >>> model_config = {'model_path': 'path/to/models', 'model_name': 'edsr', 'scale': 2}
+            >>> model_config = {
+                'model_path': 'path/to/models',
+                'model_name': 'edsr',
+                'scale': 2
+            }
             >>> expander = ImageExpander(model_config)
             >>> expander.load_model()
-            >>> input_image = ...  # Load or create your input image as a NumPy array
+            >>> # Load or create your input image as a NumPy array
+            >>> input_image = ...
             >>> upscaled_image = expander.upscale_image(input_image)
         """
         if image is not None:
@@ -182,8 +217,8 @@ class ImageExpander:
     def many_image_upscale(self,
                            image: ndarray,
                            nb_upscale: int,
-                           scale: int or None = None
-                           ) -> ndarray or None:
+                           scale: Optional[int] = None
+                           ) -> Optional[ndarray]:
         """
         Upscale an image multiple times using the super-resolution model.
 
@@ -195,11 +230,19 @@ class ImageExpander:
         :rtype: ndarray or None
 
         Example:
-            >>> model_config = {'model_path': 'path/to/models', 'model_name': 'edsr', 'scale': 2}
+            >>> model_config = {
+                'model_path': 'path/to/models',
+                'model_name': 'edsr',
+                'scale': 2
+            }
             >>> expander = ImageExpander(model_config)
             >>> expander.load_model()
-            >>> input_image = ...  # Load or create your input image as a NumPy array
-            >>> final_upscaled_image = expander.many_image_upscale(input_image, nb_upscale=3)
+            >>> # Load or create your input image as a NumPy array
+            >>> input_image = ...
+            >>> final_upscaled_image = expander.many_image_upscale(
+                input_image,
+                nb_upscale=3
+            )
         """
         max_upscale = 10
         if image is not None\
