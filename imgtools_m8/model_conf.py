@@ -2,10 +2,9 @@
 import logging
 from enum import Enum
 from os import path as Path
+from typing import Optional
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
-from imgtools_m8.exceptions import ImgToolsException
-from imgtools_m8.exceptions import SettingInvalidException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -41,9 +40,9 @@ class ModelConf:
         scale_selector (ScaleSelector): The scale selection strategy.
     """
     def __init__(self,
-                 model_path: str or None = None,
-                 model_name: str or None = None,
-                 scale: int or None = None,
+                 model_path: Optional[str] = None,
+                 model_name: Optional[str] = None,
+                 scale: Optional[int] = None,
                  scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE
                  ):
         """
@@ -75,7 +74,11 @@ class ModelConf:
         :rtype: bool
 
         Example:
-            >>> conf = ModelConf(model_path='path/to/model', model_name='model_name', scale=2)
+            >>> conf = ModelConf(
+                model_path='path/to/model',
+                model_name='model_name',
+                scale=2
+            )
             >>> conf.is_ready()
             True
         """
@@ -201,13 +204,18 @@ class ModelConf:
             scale=self.scale
         )
 
-    def set_scale(self, value: int or None, set_default: bool = True) -> bool:
+    def set_scale(
+        self,
+        value: Optional[int],
+        set_default: bool = True
+    ) -> bool:
         """
         Set the model scale.
 
         :param value: The scale value to be set.
-        :type value: int or None
-        :param set_default: Whether to set a default scale if the provided value is not valid.
+        :type value: Optional[int]
+        :param set_default:
+            Whether to set a default scale if the provided value is not valid.
         :type set_default: bool, optional
 
         :return: True if the scale was set successfully, False otherwise.
@@ -255,7 +263,9 @@ class ModelConf:
         """
         Check if the ModelConf instance has a valid scale selection strategy.
 
-        :return: True if the scale selection strategy is valid, False otherwise.
+        :return:
+            True if the scale selection strategy is valid,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -272,7 +282,9 @@ class ModelConf:
         :param value: The scale selection strategy to be set.
         :type value: ScaleSelector
 
-        :return: True if the scale selection strategy was set successfully, False otherwise.
+        :return:
+            True if the scale selection strategy was set successfully,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -309,7 +321,10 @@ class ModelConf:
         :rtype: list
 
         Example:
-            >>> conf = ModelConf(model_path='/path/to/models', model_name='edsr')
+            >>> conf = ModelConf(
+                model_path='/path/to/models',
+                model_name='edsr'
+            )
             >>> conf.get_available_scales()
             [2, 3, 4]
         """
@@ -326,7 +341,11 @@ class ModelConf:
         :rtype: str
 
         Example:
-            >>> conf = ModelConf(model_path='/path/to/models', model_name='edsr', scale=2)
+            >>> conf = ModelConf(
+                model_path='/path/to/models',
+                model_name='edsr',
+                scale=2
+            )
             >>> conf.get_file_name()
             'edsr_x2'
         """
@@ -420,7 +439,9 @@ class ModelConf:
         :param file_name: The model file name.
         :type file_name: str
 
-        :return: The model scale number extracted from the file name, or 0 if not found.
+        :return:
+            The model scale number extracted from the file name,
+            or 0 if not found.
         :rtype: int
 
         Example:
@@ -431,14 +452,15 @@ class ModelConf:
         """
         result = 0
         if Ut.is_str(file_name, not_null=True):
-            name, ext = ImageToolsHelper.cut_file_name(file_name)
+            name, _ = ImageToolsHelper.cut_file_name(file_name)
             result = Ut.get_int(name[-1:], default=0)
         return result
 
     @staticmethod
-    def get_model_scales_available(path: str,
-                                   model_name: str
-                                   ) -> list or None:
+    def get_model_scales_available(
+        path: str,
+        model_name: str
+    ) -> Optional[list]:
         """
         Get a list of available model scales for a given model name and path.
 
@@ -447,8 +469,10 @@ class ModelConf:
         :param model_name: The model name.
         :type model_name: str
 
-        :return: A list of available model scales, or None if no valid models are found.
-        :rtype: list or None
+        :return:
+            A list of available model scales,
+            or None if no valid models are found.
+        :rtype: Optional[list]
 
         Example:
             >>> ModelConf.get_model_scales_available('/path/to/models', 'edsr')
@@ -473,7 +497,7 @@ class ModelConf:
     def get_model_file_name(path: str,
                             model_name: str,
                             scale: int
-                            ) -> str or None:
+                            ) -> Optional[str]:
         """
         Get the model file name for a specific model name and scale.
 
@@ -484,8 +508,10 @@ class ModelConf:
         :param scale: The desired model scale.
         :type scale: int
 
-        :return: The model file name matching the model name and scale, or None if not found.
-        :rtype: str or None
+        :return:
+            The model file name matching the model name and scale,
+            or None if not found.
+        :rtype: Optional[str]
 
         Example:
             >>> ModelConf.get_model_file_name('/path/to/models', 'edsr', 2)
@@ -506,18 +532,20 @@ class ModelConf:
         return result
 
     @staticmethod
-    def is_model_file_name(model_path: str or None,
-                           file_name: str or None
+    def is_model_file_name(model_path: Optional[str],
+                           file_name: Optional[str]
                            ) -> bool:
         """
         Check if a given file name is a valid model file name.
 
         :param model_path: The path to the directory containing model files.
-        :type model_path: str or None
+        :type model_path: Optional[str]
         :param file_name: The file name to check.
-        :type file_name: str or None
+        :type file_name: Optional[str]
 
-        :return: True if the file name is a valid model file name, False otherwise.
+        :return:
+            True if the file name is a valid model file name,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -570,7 +598,9 @@ class ModelConf:
         :param scale: The scale to check.
         :type scale: int
 
-        :return: True if the scale is valid for the model path and name, False otherwise.
+        :return:
+            True if the scale is valid for the model path and name,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -596,7 +626,9 @@ class ModelConf:
         :param value: The value to check.
         :type value: ScaleSelector
 
-        :return: True if the value is a valid ScaleSelector enumeration, False otherwise.
+        :return:
+            True if the value is a valid ScaleSelector enumeration,
+            False otherwise.
         :rtype: bool
 
         Example:
