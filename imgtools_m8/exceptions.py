@@ -15,7 +15,8 @@ class ImgToolsException(Exception):
     """
     Base exception class for the ImgTools_m8 package.
 
-    This is the base class for all exceptions raised within the ImgTools_m8 package.
+    This is the base class for all exceptions raised
+    within the ImgTools_m8 package.
     It provides a common interface for handling errors specific to ImgTools_m8.
     """
 
@@ -24,6 +25,7 @@ class SettingInvalidException(ImgToolsException):
     """
     Exception for invalid settings or configurations.
 
-    This exception is raised when a setting or configuration provided to ImgTools_m8
+    This exception is raised when a setting
+    or configuration provided to ImgTools_m8
     is invalid or does not match the expected value or type.
     """
