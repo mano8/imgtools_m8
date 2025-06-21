@@ -5,6 +5,7 @@ import logging
 import multiprocessing
 import time
 import os
+from typing import Optional
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.img_tools import ImageTools
@@ -29,7 +30,7 @@ class MultiProcessImage(ImageTools):
                  source_path: str,
                  output_path: str,
                  output_formats: list,
-                 model_conf: dict or None = None,
+                 model_conf: Optional[dict] = None,
                  ):
         ImageTools.__init__(self,
                             source_path=source_path,
@@ -49,7 +50,7 @@ class MultiProcessImage(ImageTools):
             cpu_count = multiprocessing.cpu_count()
             pool = multiprocessing.Pool(processes=cpu_count)
             try:
-                prms = list()
+                prms = []
                 for file in files:
                     prms.append((
                         os.path.join(self.conf.get_source_path(), file),
