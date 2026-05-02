@@ -30,7 +30,7 @@ opencv-contrib-python==4.8.1.78
     # via -r requirements.in
 packaging==23.1
     # via sphinx
-pygments==2.16.1
+pygments==2.20.0
     # via sphinx
 requests==2.32.4
     # via sphinx
