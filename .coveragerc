@@ -1,0 +1,20 @@
+[run]
+source = auth_user_service
+omit =
+    auth_user_service/main.py
+    auth_user_service/routes/*
+    auth_user_service/alembic/*
+    auth_user_service/scripts/*
+    auth_user_service/services/oauth.py
+    auth_user_service/core/engine_async.py
+    auth_user_service/core/engine_sync.py
+    auth_user_service/core/init_db.py
+    auth_user_service/core/config.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
+    @abstractmethod
+    if TYPE_CHECKING:
