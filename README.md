@@ -225,7 +225,7 @@ pytest
 
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [SQLModel](https://sqlmodel.tiangolo.com/) + [Alembic](https://alembic.sqlalchemy.org/)
-- [auth-sdk-m8](https://github.com/mano8/auth-sdk-m8) — shared schemas, JWT utilities, base controllers
+- [auth-sdk-m8.](https://github.com/mano8/auth-sdk-m8.) — shared schemas, JWT utilities, base controllers
 - [Redis](https://redis.io/) — session revocation and rate limiting
 - [PyJWT](https://pyjwt.readthedocs.io/) + [passlib](https://passlib.readthedocs.io/) + [cryptography](https://cryptography.io/)
 - [google-auth](https://google-auth.readthedocs.io/) — Google OAuth2
