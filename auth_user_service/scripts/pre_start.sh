@@ -12,7 +12,7 @@ python -m auth_user_service.scripts.fastapi_pre_start || { echo "Failed to initi
 
 # Run migrations
 echo "Run Migrations"
-alembic -c ./auth_user_service/alembic.ini upgrade head || { echo "Migration failed"; exit 1; }
+alembic -c /opt/auth_user_service/alembic.ini upgrade head || { echo "Migration failed"; exit 1; }
 
 # Create initial data in DB
 echo "Create initial data in DB"
