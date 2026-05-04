@@ -11,16 +11,21 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Build arg to select environment
-ARG ENVIRONMENT=prod
+ARG ENVIRONMENT=production
 
 # Copy requirements
-COPY requirements_base.txt .
-COPY requirements_dev.txt .
-COPY requirements_prod.txt .
+COPY fa-auth-m8/auth_user_service/requirements_base.txt .
+COPY fa-auth-m8/auth_user_service/requirements_dev.txt .
+COPY fa-auth-m8/auth_user_service/requirements_prod.txt .
 
 # Install dependencies into /install
 RUN pip install --upgrade pip && \
-    pip install --prefix=/install --no-cache-dir -r requirements_${ENVIRONMENT}.txt
+    pip install --prefix=/install --no-cache-dir -r requirements_base.txt && \
+    if [ "$ENVIRONMENT" = "development" ]; then \
+        pip install --prefix=/install --no-cache-dir -r requirements_dev.txt ; \
+    else \
+        pip install --prefix=/install --no-cache-dir -r requirements_prod.txt ; \
+    fi
 
 
 # ---------- RUNTIME STAGE ----------
@@ -40,7 +45,7 @@ WORKDIR /opt
 COPY --from=builder /install /usr/local
 
 # Copy app code
-COPY --chown=appuser:appuser ./auth_user_service ./auth_user_service
+COPY --chown=appuser:appuser ./fa-auth-m8/auth_user_service ./auth_user_service
 
 # Minimal runtime tools
 RUN apt-get update && apt-get install -y dos2unix && \
