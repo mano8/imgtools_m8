@@ -3,14 +3,16 @@ set -e
 
 # Run migrations
 # Check if alembic/versions is empty
-if [ -z "$(ls -A ./shared_migrations/auth_user/versions)" ]; then
+if [ -z "$(ls -A /opt/shared_migrations/auth_user/versions)" ]; then
     echo "Generating Alembic migration..."
-    if ! alembic -c ./auth_user_service/alembic.ini revision --autogenerate -m "Initial auth migration"; then
+    if ! alembic -c /opt/auth_user_service/alembic.ini revision --autogenerate -m "Initial auth migration"; then
         echo "Failed to generate initial migration"
         exit 1
     else
         echo "Initial migration generated..."
     fi
+else
+    echo "Migrations already exist, skipping generation."
 fi
 
 # Run any pre-start tasks
@@ -34,7 +36,7 @@ if [ "$VSCODE_DEBUG" = "true" ]; then
         exit 1  # Ensure the script exits if needed
     fi
 else
-    if ! uvicorn auth_user_service.main:app --host 0.0.0.0 --port 8000 --reload; then
+    if ! uvicorn auth_user_service.main:app --host 0.0.0.0 --port 8000; then
         echo "Uvicorn failed to start. Dropping to a shell for debugging."
         exit 1  # Ensure the script exits if needed
     fi
