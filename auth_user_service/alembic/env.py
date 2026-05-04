@@ -11,6 +11,9 @@ import sys
 import os
 # add your project to PYTHONPATH if needed
 sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))
+
+import auth_user_service.db_models
+
 from auth_user_service.core.config import settings
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
