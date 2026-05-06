@@ -8,7 +8,7 @@ A self-contained FastAPI authentication microservice designed to run as a Docker
 
 - Email/password login with bcrypt password hashing
 - Google OAuth2 login
-- JWT access + refresh token pair (refresh token delivered via HttpOnly cookie)
+- JWT access + refresh token pair (refresh token delivered via HttpOnly cookie, rotated on every use)
 - Session tracking and revocation via Redis
 - Login rate limiting per email (Redis-backed)
 - Role-based access control (`user`, `admin`, `superuser`)
@@ -50,7 +50,7 @@ All routes are prefixed with `API_PREFIX` (default `/user`).
 | login | POST | `/login/access-token` | Email/password login — returns access token, sets refresh cookie |
 | login | POST | `/login/refresh-token/` | Refresh access token from cookie |
 | login | POST | `/login/logout/` | Revoke session and clear cookie |
-| login | POST | `/login/login/test-token/` | Validate access token |
+| login | POST | `/login/test-token/` | Validate access token |
 | oauth-login | * | `/oauth/...` | OAuth2 password-flow endpoints |
 | google-auth | GET | `/google/login` | Initiate Google OAuth2 flow |
 | google-auth | GET | `/google/callback` | Google OAuth2 callback |
@@ -225,7 +225,7 @@ pytest
 
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [SQLModel](https://sqlmodel.tiangolo.com/) + [Alembic](https://alembic.sqlalchemy.org/)
-- [auth-sdk-m8.](https://github.com/mano8/auth-sdk-m8.) — shared schemas, JWT utilities, base controllers
+- [auth-sdk-m8](https://github.com/mano8/auth-sdk-m8) — shared schemas, JWT validation, refresh token rotation, base controllers
 - [Redis](https://redis.io/) — session revocation and rate limiting
 - [PyJWT](https://pyjwt.readthedocs.io/) + [passlib](https://passlib.readthedocs.io/) + [cryptography](https://cryptography.io/)
 - [google-auth](https://google-auth.readthedocs.io/) — Google OAuth2
