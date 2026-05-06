@@ -58,7 +58,7 @@ def get_url():
 
 def include_object(object, name, type_, reflected, compare_to):
     """
-    Only include tables (and other objects) that start with 'docentes_' or are the version table.
+    Only include tables (and other objects) that start with 'prefix_' or are the version table.
     """
     # Always include the version table
     if type_ == "table":
