@@ -50,6 +50,7 @@ class SessionController:
             # Session already exists, update it
             db_session.provider = current_user.provider
             db_session.jwt_jti = session_data.jwt_jti
+            db_session.refresh_token_hash = session_data.refresh_token_hash
             db_session.jwt_expires_at = session_data.jwt_expires_at
             db_session.refresh_expires_at = session_data.refresh_expires_at
             db_session.external_access_token = session_data.external_access_token
