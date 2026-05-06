@@ -2,7 +2,11 @@
     "python-envs.defaultEnvManager": "ms-python.python:conda",
     "python-envs.defaultPackageManager": "ms-python.python:conda",
     "python.testing.pytestArgs": [
-        "tests"
+        "tests",
+        "--cov=auth_user_service",
+        "--cov-report=term-missing",
+        "--cov-report=xml:coverage.xml",
+        "--cov-fail-under=90"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
