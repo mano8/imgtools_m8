@@ -1,0 +1,24 @@
+# traefik.yml — Development
+log:
+  level: DEBUG
+
+api:
+  dashboard: true
+  insecure: true
+
+providers:
+  docker:
+    exposedByDefault: false
+  file:
+    filename: /etc/traefik/dynamic_conf.yml
+    watch: true
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+    http3: {}            # Enable HTTP/3
+  api:
+    address: ":9000"
+    http3: {}

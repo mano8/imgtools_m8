@@ -1,0 +1,71 @@
+"""fastapi_service/fastapi/main.py"""
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+from fastapi.routing import APIRoute
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi_service.app.main import api_router
+from fastapi_service.core.config import settings
+
+# pylint: disable=line-too-long
+
+def custom_generate_unique_id(route: APIRoute) -> str:
+    """
+    Generate a unique identifier for a given API route.
+
+    Args:
+        route (APIRoute):
+            The API route for which to generate the unique identifier.
+
+    Returns:
+        str:
+            A unique identifier string composed of the route's
+            first tag and name.
+    """
+    return f"{route.tags[0]}-{route.name}"
+
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    openapi_url=f"{settings.API_PREFIX}/openapi.json",
+    docs_url=f"{settings.API_PREFIX}/docs",
+    redoc_url=f"{settings.API_PREFIX}/redoc",
+    generate_unique_id_function=custom_generate_unique_id
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    max_age=3600,  # cache preflight requests for 1 hour
+)
+
+def custom_openapi(current_app: FastAPI):
+    """Custom openapi"""
+    if current_app.openapi_schema:
+        return current_app.openapi_schema
+    schema = get_openapi(
+        title="M8 API",
+        version="1.0.0",
+        description="Microservice for m8 dashboard and stats",
+        routes=current_app.routes,
+    )
+    # Update tokenUrl to point to external auth service
+    # "http://127.0.0.1:9000/user/login/access-token"
+    schema["components"]["securitySchemes"]["OAuth2PasswordBearer"]["flows"]["password"]["tokenUrl"] = \
+        f"{settings.BACKEND_HOST}{settings.AUTH_PREFIX}/login/access-token"
+    current_app.openapi_schema = schema
+    return current_app.openapi_schema
+
+app.openapi = lambda: custom_openapi(app)
+
+app.mount(
+    '/static',
+    StaticFiles(directory=settings.STATIC_BASE_PATH),
+    name="static"
+)
+
+app.include_router(api_router, prefix=settings.API_PREFIX)
+
