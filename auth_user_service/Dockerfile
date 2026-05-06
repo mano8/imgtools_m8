@@ -14,9 +14,9 @@ RUN apt-get update && apt-get install -y \
 ARG ENVIRONMENT=production
 
 # Copy requirements
-COPY fa-auth-m8/auth_user_service/requirements_base.txt .
-COPY fa-auth-m8/auth_user_service/requirements_dev.txt .
-COPY fa-auth-m8/auth_user_service/requirements_prod.txt .
+COPY auth_user_service/requirements_base.txt .
+COPY auth_user_service/requirements_dev.txt .
+COPY auth_user_service/requirements_prod.txt .
 
 # Install dependencies into /install
 RUN pip install --upgrade pip && \
@@ -45,7 +45,7 @@ WORKDIR /opt
 COPY --from=builder /install /usr/local
 
 # Copy app code
-COPY --chown=appuser:appuser ./fa-auth-m8/auth_user_service ./auth_user_service
+COPY --chown=appuser:appuser ./auth_user_service ./auth_user_service
 
 # Minimal runtime tools
 RUN apt-get update && apt-get install -y dos2unix && \
