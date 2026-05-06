@@ -13,8 +13,8 @@ API_PREFIX="/user"
 SET_OPEN_API=true
 SET_DOCS=true
 SET_REDOC=true
-PROJECT_NAME="DocentesApp"
-STACK_NAME="full-stack-docentes-app"
+PROJECT_NAME="M8App"
+STACK_NAME="full-stack-m8-app"
 
 # Static Path
 STATIC_BASE_PATH="changethis"
@@ -70,7 +70,7 @@ TOKENS_ENCRYPTION_KEY="changethis"
 # Mysql
 DB_HOST="127.0.0.1"
 DB_PORT=3306
-DB_DATABASE="docentes_local_app"
+DB_DATABASE="m8_app"
 DB_USER="changethis"
 DB_PASSWORD="changethis"
 
