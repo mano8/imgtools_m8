@@ -42,11 +42,8 @@ COPY --from=builder /install /usr/local
 
 COPY --chown=appuser:appuser ./fastapi_service ./fastapi_service
 
-RUN apt-get update && apt-get install -y dos2unix && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN dos2unix /opt/fastapi_service/scripts/docker_start.sh && \
-    dos2unix /opt/fastapi_service/scripts/pre_start.sh && \
+# Fix line endings (CRLF→LF) and make scripts executable
+RUN find /opt/fastapi_service/scripts -name "*.sh" -exec sed -i 's/\r$//' {} + && \
     chmod +x /opt/fastapi_service/scripts/*.sh
 
 USER appuser
