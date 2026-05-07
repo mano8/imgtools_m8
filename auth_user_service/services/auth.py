@@ -24,7 +24,15 @@ from auth_user_service.core.config import settings
 from auth_user_service.core.deps import get_redis_client
 from auth_user_service.core.security import SecurityHelper
 
-from auth_sdk_m8.schemas.auth import ExternalTokensData, TokenAccessData, TokenMinimalData, TokenSecret
+from fastapi import HTTPException
+
+from auth_sdk_m8.schemas.auth import (
+    ASYMMETRIC_ALGORITHMS,
+    ExternalTokensData,
+    TokenAccessData,
+    TokenMinimalData,
+    TokenSecret,
+)
 
 
 class AuthController:
@@ -65,6 +73,8 @@ class AuthController:
         Returns:
             A redirect URL string for initiating Google OAuth2 with PKCE.
         """
+        if not settings.GOOGLE_CLIENT_ID:
+            raise HTTPException(status_code=503, detail="Google OAuth is not configured.")
         state = cls.create_state()
         code_verifier = cls.generate_code_verifier()
         code_challenge = cls.generate_code_challenge(code_verifier)
@@ -145,6 +155,22 @@ class AuthController:
             str: The JWT JTI key.
         """
         access_token_expires, refresh_token_expires = AuthController.get_tokens_expire()
+        algo = settings.ACCESS_TOKEN_ALGORITHM
+        if algo in ASYMMETRIC_ALGORITHMS:
+            if not settings.ACCESS_PRIVATE_KEY:
+                raise ValueError(
+                    f"ACCESS_PRIVATE_KEY (PEM) is required to sign {algo} tokens"
+                )
+            access_signing_secret = TokenSecret(
+                secret_key=settings.ACCESS_PRIVATE_KEY,
+                algorithm=algo,
+            )
+        else:
+            access_signing_secret = TokenSecret(
+                secret_key=settings.ACCESS_SECRET_KEY,
+                algorithm=algo,
+            )
+
         access_token, jti = SecurityHelper.create_access_token(
             data=TokenAccessData(
                 sub=user.id,
@@ -157,10 +183,7 @@ class AuthController:
                 role=user.role,
             ),
             expires_delta=access_token_expires,
-            secrets=TokenSecret(
-                secret_key=settings.ACCESS_SECRET_KEY,
-                algorithm=settings.ACCESS_TOKEN_ALGORITHM,
-            ),
+            secrets=access_signing_secret,
         )
         refresh_token, _ = SecurityHelper.create_refresh_token(
             data=TokenMinimalData(
