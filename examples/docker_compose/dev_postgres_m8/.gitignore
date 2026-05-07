@@ -1,0 +1,7 @@
+
+mysql_db/*
+db/*
+postgres_data/*
+redis/*
+*.pem
+*README_DEV*
