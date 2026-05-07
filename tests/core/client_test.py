@@ -9,6 +9,7 @@ from auth_user_service.core.client import (
     LoginRateLimiter,
     PKCEStore,
     RedisRateLimiter,
+    RedisRefreshStore,
     RedisSessionManager,
 )
 from auth_sdk_m8.schemas.base import Period
@@ -176,6 +177,43 @@ class TestLoginRateLimiter:
         assert LoginRateLimiter.MAX_ATTEMPTS == 5
         assert LoginRateLimiter.WINDOW_SECONDS == 900
         assert LoginRateLimiter.PREFIX == "login:attempts:"
+
+
+class TestRedisRefreshStore:
+    def setup_method(self):
+        self.mock_redis = MagicMock()
+        self.store = RedisRefreshStore(self.mock_redis)
+
+    def test_register_stores_with_prefix_and_ttl(self):
+        self.store.register("abc-jti", 3600)
+        self.mock_redis.setex.assert_called_once_with("rt:abc-jti", 3600, "1")
+
+    def test_is_valid_returns_true_when_key_exists(self):
+        self.mock_redis.exists.return_value = 1
+        assert self.store.is_valid("abc-jti") is True
+        self.mock_redis.exists.assert_called_once_with("rt:abc-jti")
+
+    def test_is_valid_returns_false_when_key_absent(self):
+        self.mock_redis.exists.return_value = 0
+        assert self.store.is_valid("abc-jti") is False
+
+    def test_rotate_deletes_old_and_registers_new_atomically(self):
+        mock_pipe = MagicMock()
+        self.mock_redis.pipeline.return_value = mock_pipe
+
+        self.store.rotate("old-jti", "new-jti", 3600)
+
+        self.mock_redis.pipeline.assert_called_once()
+        mock_pipe.delete.assert_called_once_with("rt:old-jti")
+        mock_pipe.setex.assert_called_once_with("rt:new-jti", 3600, "1")
+        mock_pipe.execute.assert_called_once()
+
+    def test_revoke_deletes_key(self):
+        self.store.revoke("abc-jti")
+        self.mock_redis.delete.assert_called_once_with("rt:abc-jti")
+
+    def test_prefix_constant(self):
+        assert RedisRefreshStore.PREFIX == "rt:"
 
 
 class TestRedisSessionManager:

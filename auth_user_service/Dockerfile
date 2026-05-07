@@ -47,13 +47,8 @@ COPY --from=builder /install /usr/local
 # Copy app code
 COPY --chown=appuser:appuser ./auth_user_service ./auth_user_service
 
-# Minimal runtime tools
-RUN apt-get update && apt-get install -y dos2unix && \
-    rm -rf /var/lib/apt/lists/*
-
-# Fix scripts
-RUN dos2unix /opt/auth_user_service/scripts/docker_start.sh && \
-    dos2unix /opt/auth_user_service/scripts/pre_start.sh && \
+# Fix line endings (CRLF→LF) and make scripts executable
+RUN find /opt/auth_user_service/scripts -name "*.sh" -exec sed -i 's/\r$//' {} + && \
     chmod +x /opt/auth_user_service/scripts/*.sh
 
 USER appuser

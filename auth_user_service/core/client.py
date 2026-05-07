@@ -138,6 +138,50 @@ class LoginRateLimiter:
         self.client.delete(self._key(identifier))
 
 
+class RedisRefreshStore:
+    """Allowlist-based refresh token store backed by Redis.
+
+    Each active refresh JTI is registered as a Redis key with a TTL matching
+    the token's remaining lifetime.  Rotation atomically removes the consumed
+    JTI and registers the replacement — making reuse detectable immediately.
+
+    This inverts the blacklist approach used by ``RedisSessionManager``:
+    an absent key means the token is unknown/revoked (safe-fail when Redis
+    is flushed), whereas a present key confirms the token is active.
+    """
+
+    PREFIX: Final[str] = "rt:"
+
+    def __init__(self, client: Redis) -> None:
+        self.client = client
+
+    def _key(self, jti: str) -> str:
+        return f"{self.PREFIX}{jti}"
+
+    def register(self, jti: str, ttl_seconds: int) -> None:
+        """Mark *jti* as an active refresh token with the given TTL."""
+        self.client.setex(self._key(jti), ttl_seconds, "1")
+
+    def is_valid(self, jti: str) -> bool:
+        """Return True if *jti* is a known, active refresh token."""
+        return bool(self.client.exists(self._key(jti)))
+
+    def rotate(self, old_jti: str, new_jti: str, ttl_seconds: int) -> None:
+        """Atomically invalidate *old_jti* and register *new_jti*.
+
+        Using a pipeline ensures both operations succeed or fail together,
+        preventing a window where neither JTI is valid.
+        """
+        pipe = self.client.pipeline()
+        pipe.delete(self._key(old_jti))
+        pipe.setex(self._key(new_jti), ttl_seconds, "1")
+        pipe.execute()
+
+    def revoke(self, jti: str) -> None:
+        """Permanently revoke *jti* (e.g. on explicit logout)."""
+        self.client.delete(self._key(jti))
+
+
 class RedisSessionManager:
     """
     Manages token revocation via a Redis-backed blacklist.

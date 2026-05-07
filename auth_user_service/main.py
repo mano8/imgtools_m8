@@ -47,7 +47,7 @@ app.add_middleware(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.SECRET_KEY.get_secret_value(),
+    secret_key=settings.TOKENS_ENCRYPTION_KEY.get_secret_value(),
     max_age=3600
 )
 

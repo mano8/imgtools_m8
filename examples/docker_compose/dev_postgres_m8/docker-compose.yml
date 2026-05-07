@@ -11,25 +11,22 @@ services:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic_conf.yml:/etc/traefik/dynamic_conf.yml:ro
       - ./traefik/certs:/etc/traefik/certs:ro
-      - ./traefik/acme.json:/etc/traefik/acme.json
     networks:
       - m8_app_network
 
   m8_db:
-    image: bitnami/mariadb:latest
+    image: postgres:16-alpine
     volumes:
-      - ./mysql_db:/bitnami/mariadb
+      - ./postgres_data:/var/lib/postgresql/data
     environment:
-      - ALLOW_EMPTY_PASSWORD=no
-      - MARIADB_PORT_NUMBER=${DB_PORT}
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
-      - MARIADB_USER=${DB_USER}
-      - MARIADB_PASSWORD=${DB_PASSWORD}
-      - MARIADB_DATABASE=${DB_DATABASE}
+      - POSTGRES_DB=${DB_DATABASE}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - PGPORT=${DB_PORT}
     ports:
-      - "3306:3306"
+      - "${DB_PORT}:${DB_PORT}"
     healthcheck:
-      test: ["CMD-SHELL", "MYSQL_PWD=$$MARIADB_ROOT_PASSWORD mariadb-admin ping -h localhost -u root"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,10 +70,11 @@ services:
       SET_OPEN_API: true
       SET_DOCS: true
       SET_REDOC: true
+      SELECTED_DB: Postgres
       BACKEND_HOST: ${BACKEND_HOST}
       FRONTEND_HOST: ${FRONTEND_HOST}
-      SELECTED_DB: ${SELECTED_DB}
       DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
       DB_DATABASE: ${DB_DATABASE}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_USER: ${DB_USER}
@@ -124,17 +122,16 @@ services:
       SET_OPEN_API: true
       SET_DOCS: true
       SET_REDOC: true
+      SELECTED_DB: Postgres
       BACKEND_HOST: ${BACKEND_HOST}
       FRONTEND_HOST: ${FRONTEND_HOST}
-      SELECTED_DB: ${SELECTED_DB}
       DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
       DB_DATABASE: ${DB_DATABASE}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_USER: ${DB_USER}
       REDIS_USER: ${REDIS_USER}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      FIRST_SUPERUSER: ${FIRST_SUPERUSER}
-      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
       ACCESS_SECRET_KEY: ${ACCESS_SECRET_KEY:-}
       ACCESS_PUBLIC_KEY: ${ACCESS_PUBLIC_KEY:-}
       REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY}

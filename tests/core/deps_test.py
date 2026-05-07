@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
-from pydantic import SecretStr
 
 from auth_user_service.core.deps import (
+    _access_validation_secret,
     get_current_active_superuser,
     get_current_user,
     get_redis_client,
@@ -39,7 +39,7 @@ def _make_valid_token(user_id: str = None) -> str:
     )
     token_secret = TokenSecret(
         secret_key=settings.ACCESS_SECRET_KEY,
-        algorithm=settings.TOKEN_ALGORITHM,
+        algorithm=settings.ACCESS_TOKEN_ALGORITHM,
     )
     token, _ = SecurityHelper.create_access_token(
         data=data,
@@ -54,12 +54,10 @@ class TestGetCurrentUser:
         token = _make_valid_token()
         mock_redis = MagicMock()
 
-        mock_redis_manager = MagicMock()
-        mock_redis_manager.is_blacklisted.return_value = False
-
-        with patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
-            mock_cls.return_value = mock_redis_manager
-            result = get_current_user(token=token, redis=mock_redis)
+        with patch("auth_user_service.core.deps.get_redis_client", return_value=mock_redis), \
+             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+            mock_cls.return_value.is_blacklisted.return_value = False
+            result = get_current_user(token=token)
 
         assert isinstance(result, UserModel)
         assert result.email == "dep_test@example.com"
@@ -68,23 +66,30 @@ class TestGetCurrentUser:
         token = _make_valid_token()
         mock_redis = MagicMock()
 
-        mock_redis_manager = MagicMock()
-        mock_redis_manager.is_blacklisted.return_value = True
-
-        with patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
-            mock_cls.return_value = mock_redis_manager
+        with patch("auth_user_service.core.deps.get_redis_client", return_value=mock_redis), \
+             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+            mock_cls.return_value.is_blacklisted.return_value = True
             with pytest.raises(HTTPException) as exc_info:
-                get_current_user(token=token, redis=mock_redis)
+                get_current_user(token=token)
 
         assert exc_info.value.status_code == 401
 
     def test_invalid_token_raises_403(self):
-        mock_redis = MagicMock()
-
         with pytest.raises(HTTPException) as exc_info:
-            get_current_user(token="this.is.not.a.valid.jwt", redis=mock_redis)
+            get_current_user(token="this.is.not.a.valid.jwt")
 
         assert exc_info.value.status_code == 403
+
+    def test_non_stateful_mode_skips_blacklist_check(self):
+        token = _make_valid_token()
+
+        with patch("auth_user_service.core.deps.settings") as mock_cfg, \
+             patch("auth_user_service.core.deps.get_redis_client") as mock_get_redis:
+            mock_cfg.TOKEN_MODE = "hybrid"
+            result = get_current_user(token=token)
+
+        mock_get_redis.assert_not_called()
+        assert isinstance(result, UserModel)
 
     def test_inactive_user_raises_403(self):
         from auth_user_service.core.config import settings
@@ -98,7 +103,7 @@ class TestGetCurrentUser:
         )
         token_secret = TokenSecret(
             secret_key=settings.ACCESS_SECRET_KEY,
-            algorithm=settings.TOKEN_ALGORITHM,
+            algorithm=settings.ACCESS_TOKEN_ALGORITHM,
         )
         token, _ = SecurityHelper.create_access_token(
             data=data,
@@ -107,15 +112,25 @@ class TestGetCurrentUser:
         )
 
         mock_redis = MagicMock()
-        mock_redis_manager = MagicMock()
-        mock_redis_manager.is_blacklisted.return_value = False
-
-        with patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
-            mock_cls.return_value = mock_redis_manager
+        with patch("auth_user_service.core.deps.get_redis_client", return_value=mock_redis), \
+             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+            mock_cls.return_value.is_blacklisted.return_value = False
             with pytest.raises(HTTPException) as exc_info:
-                get_current_user(token=token, redis=mock_redis)
+                get_current_user(token=token)
 
         assert exc_info.value.status_code == 403
+
+
+class TestAccessValidationSecret:
+    def test_rs256_returns_public_key_token_secret(self):
+        fake_pub = "-----BEGIN PUBLIC KEY-----\nfakepub\n-----END PUBLIC KEY-----"
+        with patch("auth_user_service.core.deps.settings") as mock_cfg:
+            mock_cfg.ACCESS_TOKEN_ALGORITHM = "RS256"
+            mock_cfg.ACCESS_PUBLIC_KEY = fake_pub
+            secret = _access_validation_secret()
+
+        assert secret.algorithm == "RS256"
+        assert secret.secret_key.get_secret_value() == fake_pub
 
 
 class TestGetCurrentActiveSuperuser:
@@ -156,6 +171,11 @@ class TestGetRedisClient:
         from redis import Redis
         client = get_redis_client()
         assert isinstance(client, Redis)
+
+    def test_returns_none_when_pool_is_none(self):
+        with patch("auth_user_service.core.deps._redis_pool", None):
+            result = get_redis_client()
+        assert result is None
 
 
 class TestVerifyPrivateApiSecret:

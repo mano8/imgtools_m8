@@ -5,11 +5,11 @@ These models are used to manage API keys and their associated rate limits.
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 import uuid
-from sqlmodel import CHAR, Column, Field, ForeignKey, Relationship, SQLModel
+from sqlmodel import Column, Field, ForeignKey, Relationship, SQLModel
 
 from auth_sdk_m8.schemas.base import Period
 from auth_sdk_m8.models.shared import TimestampMixin
-from auth_user_service.core.db_utils import get_table_args, prefixed_fk, prefixed_tables
+from auth_user_service.core.db_utils import UUIDChar, get_table_args, prefixed_fk, prefixed_tables
 if TYPE_CHECKING:
     from auth_user_service.db_models.users import User
 
@@ -76,7 +76,7 @@ class ApiKey(ApiKeyBase, SQLModel, table=True):
     user_id: uuid.UUID = Field(
         sa_column=Column(
             "user_id",
-            CHAR(36),
+            UUIDChar(),
             ForeignKey(prefixed_fk("user", "id"), ondelete="CASCADE"),
             nullable=False,
             index=True
@@ -123,7 +123,7 @@ class RateLimit(SQLModel, table=True):
     user_id: uuid.UUID = Field(
         sa_column=Column(
             "user_id",
-            CHAR(36),
+            UUIDChar(),
             ForeignKey(prefixed_fk("user", "id"), ondelete="CASCADE"),
             nullable=False,
             index=True

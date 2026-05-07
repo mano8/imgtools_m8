@@ -6,7 +6,9 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import SecretStr
 
+import auth_user_service.services.auth as _auth_module
 from auth_user_service.services.auth import AuthController
 
 
@@ -188,6 +190,57 @@ class TestCreateAuthTokens:
         _, _, jti = AuthController.create_auth_tokens(user=user)
 
         uuid.UUID(jti)  # raises ValueError if not a valid UUID
+
+    def test_rs256_missing_private_key_raises(self):
+        user = MagicMock()
+        user.id = str(uuid.uuid4())
+        user.full_name = "User"
+        user.email = "u@example.com"
+        user.avatar = None
+        user.is_active = True
+        user.email_verified = True
+        user.is_superuser = False
+        user.role = "user"
+
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.ACCESS_TOKEN_ALGORITHM = "RS256"
+            mock_cfg.ACCESS_PRIVATE_KEY = None
+            mock_cfg.ACCESS_TOKEN_EXPIRE_MINUTES = 30
+            mock_cfg.REFRESH_TOKEN_EXPIRE_MINUTES = 120
+            with pytest.raises(ValueError, match="ACCESS_PRIVATE_KEY"):
+                AuthController.create_auth_tokens(user=user)
+
+    def test_rs256_with_private_key_creates_tokens(self):
+        user = MagicMock()
+        user.id = str(uuid.uuid4())
+        user.full_name = "User"
+        user.email = "u@example.com"
+        user.avatar = None
+        user.is_active = True
+        user.email_verified = True
+        user.is_superuser = False
+        user.role = "user"
+
+        fake_jti = str(uuid.uuid4())
+        fake_priv = SecretStr("-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----")
+        fake_refresh = SecretStr("Zz1_fake-refresh-secret-long-enough-12345678")
+
+        with patch("auth_user_service.services.auth.settings") as mock_cfg, \
+             patch.object(_auth_module.SecurityHelper, "create_access_token",
+                          return_value=("acc_tok", fake_jti)), \
+             patch.object(_auth_module.SecurityHelper, "create_refresh_token",
+                          return_value=("ref_tok", fake_jti)):
+            mock_cfg.ACCESS_TOKEN_ALGORITHM = "RS256"
+            mock_cfg.ACCESS_PRIVATE_KEY = fake_priv
+            mock_cfg.ACCESS_TOKEN_EXPIRE_MINUTES = 30
+            mock_cfg.REFRESH_TOKEN_EXPIRE_MINUTES = 120
+            mock_cfg.REFRESH_SECRET_KEY = fake_refresh
+            mock_cfg.REFRESH_TOKEN_ALGORITHM = "HS256"
+            access, refresh, jti = AuthController.create_auth_tokens(user=user)
+
+        assert access == "acc_tok"
+        assert refresh == "ref_tok"
+        assert jti == fake_jti
 
 
 class TestCreateAuthSession:

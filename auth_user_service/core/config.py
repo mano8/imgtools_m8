@@ -3,6 +3,8 @@ Configuration settings for the FastAPI application.
 This module loads environment settings securely and applies best practices.
 """
 from pathlib import Path
+from typing import Optional
+
 from pydantic import (
     EmailStr,
     SecretStr
@@ -45,8 +47,8 @@ class Settings(CommonSettings):
     # Declare only service-specific fields
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: SecretStr
-    GOOGLE_CLIENT_ID: SecretStr
-    GOOGLE_CLIENT_SECRET: SecretStr
+    GOOGLE_CLIENT_ID: Optional[SecretStr] = None
+    GOOGLE_CLIENT_SECRET: Optional[SecretStr] = None
     PRIVATE_API_SECRET: SecretStr
     TOKENS_ENCRYPTION_KEY: SecretStr
 

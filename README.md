@@ -123,13 +123,26 @@ Update `DB_HOST`, `DB_PORT`, and `DB_DATABASE` accordingly. Both drivers ship in
 
 | Variable | Required | Default | Description |
 | -------- | -------- | ------- | ----------- |
-| `SECRET_KEY` | yes | — | Session middleware secret |
-| `ACCESS_SECRET_KEY` | yes | — | JWT access token signing key |
-| `REFRESH_SECRET_KEY` | yes | — | JWT refresh token signing key |
+| `TOKEN_MODE` | no | `stateful` | `stateless` \| `hybrid` \| `stateful` — controls Redis usage and JTI revocation |
+| `ACCESS_TOKEN_ALGORITHM` | no | `HS256` | Signing algorithm for access tokens (`HS256`, `RS256`, `ES256`) |
+| `REFRESH_TOKEN_ALGORITHM` | no | `HS256` | Signing algorithm for refresh tokens |
+| `ACCESS_SECRET_KEY` | HS256 only | — | Symmetric signing key for access tokens (omit for RS256/ES256) |
+| `REFRESH_SECRET_KEY` | yes | — | Signing key for refresh tokens |
+| `ACCESS_PRIVATE_KEY` | RS256/ES256 only | — | PEM private key used by the auth service to sign access tokens |
+| `ACCESS_PUBLIC_KEY` | RS256/ES256 only | — | PEM public key distributed to all consuming services for verification |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | no | `30` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRE_MINUTES` | no | `120` | Refresh token lifetime |
 | `REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS` | no | `3600` | Refresh cookie max-age |
 | `TOKENS_ENCRYPTION_KEY` | yes | — | Token payload encryption key |
+
+**HS256 (default)** — set `ACCESS_SECRET_KEY` and `REFRESH_SECRET_KEY`; leave `ACCESS_PRIVATE_KEY` / `ACCESS_PUBLIC_KEY` blank.
+
+**RS256 / ES256** — leave `ACCESS_SECRET_KEY` blank; set `ACCESS_TOKEN_ALGORITHM`, `ACCESS_PRIVATE_KEY`, and `ACCESS_PUBLIC_KEY`.  Generate a key pair with:
+
+```bash
+openssl genrsa -out private.pem 2048
+openssl rsa -in private.pem -pubout -out public.pem
+```
 
 ### Database
 
@@ -159,8 +172,8 @@ Update `DB_HOST`, `DB_PORT`, and `DB_DATABASE` accordingly. Both drivers ship in
 | -------- | -------- | ----------- |
 | `FIRST_SUPERUSER` | yes | Email of the bootstrap superuser |
 | `FIRST_SUPERUSER_PASSWORD` | yes | Password of the bootstrap superuser |
-| `GOOGLE_CLIENT_ID` | yes | Google OAuth2 client ID |
-| `GOOGLE_CLIENT_SECRET` | yes | Google OAuth2 client secret |
+| `GOOGLE_CLIENT_ID` | no | Google OAuth2 client ID (required only if using Google login) |
+| `GOOGLE_CLIENT_SECRET` | no | Google OAuth2 client secret (required only if using Google login) |
 | `PRIVATE_API_SECRET` | yes | Shared secret for private inter-service endpoints (`X-Internal-Token` header) |
 
 ### Static / Templates
