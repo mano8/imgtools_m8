@@ -52,47 +52,41 @@ def _make_valid_token(user_id: str = None) -> str:
 class TestGetCurrentUser:
     def test_valid_token_not_revoked_returns_user_model(self):
         token = _make_valid_token()
+        mock_redis = MagicMock()
 
         mock_redis_manager = MagicMock()
         mock_redis_manager.is_blacklisted.return_value = False
 
-        with patch("auth_user_service.core.deps.get_redis_client"), \
-             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+        with patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
             mock_cls.return_value = mock_redis_manager
-            result = get_current_user(token=token)
+            result = get_current_user(token=token, redis=mock_redis)
 
         assert isinstance(result, UserModel)
         assert result.email == "dep_test@example.com"
 
-    def test_revoked_session_raises_403(self):
+    def test_revoked_session_raises_401(self):
         token = _make_valid_token()
+        mock_redis = MagicMock()
 
         mock_redis_manager = MagicMock()
         mock_redis_manager.is_blacklisted.return_value = True
 
-        with patch("auth_user_service.core.deps.get_redis_client"), \
-             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+        with patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
             mock_cls.return_value = mock_redis_manager
             with pytest.raises(HTTPException) as exc_info:
-                get_current_user(token=token)
+                get_current_user(token=token, redis=mock_redis)
 
-        assert exc_info.value.status_code == 403
+        assert exc_info.value.status_code == 401
 
     def test_invalid_token_raises_403(self):
+        mock_redis = MagicMock()
+
         with pytest.raises(HTTPException) as exc_info:
-            get_current_user(token="this.is.not.a.valid.jwt")
+            get_current_user(token="this.is.not.a.valid.jwt", redis=mock_redis)
 
         assert exc_info.value.status_code == 403
 
     def test_inactive_user_raises_403(self):
-        import re
-        _pattern = re.compile(
-            r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[-_])[A-Za-z\d\-_]{32,}$"
-        )
-        key = secrets.token_urlsafe(32)
-        while not _pattern.match(key):
-            key = secrets.token_urlsafe(32)
-
         from auth_user_service.core.config import settings
         data = TokenAccessData(
             sub=str(uuid.uuid4()),
@@ -112,14 +106,14 @@ class TestGetCurrentUser:
             secrets=token_secret,
         )
 
+        mock_redis = MagicMock()
         mock_redis_manager = MagicMock()
         mock_redis_manager.is_blacklisted.return_value = False
 
-        with patch("auth_user_service.core.deps.get_redis_client"), \
-             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+        with patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
             mock_cls.return_value = mock_redis_manager
             with pytest.raises(HTTPException) as exc_info:
-                get_current_user(token=token)
+                get_current_user(token=token, redis=mock_redis)
 
         assert exc_info.value.status_code == 403
 
