@@ -19,6 +19,8 @@ class OAuthController:
         """
         get and verrify google access token from OAuth callback
         """
+        if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+            raise HTTPException(status_code=503, detail="Google OAuth is not configured.")
         token_request_uri = "https://oauth2.googleapis.com/token"
         data = {
             'code': code,
