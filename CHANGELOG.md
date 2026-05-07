@@ -6,6 +6,54 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`TOKEN_MODE` configuration** (`stateless` | `hybrid` | `stateful`): controls whether Redis
+  is required at startup, whether JTI blacklist checks run per-request, and whether DB sessions
+  are persisted on login.  Defaults to `stateful` for backward compatibility.
+- **Per-algorithm token signing keys**: `ACCESS_TOKEN_ALGORITHM` and `REFRESH_TOKEN_ALGORITHM`
+  replace the single ambiguous `TOKEN_ALGORITHM` (backward-compat alias preserved via SDK
+  validator).
+- **Asymmetric signing (RS256 / ES256)**: `ACCESS_PRIVATE_KEY` (PEM, auth service only) and
+  `ACCESS_PUBLIC_KEY` (PEM, distributed to all consumers) are new optional env vars.
+  `ACCESS_SECRET_KEY` is now required only for HS256; RS256/ES256 deployments leave it blank.
+- **`RedisRefreshStore`** (`auth_user_service/core/client.py`): allowlist-backed refresh token
+  store.  Each active refresh JTI is registered as a Redis key with a matching TTL; rotation is
+  atomic via a Redis pipeline.  Replaces the old blacklist approach — an absent key means
+  unknown/revoked, which is safe-fail when Redis is flushed.
+- **`examples/docker_compose/dev_postgres_m8/`**: new Compose stack using `postgres:16-alpine`
+  with Traefik, Redis, auth service, and example service; includes full env files with inline
+  comments for asymmetric key configuration.
+- **Observability hooks**: `_LoggingHooks` attached to `TokenValidator` in both
+  `auth_user_service/core/deps.py` and `examples/fastapi_service/core/deps.py`.  Successful and
+  failed validations emit `DEBUG` / `WARNING` log lines with `jti`, `sub`, and failure reason.
+
+### Changed
+
+- **`auth_user_service/core/deps.py`**: Redis connection pool is only created when
+  `TOKEN_MODE != "stateless"`.  JTI blacklist check is only performed when
+  `TOKEN_MODE == "stateful"`.  `get_current_user` no longer accepts a `redis` dependency
+  argument — it calls `get_redis_client()` internally when needed.
+- **`auth_user_service/routes/login.py`**: login registers the refresh JTI in
+  `RedisRefreshStore`; token refresh validates via allowlist and atomically rotates to the new
+  JTI; logout revokes the refresh JTI and (stateful mode) blacklists the access JTI.  Rate
+  limiting and DB session creation are gated on Redis availability and `TOKEN_MODE`.
+- **`examples/fastapi_service/core/deps.py`**: `TokenValidator` is now a module-level singleton
+  (was re-created per-request); `_access_validation_secret()` selects the public key for
+  RS256/ES256 automatically.
+- **`examples/docker_compose/local_mysql_m8/auth.env`**: `SECRET_KEY` commented out;
+  `ACCESS_TOKEN_ALGORITHM`, `REFRESH_TOKEN_ALGORITHM`, `TOKEN_MODE`, and `GOOGLE_CLIENT_*`
+  added; asymmetric key generation instructions added as comments.
+- **`examples/docker_compose/local_mysql_m8/docker-compose.yml`**: `SECRET_KEY` removed from
+  service env blocks; `ACCESS_PRIVATE_KEY`, `ACCESS_PUBLIC_KEY`, and all new token vars
+  forwarded with `${VAR:-default}` fallbacks.
+
+### Breaking
+
+- Existing refresh sessions are invalidated on first deploy — JTIs are not pre-populated in the
+  new Redis allowlist and will be rejected on the next refresh attempt.  Users must re-login once
+  after upgrading.
+
 ## [0.3.0] - 2026-05-07
 
 ### Added
