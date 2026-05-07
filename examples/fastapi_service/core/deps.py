@@ -10,10 +10,11 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
+from pydantic import SecretStr
 from redis import Redis
 
 from auth_sdk_m8.core.exceptions import InvalidToken
-from auth_sdk_m8.schemas.auth import TokenSecret
+from auth_sdk_m8.schemas.auth import ASYMMETRIC_ALGORITHMS, TokenSecret
 from auth_sdk_m8.schemas.base import RoleType
 from auth_sdk_m8.schemas.user import UserModel
 from auth_sdk_m8.security import TokenValidationConfig, TokenValidator, ValidationHooks
@@ -40,12 +41,24 @@ class _LoggingHooks:
 
 _hooks: ValidationHooks = _LoggingHooks()
 
+def _access_validation_secret() -> TokenSecret:
+    """Return the TokenSecret for validating access tokens.
+
+    HS256  → symmetric ACCESS_SECRET_KEY.
+    RS256/ES256 → public key only; consumer services never hold the private key.
+    """
+    algo = settings.ACCESS_TOKEN_ALGORITHM
+    if algo in ASYMMETRIC_ALGORITHMS:
+        return TokenSecret(
+            secret_key=SecretStr(settings.ACCESS_PUBLIC_KEY or ""),
+            algorithm=algo,
+        )
+    return TokenSecret(secret_key=settings.ACCESS_SECRET_KEY, algorithm=algo)
+
+
 # Module-level validator — created once at startup, not per-request.
 _validator = TokenValidator(
-    secrets=TokenSecret(
-        secret_key=settings.ACCESS_SECRET_KEY,
-        algorithm=settings.ACCESS_TOKEN_ALGORITHM,
-    ),
+    secrets=_access_validation_secret(),
     config=TokenValidationConfig(
         allowed_algorithms=[settings.ACCESS_TOKEN_ALGORITHM],
     ),
