@@ -8,11 +8,11 @@ import uuid
 
 from pydantic import EmailStr, ValidationError, model_validator
 from sqlalchemy import Column
-from sqlmodel import CHAR, Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
 from auth_sdk_m8.models.shared import TimestampMixin
-from auth_user_service.core.db_utils import get_table_args, prefixed_tables
+from auth_user_service.core.db_utils import UUIDChar, get_table_args, prefixed_tables
 if TYPE_CHECKING:
     from auth_user_service.db_models.api_keys import ApiKey, RateLimit
     from auth_user_service.db_models.sessions import ClientSession
@@ -271,7 +271,7 @@ class User(UserBase, table=True):
     id: uuid.UUID = Field(
         sa_column=Column(
             "id",
-            CHAR(36),
+            UUIDChar(),
             default=lambda: str(uuid.uuid4()),
             primary_key=True,
             index=True

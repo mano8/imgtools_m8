@@ -1,10 +1,36 @@
 """
 dm_model's helpers
 """
-from typing import Dict, Any
+import uuid
+from typing import Any, Dict, Optional
 from sqlmodel import SQLModel
+from sqlalchemy import types
 from sqlalchemy.ext.declarative import declared_attr
 from auth_user_service.core.config import settings
+
+
+class UUIDChar(types.TypeDecorator):
+    """
+    Store UUIDs as CHAR(36) strings.
+
+    Coerces uuid.UUID → str on bind so PostgreSQL's strict type system
+    compares character(36) against a text literal (not the uuid wire type
+    that psycopg2 would otherwise send).  Converts back to uuid.UUID on read.
+    Works identically on MySQL.
+    """
+
+    impl = types.CHAR(36)
+    cache_ok = True
+
+    def process_bind_param(self, value: Any, dialect: Any) -> Optional[str]:
+        if isinstance(value, uuid.UUID):
+            return str(value)
+        return value
+
+    def process_result_value(self, value: Any, dialect: Any) -> Optional[uuid.UUID]:
+        if value is None:
+            return None
+        return uuid.UUID(str(value))
 
 
 def get_table_args() -> Dict[str, Any]:
