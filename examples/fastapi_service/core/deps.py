@@ -4,21 +4,23 @@ Provides token validation, current-user extraction, and role-based access
 helpers for service routes.
 """
 
+import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
-from pydantic import SecretStr
 from redis import Redis
 
 from auth_sdk_m8.core.exceptions import InvalidToken
 from auth_sdk_m8.schemas.auth import TokenSecret
 from auth_sdk_m8.schemas.base import RoleType
 from auth_sdk_m8.schemas.user import UserModel
-from auth_sdk_m8.security import TokenValidationConfig, TokenValidator
+from auth_sdk_m8.security import TokenValidationConfig, TokenValidator, ValidationHooks
 
 from fastapi_service.core.config import settings
+
+_logger = logging.getLogger(__name__)
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.AUTH_PREFIX}/login/access-token"
@@ -26,31 +28,36 @@ reusable_oauth2 = OAuth2PasswordBearer(
 TokenDep = Annotated[str, Depends(reusable_oauth2)]
 
 
-def get_validator() -> TokenValidator:
-    """Build the access-token validator from service settings.
+class _LoggingHooks:
+    """Emit structured log lines for every token validation outcome."""
 
-    Creating the validator per-request is cheap (pure in-memory object).
-    For high-throughput services, cache this at module level or inject it
-    via a lifespan-scoped dependency.
-    """
-    return TokenValidator(
-        secrets=TokenSecret(
-            secret_key=SecretStr(settings.ACCESS_SECRET_KEY),
-            algorithm=settings.TOKEN_ALGORITHM,
-        ),
-        config=TokenValidationConfig(),
-    )
+    def on_success(self, *, jti: str, sub: str, token_type: str) -> None:
+        _logger.debug("token.valid type=%s sub=%s jti=%s", token_type, sub, jti)
+
+    def on_failure(self, *, reason: str, token_type: str) -> None:
+        _logger.warning("token.invalid type=%s reason=%s", token_type, reason)
 
 
-ValidatorDep = Annotated[TokenValidator, Depends(get_validator)]
+_hooks: ValidationHooks = _LoggingHooks()
+
+# Module-level validator — created once at startup, not per-request.
+_validator = TokenValidator(
+    secrets=TokenSecret(
+        secret_key=settings.ACCESS_SECRET_KEY,
+        algorithm=settings.ACCESS_TOKEN_ALGORITHM,
+    ),
+    config=TokenValidationConfig(
+        allowed_algorithms=[settings.ACCESS_TOKEN_ALGORITHM],
+    ),
+    hooks=_hooks,
+)
 
 
-def get_current_user(token: TokenDep, validator: ValidatorDep) -> UserModel:
+def get_current_user(token: TokenDep) -> UserModel:
     """Retrieve the current user from the JWT access token.
 
     Args:
         token: JWT string extracted from the Authorization header.
-        validator: Pre-configured ``TokenValidator`` instance.
 
     Returns:
         Authenticated ``UserModel``.
@@ -59,7 +66,7 @@ def get_current_user(token: TokenDep, validator: ValidatorDep) -> UserModel:
         HTTPException 403: Token invalid, expired, or user inactive.
     """
     try:
-        payload = validator.validate_access_token(token)
+        payload = _validator.validate_access_token(token)
     except InvalidToken as ex:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

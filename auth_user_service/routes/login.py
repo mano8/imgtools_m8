@@ -25,7 +25,6 @@ from auth_user_service.core.deps import (
     SessionDep,
     TokenDep,
     _access_validator,
-    get_redis_client,
 )
 from auth_user_service.core.security import SecurityHelper
 from auth_user_service.db_models.users import UserPublic
@@ -41,7 +40,7 @@ _SECURE_COOKIE = settings.ENVIRONMENT != "local"
 
 _REFRESH_SECRETS = TokenSecret(
     secret_key=settings.REFRESH_SECRET_KEY,
-    algorithm=settings.TOKEN_ALGORITHM,
+    algorithm=settings.REFRESH_TOKEN_ALGORITHM,
 )
 
 
@@ -54,13 +53,14 @@ def login_access_token(
 ) -> Token:
     """Authenticate via email/password and issue JWT tokens."""
     email = form_data.username
-    rate_limiter = LoginRateLimiter(redis)
 
-    if not rate_limiter.is_allowed(email):
-        raise HTTPException(
-            status_code=429,
-            detail="Too many login attempts. Try again in 15 minutes.",
-        )
+    if redis is not None:
+        rate_limiter = LoginRateLimiter(redis)
+        if not rate_limiter.is_allowed(email):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many login attempts. Try again in 15 minutes.",
+            )
 
     user = AuthController.authenticate(
         session=session,
@@ -74,15 +74,17 @@ def login_access_token(
             detail="Invalid credentials or inactive user",
         )
 
-    rate_limiter.reset(email)
+    if redis is not None:
+        LoginRateLimiter(redis).reset(email)
 
     access_token, refresh_token, jti = AuthController.create_auth_tokens(user=user)
-    AuthController.create_auth_session(
-        session=session,
-        user=user,
-        jti=jti,
-        refresh_token=refresh_token,
-    )
+    if settings.TOKEN_MODE != "stateless":
+        AuthController.create_auth_session(
+            session=session,
+            user=user,
+            jti=jti,
+            refresh_token=refresh_token,
+        )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
@@ -114,28 +116,32 @@ def login_refresh_token(
     except InvalidToken as err:
         raise HTTPException(status_code=401, detail=str(err)) from err
 
-    if SessionController.is_session_revoked(old_jti):
-        response.delete_cookie(key="refresh_token")
-        raise HTTPException(status_code=401, detail="Token revoked")
+    # Revocation and rotation only apply in stateful/hybrid modes.
+    if settings.TOKEN_MODE != "stateless":
+        if SessionController.is_session_revoked(old_jti):
+            response.delete_cookie(key="refresh_token")
+            raise HTTPException(status_code=401, detail="Token revoked")
 
     user = UserController.get_user(session=session, user_id=user_id)
     if user is None or user.is_active is not True:
         raise HTTPException(status_code=401, detail="Invalid user or inactive user")
 
-    # Revoke the consumed JTI before issuing new tokens (rotation).
-    # Any reuse of the old refresh token after this point will be rejected.
-    old_expires_at = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES
-    )
-    SessionController.revoke_session_jti(old_jti, old_expires_at)
+    if settings.TOKEN_MODE != "stateless":
+        # Revoke the consumed JTI before issuing new tokens (rotation).
+        # Any reuse of the old refresh token after this point will be rejected.
+        old_expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES
+        )
+        SessionController.revoke_session_jti(old_jti, old_expires_at)
 
     access_token, new_refresh_token, new_jti = AuthController.create_auth_tokens(user=user)
-    AuthController.create_auth_session(
-        session=session,
-        user=user,
-        jti=new_jti,
-        refresh_token=new_refresh_token,
-    )
+    if settings.TOKEN_MODE != "stateless":
+        AuthController.create_auth_session(
+            session=session,
+            user=user,
+            jti=new_jti,
+            refresh_token=new_refresh_token,
+        )
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,

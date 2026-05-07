@@ -5,8 +5,9 @@ Provides token validation, current-user extraction, Redis connectivity,
 and role/privilege guards for auth_user_service routes.
 """
 
+import logging
 import secrets
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -16,11 +17,13 @@ from redis import ConnectionPool, Redis
 from auth_sdk_m8.core.exceptions import InvalidToken
 from auth_sdk_m8.schemas.auth import TokenSecret
 from auth_sdk_m8.schemas.user import UserModel
-from auth_sdk_m8.security import TokenValidationConfig, TokenValidator
+from auth_sdk_m8.security import TokenValidationConfig, TokenValidator, ValidationHooks
 
 from auth_user_service.core.client import RedisSessionManager
 from auth_user_service.core.config import settings
 from auth_user_service.core.engine_sync import SessionDep  # noqa: F401 (re-exported)
+
+_logger = logging.getLogger(__name__)
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_PREFIX}/login/access-token"
@@ -31,47 +34,66 @@ google_oauth2 = OAuth2PasswordBearer(
 TokenDep = Annotated[str, Depends(reusable_oauth2)]
 GoogleTokenDep = Annotated[str, Depends(google_oauth2)]
 
-_redis_pool = ConnectionPool(
-    host=settings.REDIS_HOST,
-    port=settings.REDIS_PORT,
-    username=settings.REDIS_USER,
-    password=settings.REDIS_PASSWORD.get_secret_value() or None,
-    decode_responses=True,
+
+class _LoggingHooks:
+    """Emit structured log lines for every token validation outcome."""
+
+    def on_success(self, *, jti: str, sub: str, token_type: str) -> None:
+        _logger.debug("token.valid type=%s sub=%s jti=%s", token_type, sub, jti)
+
+    def on_failure(self, *, reason: str, token_type: str) -> None:
+        _logger.warning("token.invalid type=%s reason=%s", token_type, reason)
+
+
+_hooks: ValidationHooks = _LoggingHooks()
+
+# Redis pool is skipped entirely in stateless mode.
+_redis_pool: Optional[ConnectionPool] = (
+    ConnectionPool(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        username=settings.REDIS_USER,
+        password=settings.REDIS_PASSWORD.get_secret_value() or None,
+        decode_responses=True,
+    )
+    if settings.TOKEN_MODE != "stateless"
+    else None
 )
 
 # Module-level validator — created once at startup from validated settings.
 _access_validator = TokenValidator(
     secrets=TokenSecret(
         secret_key=settings.ACCESS_SECRET_KEY,
-        algorithm=settings.TOKEN_ALGORITHM,
+        algorithm=settings.ACCESS_TOKEN_ALGORITHM,
     ),
-    config=TokenValidationConfig(),
+    config=TokenValidationConfig(
+        allowed_algorithms=[settings.ACCESS_TOKEN_ALGORITHM],
+    ),
+    hooks=_hooks,
 )
 
 
-def get_redis_client() -> Redis:
-    """Return a Redis client from the shared connection pool."""
+def get_redis_client() -> Optional[Redis]:
+    """Return a Redis client from the shared pool, or None in stateless mode."""
+    if _redis_pool is None:
+        return None
     return Redis(connection_pool=_redis_pool)
 
 
-RedisDep = Annotated[Redis, Depends(get_redis_client)]
+RedisDep = Annotated[Optional[Redis], Depends(get_redis_client)]
 
 
-def get_current_user(
-    token: TokenDep,
-    redis: RedisDep,
-) -> UserModel:
+def get_current_user(token: TokenDep) -> UserModel:
     """Validate the access token and return the authenticated user.
 
     Args:
         token: JWT string extracted from the Authorization header.
-        redis: Redis client (injected via Depends).
 
     Returns:
         Authenticated ``UserModel``.
 
     Raises:
-        HTTPException 401: Token revoked.
+        HTTPException 401: Token revoked (stateful mode only).
         HTTPException 403: Token invalid, expired, or user inactive.
     """
     try:
@@ -82,11 +104,15 @@ def get_current_user(
             detail="Could not validate credentials.",
         ) from ex
 
-    if RedisSessionManager(redis).is_blacklisted(payload.jti):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session revoked",
-        )
+    # JTI blacklist check only applies in stateful mode.
+    # In hybrid mode, access tokens are stateless; only refresh JTIs are tracked.
+    if settings.TOKEN_MODE == "stateful":
+        redis = get_redis_client()
+        if redis is not None and RedisSessionManager(redis).is_blacklisted(payload.jti):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session revoked",
+            )
 
     if not payload.is_active:
         raise HTTPException(

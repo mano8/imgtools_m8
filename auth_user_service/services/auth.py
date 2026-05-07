@@ -159,20 +159,20 @@ class AuthController:
             expires_delta=access_token_expires,
             secrets=TokenSecret(
                 secret_key=settings.ACCESS_SECRET_KEY,
-                algorithm=settings.TOKEN_ALGORITHM
-            )
+                algorithm=settings.ACCESS_TOKEN_ALGORITHM,
+            ),
         )
         refresh_token, _ = SecurityHelper.create_refresh_token(
             data=TokenMinimalData(
                 sub=user.id,
-                type="refresh"
+                type="refresh",
             ),
             expires_delta=refresh_token_expires,
             secrets=TokenSecret(
                 secret_key=settings.REFRESH_SECRET_KEY,
-                algorithm=settings.TOKEN_ALGORITHM
+                algorithm=settings.REFRESH_TOKEN_ALGORITHM,
             ),
-            jti=jti
+            jti=jti,
         )
         return access_token, refresh_token, jti
 
