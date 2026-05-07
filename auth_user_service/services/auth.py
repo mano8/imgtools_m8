@@ -173,7 +173,7 @@ class AuthController:
 
         access_token, jti = SecurityHelper.create_access_token(
             data=TokenAccessData(
-                sub=user.id,
+                sub=str(user.id),
                 full_name=user.full_name,
                 email=user.email,
                 avatar=user.avatar,
@@ -187,7 +187,7 @@ class AuthController:
         )
         refresh_token, _ = SecurityHelper.create_refresh_token(
             data=TokenMinimalData(
-                sub=user.id,
+                sub=str(user.id),
                 type="refresh",
             ),
             expires_delta=refresh_token_expires,
