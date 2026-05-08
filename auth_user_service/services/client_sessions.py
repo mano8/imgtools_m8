@@ -114,6 +114,18 @@ class SessionController:
         return redis.is_blacklisted(jti)
 
     @staticmethod
+    def delete_session_by_jti(session: Session, jti: str) -> None:
+        """Delete the DB session record for the given JTI.
+
+        Args:
+            session: SQLModel DB session.
+            jti: JWT identifier of the session to remove.
+        """
+        stmt = delete(ClientSession).where(ClientSession.jwt_jti == jti)
+        session.exec(stmt)
+        session.commit()
+
+    @staticmethod
     def purge_expired_sessions(
         session: Session,
         current_user: CurrentUser,

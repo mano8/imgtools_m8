@@ -161,12 +161,30 @@ def login_refresh_token(
 @router.post("/logout/", response_model=ResponseMessage)
 def logout(
     response: Response,
+    session: SessionDep,
     token: TokenDep,
     redis: RedisDep,
     refresh_token: str = Depends(SecurityHelper.get_refresh_token_from_cookie),
 ) -> ResponseMessage:
-    """Revoke both tokens and clear the refresh-token cookie."""
-    # Revoke refresh token from the allowlist.
+    """Revoke both tokens, delete the DB session, and clear the cookie."""
+    jti: str | None = None
+
+    # Blacklist the access token JTI so it cannot be reused until natural expiry.
+    if settings.TOKEN_MODE == "stateful":
+        try:
+            payload = _access_validator.validate_access_token(token)
+            jti = payload.jti
+            if payload.exp is not None:
+                expires_at = datetime.fromtimestamp(payload.exp, tz=timezone.utc)
+            else:
+                expires_at = datetime.now(timezone.utc) + timedelta(
+                    minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+                )
+            SessionController.revoke_session_jti(payload.jti, expires_at)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not blacklist access token JTI on logout.")
+
+    # Revoke the refresh JTI from the Redis allowlist.
     if redis is not None and settings.TOKEN_MODE != "stateless":
         try:
             _, refresh_jti = SecurityHelper.decode_refresh_token(
@@ -175,22 +193,17 @@ def logout(
                 return_jti=True,
             )
             RedisRefreshStore(redis).revoke(refresh_jti)
-        except Exception:
+            if jti is None:
+                jti = refresh_jti
+        except Exception:  # noqa: BLE001
             logger.warning("Could not revoke refresh JTI on logout.")
 
-    # Blacklist the access token JTI so it cannot be used until natural expiry.
-    if settings.TOKEN_MODE == "stateful":
+    # Remove the DB session record.
+    if settings.TOKEN_MODE != "stateless" and jti is not None:
         try:
-            payload = _access_validator.validate_access_token(token)
-            if payload.exp is not None:
-                expires_at = datetime.fromtimestamp(payload.exp, tz=timezone.utc)
-            else:
-                expires_at = datetime.now(timezone.utc) + timedelta(
-                    minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-                )
-            SessionController.revoke_session_jti(payload.jti, expires_at)
-        except Exception:
-            logger.warning("Could not blacklist access token JTI on logout.")
+            SessionController.delete_session_by_jti(session=session, jti=jti)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not delete DB session on logout.")
 
     response.delete_cookie(key="refresh_token")
     return ResponseMessage(success=True, msg="Logged out successfully")
