@@ -1,4 +1,3 @@
-
 from typing import List
 import uuid
 from pydantic import model_validator
@@ -10,6 +9,8 @@ from auth_sdk_m8.schemas.base import CategoryType
 from auth_sdk_m8.models.shared import TimestampMixin
 from fastapi_service.core.db_models import prefixed_tables
 from fastapi_service.core.config import settings
+
+
 # ---------------------------------------------------------------
 # ---------------------------------------------------------------
 # ------- Category
@@ -19,6 +20,7 @@ class CategoryBase(SQLModel):
     """
     Shared fields for category schemas.
     """
+
     name: str = Field(
         unique=True,
         min_length=1,
@@ -41,6 +43,7 @@ class CategoryGenerators(CategoryBase):
     """
     Category schema with slug auto-generation.
     """
+
     @model_validator(mode="before")
     @classmethod
     def generate_slug(cls, values):
@@ -65,22 +68,15 @@ class CategoryUpdate(CategoryGenerators):
     """
 
 
-class Category(
-    TimestampMixin,
-    CategoryBase,
-    SQLModel,
-    table=True
-):
+class Category(TimestampMixin, CategoryBase, SQLModel, table=True):
     """
     Database model for a category.
     """
+
     __tablename__ = prefixed_tables("category")
     __table_args__ = (
         UniqueConstraint("slug", name="uq_category_slug"),
-        {
-            "mysql_engine": settings.DB_ENGINE,
-            "mysql_charset": settings.DB_CHARSET
-        },
+        {"mysql_engine": settings.DB_ENGINE, "mysql_charset": settings.DB_CHARSET},
     )
     id: int = Field(
         default=None,
@@ -89,12 +85,7 @@ class Category(
         description="Category ID",
     )
     owner_id: uuid.UUID = Field(
-        sa_column=Column(
-            "owner_id",
-            CHAR(36),
-            nullable=False,
-            index=True
-        ),
+        sa_column=Column("owner_id", CHAR(36), nullable=False, index=True),
         description="ID of the user who owns this category",
     )
 
@@ -103,6 +94,7 @@ class CategoryPublic(CategoryBase, SQLModel):
     """
     Public representation of a category.
     """
+
     id: int = Field(
         description="Category ID",
     )
@@ -115,6 +107,7 @@ class CategoriesPublic(SQLModel):
     """
     Wrapper for a list of public categories.
     """
+
     data: List[CategoryPublic] = Field(
         description="List of categories",
     )

@@ -1,4 +1,5 @@
 """Unit tests for utils.files.FilesHelper."""
+
 import os
 import tempfile
 
@@ -88,7 +89,7 @@ class TestGetPathFileSizes:
             path1 = os.path.join(tmpdir, "a.txt")
             path2 = os.path.join(tmpdir, "b.txt")
             with open(path1, "w") as f:
-                f.write("hello")   # 5 bytes
+                f.write("hello")  # 5 bytes
             with open(path2, "w") as f:
                 f.write("world!")  # 6 bytes
 

@@ -1,4 +1,5 @@
 """Unit tests for services.dashboard.DashboardController."""
+
 import uuid
 from datetime import datetime
 from unittest.mock import MagicMock, patch
@@ -16,7 +17,9 @@ class TestGetRangeActivity:
         assert start.minute == 0
         assert start.second == 0
         assert start.microsecond == 0
-        assert end == start.replace(hour=start.hour) + __import__("datetime").timedelta(hours=1)
+        assert end == start.replace(hour=start.hour) + __import__("datetime").timedelta(
+            hours=1
+        )
 
     def test_day_range(self):
         start, end = DashboardController.get_range_activity(RangeActivityType.DAY)
@@ -25,6 +28,7 @@ class TestGetRangeActivity:
         assert start.minute == 0
         assert start.second == 0
         from datetime import timedelta
+
         assert end == start + timedelta(days=1)
 
     def test_month_range_standard(self):

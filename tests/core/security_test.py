@@ -4,6 +4,7 @@ Unit tests for SecurityHelper class.
 This module tests the functionality of the SecurityHelper class, including
 token creation, password hashing, and validation.
 """
+
 import secrets
 import uuid
 from datetime import timedelta
@@ -26,16 +27,14 @@ class TestSecurityHelper:
         """Fixture for providing token secrets."""
         # Must satisfy SECRET_KEY_REGEX: [A-Za-z\d\-_]{32,} with lower+upper+digit+[-_]
         import re
+
         _pattern = re.compile(
             r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[-_])[A-Za-z\d\-_]{32,}$"
         )
         key = secrets.token_urlsafe(32)
         while not _pattern.match(key):
             key = secrets.token_urlsafe(32)
-        return TokenSecret(
-            secret_key=SecretStr(key),
-            algorithm="HS256"
-        )
+        return TokenSecret(secret_key=SecretStr(key), algorithm="HS256")
 
     @pytest.fixture
     def access_data(self):
@@ -45,15 +44,13 @@ class TestSecurityHelper:
             role="admin",
             email="test_user@example.com",
             full_name="Test User",
-            is_superuser=False
+            is_superuser=False,
         )
 
     @pytest.fixture
     def minimal_data(self):
         """Fixture for providing minimal token data."""
-        return TokenMinimalData(
-            sub=str(uuid.uuid4())
-        )
+        return TokenMinimalData(sub=str(uuid.uuid4()))
 
     def test_create_access_token(self, access_data, token_secrets_fixture):
         """
@@ -96,9 +93,7 @@ class TestSecurityHelper:
         """
         expires_delta = timedelta(days=7)
         token, jti = SecurityHelper.create_refresh_token(
-            minimal_data,
-            expires_delta,
-            token_secrets_fixture
+            minimal_data, expires_delta, token_secrets_fixture
         )
 
         assert isinstance(token, str)
@@ -108,7 +103,7 @@ class TestSecurityHelper:
         decoded_token = jwt.decode(
             token,
             token_secrets_fixture.secret_key.get_secret_value(),
-            algorithms=[token_secrets_fixture.algorithm]
+            algorithms=[token_secrets_fixture.algorithm],
         )
         assert decoded_token["sub"] == minimal_data.sub
         assert decoded_token["type"] == "refresh"
@@ -116,9 +111,7 @@ class TestSecurityHelper:
         assert "jti" in decoded_token
 
     def test_create_refresh_token_with_custom_jti(
-        self,
-        minimal_data,
-        token_secrets_fixture
+        self, minimal_data, token_secrets_fixture
     ):
         """
         Test the creation of a refresh token with a custom JTI.
@@ -131,10 +124,7 @@ class TestSecurityHelper:
         custom_jti = str(uuid.uuid4())
         expires_delta = timedelta(days=7)
         token, jti = SecurityHelper.create_refresh_token(
-            minimal_data,
-            expires_delta,
-            token_secrets_fixture,
-            jti=custom_jti
+            minimal_data, expires_delta, token_secrets_fixture, jti=custom_jti
         )
 
         assert jti == custom_jti
@@ -142,7 +132,7 @@ class TestSecurityHelper:
         decoded_token = jwt.decode(
             token,
             token_secrets_fixture.secret_key.get_secret_value(),
-            algorithms=[token_secrets_fixture.algorithm]
+            algorithms=[token_secrets_fixture.algorithm],
         )
         assert decoded_token["jti"] == custom_jti
 
@@ -152,16 +142,20 @@ class TestSecurityHelper:
         [
             (
                 "secure_password",
-                bcrypt.hashpw("secure_password".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
-                True
+                bcrypt.hashpw(
+                    "secure_password".encode("utf-8"), bcrypt.gensalt()
+                ).decode("utf-8"),
+                True,
             ),
             (
                 "wrong_password",
-                bcrypt.hashpw("secure_password".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
-                False
+                bcrypt.hashpw(
+                    "secure_password".encode("utf-8"), bcrypt.gensalt()
+                ).decode("utf-8"),
+                False,
             ),
         ],
-        ids=["correct_password_matches", "wrong_password_no_match"]
+        ids=["correct_password_matches", "wrong_password_no_match"],
     )
     def test_verify_password(plain_password, hashed_password, expected_result):
         """
@@ -172,7 +166,10 @@ class TestSecurityHelper:
             hashed_password (str): Hashed password.
             expected_result (bool): Expected verification result.
         """
-        assert SecurityHelper.verify_password(plain_password, hashed_password) is expected_result
+        assert (
+            SecurityHelper.verify_password(plain_password, hashed_password)
+            is expected_result
+        )
 
     @staticmethod
     def test_verify_password_invalid_hash():
@@ -182,7 +179,10 @@ class TestSecurityHelper:
         plain_password = "secure_password"
         invalid_hashed_password = "invalid_hash"
 
-        assert SecurityHelper.verify_password(plain_password, invalid_hashed_password) is False
+        assert (
+            SecurityHelper.verify_password(plain_password, invalid_hashed_password)
+            is False
+        )
 
     def test_get_password_hash(self):
         """
@@ -199,13 +199,10 @@ class TestSecurityHelper:
         [
             (SecretStr(""), ValidationError),
             (SecretStr("sdfsdfJKKJSHD_sdf4564sd5f46_QDQSDQS4654!"), ValidationError),
-        ]
+        ],
     )
     def test_create_access_token_with_invalid_secret(
-        self,
-        access_data,
-        secret_key,
-        expected_exception
+        self, access_data, secret_key, expected_exception
     ):
         """
         Test access token creation with invalid token_secrets_fixture.
@@ -218,10 +215,7 @@ class TestSecurityHelper:
         expires_delta = timedelta(minutes=15)
 
         with pytest.raises(expected_exception):
-            token_secret = TokenSecret(
-                secret_key=secret_key,
-                algorithm="HS256"
-            )
+            token_secret = TokenSecret(secret_key=secret_key, algorithm="HS256")
             SecurityHelper.create_access_token(access_data, expires_delta, token_secret)
 
     @pytest.mark.parametrize(
@@ -229,13 +223,10 @@ class TestSecurityHelper:
         [
             (SecretStr(""), ValidationError),
             (SecretStr("sdfsdfJKKJSHD_sdf4564sd5f46_QDQSDQS4654!"), ValidationError),
-        ]
+        ],
     )
     def test_create_refresh_token_with_invalid_secret(
-        self,
-        minimal_data,
-        secret_key,
-        expected_exception
+        self, minimal_data, secret_key, expected_exception
     ):
         """
         Test refresh token creation with invalid token_secrets_fixture.
@@ -247,11 +238,10 @@ class TestSecurityHelper:
         """
         expires_delta = timedelta(days=7)
         with pytest.raises(expected_exception):
-            token_secret = TokenSecret(
-                secret_key=secret_key,
-                algorithm="HS256"
+            token_secret = TokenSecret(secret_key=secret_key, algorithm="HS256")
+            SecurityHelper.create_refresh_token(
+                minimal_data, expires_delta, token_secret
             )
-            SecurityHelper.create_refresh_token(minimal_data, expires_delta, token_secret)
 
     def test_encrypt_and_decrypt_token_roundtrip(self):
         """Encrypting then decrypting returns the original plaintext."""

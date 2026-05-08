@@ -1,4 +1,5 @@
 """Unit tests for core.deps dependency functions."""
+
 import secrets
 import uuid
 from datetime import timedelta
@@ -22,6 +23,7 @@ from auth_sdk_m8.schemas.user import UserModel
 def _make_valid_token(user_id: str = None) -> str:
     """Create a signed access token that passes decode_access_token validation."""
     import re
+
     _pattern = re.compile(
         r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[-_])[A-Za-z\d\-_]{32,}$"
     )
@@ -30,6 +32,7 @@ def _make_valid_token(user_id: str = None) -> str:
         key = secrets.token_urlsafe(32)
 
     from auth_user_service.core.config import settings
+
     data = TokenAccessData(
         sub=user_id or str(uuid.uuid4()),
         role="user",
@@ -54,8 +57,12 @@ class TestGetCurrentUser:
         token = _make_valid_token()
         mock_redis = MagicMock()
 
-        with patch("auth_user_service.core.deps.get_redis_client", return_value=mock_redis), \
-             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+        with (
+            patch(
+                "auth_user_service.core.deps.get_redis_client", return_value=mock_redis
+            ),
+            patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls,
+        ):
             mock_cls.return_value.is_blacklisted.return_value = False
             result = get_current_user(token=token)
 
@@ -66,8 +73,12 @@ class TestGetCurrentUser:
         token = _make_valid_token()
         mock_redis = MagicMock()
 
-        with patch("auth_user_service.core.deps.get_redis_client", return_value=mock_redis), \
-             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+        with (
+            patch(
+                "auth_user_service.core.deps.get_redis_client", return_value=mock_redis
+            ),
+            patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls,
+        ):
             mock_cls.return_value.is_blacklisted.return_value = True
             with pytest.raises(HTTPException) as exc_info:
                 get_current_user(token=token)
@@ -83,8 +94,10 @@ class TestGetCurrentUser:
     def test_non_stateful_mode_skips_blacklist_check(self):
         token = _make_valid_token()
 
-        with patch("auth_user_service.core.deps.settings") as mock_cfg, \
-             patch("auth_user_service.core.deps.get_redis_client") as mock_get_redis:
+        with (
+            patch("auth_user_service.core.deps.settings") as mock_cfg,
+            patch("auth_user_service.core.deps.get_redis_client") as mock_get_redis,
+        ):
             mock_cfg.TOKEN_MODE = "hybrid"
             result = get_current_user(token=token)
 
@@ -93,6 +106,7 @@ class TestGetCurrentUser:
 
     def test_inactive_user_raises_403(self):
         from auth_user_service.core.config import settings
+
         data = TokenAccessData(
             sub=str(uuid.uuid4()),
             role="user",
@@ -112,8 +126,12 @@ class TestGetCurrentUser:
         )
 
         mock_redis = MagicMock()
-        with patch("auth_user_service.core.deps.get_redis_client", return_value=mock_redis), \
-             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls:
+        with (
+            patch(
+                "auth_user_service.core.deps.get_redis_client", return_value=mock_redis
+            ),
+            patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls,
+        ):
             mock_cls.return_value.is_blacklisted.return_value = False
             with pytest.raises(HTTPException) as exc_info:
                 get_current_user(token=token)
@@ -169,6 +187,7 @@ class TestGetTemplates:
 class TestGetRedisClient:
     def test_returns_redis_instance(self):
         from redis import Redis
+
         client = get_redis_client()
         assert isinstance(client, Redis)
 
@@ -181,6 +200,7 @@ class TestGetRedisClient:
 class TestVerifyPrivateApiSecret:
     def test_correct_secret_passes(self):
         from auth_user_service.core.config import settings
+
         correct = settings.PRIVATE_API_SECRET.get_secret_value()
         verify_private_api_secret(x_internal_token=correct)  # should not raise
 

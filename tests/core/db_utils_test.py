@@ -1,4 +1,5 @@
 """Unit tests for core.db_utils helpers."""
+
 from unittest.mock import patch
 
 import pytest

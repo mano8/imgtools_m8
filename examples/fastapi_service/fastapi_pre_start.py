@@ -1,15 +1,10 @@
 """Pre Start Script"""
+
 import logging
 
 from sqlalchemy import Engine
 from sqlmodel import Session, select
-from tenacity import (
-    after_log,
-    before_log,
-    retry,
-    stop_after_attempt,
-    wait_fixed
-)
+from tenacity import after_log, before_log, retry, stop_after_attempt, wait_fixed
 from fastapi_service.core.engine_sync import engine
 
 logging.basicConfig(level=logging.INFO)

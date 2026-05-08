@@ -1,6 +1,7 @@
 """
 Shared pytest fixtures for the fa-auth-m8 test suite.
 """
+
 import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone

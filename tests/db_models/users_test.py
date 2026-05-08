@@ -1,4 +1,5 @@
 """Unit tests for db_models.users validation logic."""
+
 import uuid
 
 import pytest

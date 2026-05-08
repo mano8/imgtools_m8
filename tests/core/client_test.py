@@ -1,4 +1,5 @@
 """Unit tests for core.client Redis utilities."""
+
 import uuid
 from datetime import timedelta
 from unittest.mock import MagicMock
@@ -171,7 +172,9 @@ class TestLoginRateLimiter:
 
     def test_reset_deletes_key(self):
         self.limiter.reset("user@example.com")
-        self.mock_redis.delete.assert_called_once_with("login:attempts:user@example.com")
+        self.mock_redis.delete.assert_called_once_with(
+            "login:attempts:user@example.com"
+        )
 
     def test_constants(self):
         assert LoginRateLimiter.MAX_ATTEMPTS == 5
@@ -223,7 +226,9 @@ class TestRedisSessionManager:
 
     def test_blacklist_jti_stores_with_ttl(self):
         self.manager.blacklist_jti("some-jti", 300)
-        self.mock_redis.setex.assert_called_once_with("jwt:blacklist:some-jti", 300, "revoked")
+        self.mock_redis.setex.assert_called_once_with(
+            "jwt:blacklist:some-jti", 300, "revoked"
+        )
 
     def test_is_blacklisted_returns_true_when_exists(self):
         self.mock_redis.exists.return_value = 1
