@@ -6,17 +6,12 @@ to initialize the database with initial data, specifically creating a
 default superuser if one does not already exist. It is expected that
 database tables are created via Alembic migrations.
 """
+
 from sqlmodel import Session, select
 from auth_user_service.services.users import UserController
 from auth_user_service.core.config import settings
-from auth_user_service.db_models.users import (
-    User,
-    UserCreate
-)
-from auth_sdk_m8.schemas.base import (
-    AuthProviderType,
-    RoleType
-)
+from auth_user_service.db_models.users import User, UserCreate
+from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
 # make sure all SQLModel models are imported (app.models)
 # before initializing DB otherwise, SQLModel might fail
 # to initialize relationships properly
@@ -56,7 +51,6 @@ def initial_user_db(session: Session) -> None:
             email=settings.FIRST_SUPERUSER,
             password=settings.FIRST_SUPERUSER_PASSWORD.get_secret_value(),
             is_superuser=True,
-            role=RoleType.SUPERADMIN
+            role=RoleType.SUPERADMIN,
         )
-        user = UserController.create_user(
-            session=session, user_create=user_in)
+        user = UserController.create_user(session=session, user_create=user_in)

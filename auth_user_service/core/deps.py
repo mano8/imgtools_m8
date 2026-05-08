@@ -22,6 +22,7 @@ from auth_sdk_m8.security import TokenValidationConfig, TokenValidator, Validati
 
 from auth_user_service.core.client import RedisSessionManager
 from auth_user_service.core.config import settings
+from auth_sdk_m8.observability.metrics import get as _get_metrics
 from auth_user_service.core.engine_sync import SessionDep  # noqa: F401 (re-exported)
 
 _logger = logging.getLogger(__name__)
@@ -60,6 +61,7 @@ _redis_pool: Optional[ConnectionPool] = (
     if settings.TOKEN_MODE != "stateless"
     else None
 )
+
 
 def _access_validation_secret() -> TokenSecret:
     """Return the TokenSecret used to *validate* access tokens.
@@ -112,6 +114,9 @@ def get_current_user(token: TokenDep) -> UserModel:
     try:
         payload = _access_validator.validate_access_token(token)
     except InvalidToken as ex:
+        _m = _get_metrics()
+        if _m and _m.token_validation_failures_total:
+            _m.token_validation_failures_total.labels(reason="invalid").inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials.",
@@ -122,12 +127,18 @@ def get_current_user(token: TokenDep) -> UserModel:
     if settings.TOKEN_MODE == "stateful":
         redis = get_redis_client()
         if redis is not None and RedisSessionManager(redis).is_blacklisted(payload.jti):
+            _m = _get_metrics()
+            if _m and _m.token_validation_failures_total:
+                _m.token_validation_failures_total.labels(reason="revoked").inc()
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Session revoked",
             )
 
     if not payload.is_active:
+        _m = _get_metrics()
+        if _m and _m.token_validation_failures_total:
+            _m.token_validation_failures_total.labels(reason="inactive").inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive user",
@@ -166,4 +177,6 @@ def verify_private_api_secret(
     """Reject requests that do not carry the correct inter-service secret."""
     expected = settings.PRIVATE_API_SECRET.get_secret_value()
     if not secrets.compare_digest(x_internal_token, expected):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )

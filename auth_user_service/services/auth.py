@@ -15,10 +15,7 @@ from sqlmodel import Session
 from auth_user_service.services.client_sessions import SessionController
 from auth_user_service.services.users import UserController
 from auth_user_service.db_models.users import User
-from auth_user_service.db_models.sessions import (
-    ClientSessionCreate,
-    ClientSession
-)
+from auth_user_service.db_models.sessions import ClientSessionCreate, ClientSession
 from auth_user_service.core.client import PKCEStore
 from auth_user_service.core.config import settings
 from auth_user_service.core.deps import get_redis_client
@@ -74,7 +71,9 @@ class AuthController:
             A redirect URL string for initiating Google OAuth2 with PKCE.
         """
         if not settings.GOOGLE_CLIENT_ID:
-            raise HTTPException(status_code=503, detail="Google OAuth is not configured.")
+            raise HTTPException(
+                status_code=503, detail="Google OAuth is not configured."
+            )
         state = cls.create_state()
         code_verifier = cls.generate_code_verifier()
         code_challenge = cls.generate_code_challenge(code_verifier)
@@ -90,22 +89,15 @@ class AuthController:
             "access_type": "offline",
             "prompt": "consent",
             "code_challenge": code_challenge,
-            "code_challenge_method": "S256"
+            "code_challenge_method": "S256",
         }
         query = "&".join(
-            f"{k}={quote_plus(v)}"
-            for k, v in params.items()
-            if v is not None
+            f"{k}={quote_plus(v)}" for k, v in params.items() if v is not None
         )
         return f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
 
     @staticmethod
-    def authenticate(
-        *,
-        session: Session,
-        email: str,
-        password: str
-    ) -> Optional[User]:
+    def authenticate(*, session: Session, email: str, password: str) -> Optional[User]:
         """
         Authenticate a user by their email and password.
 
@@ -118,8 +110,7 @@ class AuthController:
             User | None: The authenticated user object
             if authentication is successful, otherwise None.
         """
-        db_user = UserController.get_user_by_email(
-            session=session, email=email)
+        db_user = UserController.get_user_by_email(session=session, email=email)
         if not db_user:
             return None
         if not SecurityHelper.verify_password(password, db_user.hashed_password):
@@ -131,18 +122,12 @@ class AuthController:
         """
         Get tokens expiarition timedelta.
         """
-        access_token_expires = timedelta(
-            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-        refresh_token_expires = timedelta(
-            minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES
-        )
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        refresh_token_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
         return access_token_expires, refresh_token_expires
 
     @staticmethod
-    def create_auth_tokens(
-        user: User
-    ) -> Union[str, str, str]:
+    def create_auth_tokens(user: User) -> Union[str, str, str]:
         """
         Create authentication tokens for a user.
 
@@ -206,7 +191,7 @@ class AuthController:
         user: User,
         jti: str,
         refresh_token: str,
-        external_token: Optional[ExternalTokensData] = None
+        external_token: Optional[ExternalTokensData] = None,
     ) -> ClientSession:
         """Add or update client session."""
         access_token_expires, refresh_token_expires = AuthController.get_tokens_expire()

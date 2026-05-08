@@ -1,4 +1,5 @@
 """AddOn extension auth."""
+
 import logging
 from datetime import timedelta
 from httpx import HTTPError as HTTPXError
@@ -15,6 +16,7 @@ from auth_user_service.services.oauth import OAuthController
 from auth_user_service.core.client import PKCEStore
 from auth_user_service.core.deps import get_redis_client
 from auth_user_service.core.config import settings
+from auth_sdk_m8.observability.metrics import get as _get_metrics
 
 from auth_sdk_m8.schemas.auth import ExternalTokensData
 from auth_sdk_m8.schemas.base import AuthProviderType
@@ -118,10 +120,18 @@ async def google_auth_callback(
             samesite="lax",
             max_age=settings.REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS,
         )
+
+        _m = _get_metrics()
+        if _m and _m.oauth_attempts_total:
+            _m.oauth_attempts_total.labels(provider="google", result="success").inc()
+
         return response
 
     except HTTPXError as ex:
         logger.error("Google token exchange failed: %s", ex)
+        _m = _get_metrics()
+        if _m and _m.oauth_attempts_total:
+            _m.oauth_attempts_total.labels(provider="google", result="failed").inc()
         raise HTTPException(
             status_code=400, detail="Token exchange with Google failed."
         ) from ex
@@ -129,4 +139,7 @@ async def google_auth_callback(
         raise
     except Exception as ex:
         logger.exception("Unexpected error during Google OAuth callback")
+        _m = _get_metrics()
+        if _m and _m.oauth_attempts_total:
+            _m.oauth_attempts_total.labels(provider="google", result="failed").inc()
         raise HTTPException(status_code=500, detail="Authentication error.") from ex

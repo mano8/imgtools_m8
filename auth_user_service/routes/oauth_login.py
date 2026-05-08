@@ -1,4 +1,5 @@
 """Google Views routes."""
+
 from datetime import datetime, timezone
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -20,13 +21,9 @@ router = APIRouter(prefix="/google-api", tags=["google-api"])
 # pylint: disable=broad-exception-caught, not-callable
 
 
-@router.get(
-    "/login/",
-    response_class=HTMLResponse
-)
+@router.get("/login/", response_class=HTMLResponse)
 async def google_auth_login(
-    request: Request,
-    templates: Jinja2Templates = Depends(get_templates)
+    request: Request, templates: Jinja2Templates = Depends(get_templates)
 ) -> dict:
     """Retrieve category list."""
     google_login_url = AuthController.get_google_login_url(
@@ -37,23 +34,17 @@ async def google_auth_login(
         "base_url": str(request.base_url),
         "google_login_url": google_login_url,
     }
-    return templates.TemplateResponse(
-        "auth/login.html",
-        context
-    )
+    return templates.TemplateResponse("auth/login.html", context)
 
 
-@router.get(
-    "/login_success/{session_id}/",
-    response_class=HTMLResponse
-)
+@router.get("/login_success/{session_id}/", response_class=HTMLResponse)
 async def google_auth_success_login(
     response: Response,
     request: Request,
     session: SessionDep,
     session_id: uuid.UUID,
     access_token: str = Depends(SecurityHelper.get_access_token_from_cookie),
-    templates: Jinja2Templates = Depends(get_templates)
+    templates: Jinja2Templates = Depends(get_templates),
 ) -> dict:
     """Retrieve category list."""
     try:
@@ -61,7 +52,7 @@ async def google_auth_success_login(
             token_data=TokenDecodeProps(
                 access_token=access_token,
                 secret_key=settings.ACCESS_SECRET_KEY,
-                algorithm=settings.TOKEN_ALGORITHM
+                algorithm=settings.TOKEN_ALGORITHM,
             )
         )
     except InvalidToken as err:
@@ -71,16 +62,16 @@ async def google_auth_success_login(
         response.delete_cookie(key="access_token")
         raise HTTPException(status_code=401, detail="Token revoked")
 
-    statement = select(ClientSession).where(
-        token_data.sub==ClientSession.user_id
-    ).where(
-        session_id==ClientSession.id
+    statement = (
+        select(ClientSession)
+        .where(token_data.sub == ClientSession.user_id)
+        .where(session_id == ClientSession.id)
     )
     current_session = session.exec(statement).first()
 
-    if not current_session\
-            or current_session.refresh_expires_at < datetime.now(
-                timezone.utc).replace(tzinfo=None):
+    if not current_session or current_session.refresh_expires_at < datetime.now(
+        timezone.utc
+    ).replace(tzinfo=None):
         raise HTTPException(status_code=403, detail="Session expired or invalid.")
     access_delta, refresh_delta = AuthController.get_tokens_expire()
     access_token, refresh_token, jti = AuthController.create_auth_tokens(
@@ -90,7 +81,7 @@ async def google_auth_success_login(
     current_session.jwt_expires_at = datetime.now(timezone.utc) + access_delta
     current_session.refresh_expires_at = datetime.now(timezone.utc) + refresh_delta
     current_session.jwt_jti = jti
-    current_session.refresh_token_hash=SecurityHelper.hash_token(refresh_token)
+    current_session.refresh_token_hash = SecurityHelper.hash_token(refresh_token)
     session.add(current_session)
     session.commit()
     context = {
@@ -100,9 +91,6 @@ async def google_auth_success_login(
         "jwt": access_token,
         "jwt_expires": access_delta.seconds * 1000,
         "name": current_session.user.full_name or "User",
-        "extension_id": settings.EXTENSION_ID
+        "extension_id": settings.EXTENSION_ID,
     }
-    return templates.TemplateResponse(
-        "auth/login_success.html",
-        context
-    )
+    return templates.TemplateResponse("auth/login_success.html", context)
