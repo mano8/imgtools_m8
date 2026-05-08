@@ -70,11 +70,11 @@ services:
     env_file:
       - ./auth.env
     environment:
-      ENVIRONMENT: development
-      API_PREFIX: /user
-      SET_OPEN_API: true
-      SET_DOCS: true
-      SET_REDOC: true
+      ENVIRONMENT: ${ENVIRONMENT}
+      API_PREFIX: ${API_PREFIX}
+      SET_OPEN_API: ${SET_OPEN_API}
+      SET_DOCS: ${SET_DOCS}
+      SET_REDOC: ${SET_REDOC}
       BACKEND_HOST: ${BACKEND_HOST}
       FRONTEND_HOST: ${FRONTEND_HOST}
       SELECTED_DB: ${SELECTED_DB}
@@ -121,11 +121,11 @@ services:
     env_file:
       - ./api.env
     environment:
-      ENVIRONMENT: development
-      API_PREFIX: /fastapi
-      SET_OPEN_API: true
-      SET_DOCS: true
-      SET_REDOC: true
+      ENVIRONMENT: ${ENVIRONMENT}
+      API_PREFIX: ${API_PREFIX}
+      SET_OPEN_API: ${SET_OPEN_API}
+      SET_DOCS: ${SET_DOCS}
+      SET_REDOC: ${SET_REDOC}
       BACKEND_HOST: ${BACKEND_HOST}
       FRONTEND_HOST: ${FRONTEND_HOST}
       SELECTED_DB: ${SELECTED_DB}
