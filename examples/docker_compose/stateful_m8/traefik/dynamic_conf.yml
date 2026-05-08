@@ -1,0 +1,50 @@
+# dynamic_conf.yml — Development
+tls:
+  certificates:
+    - certFile: "/etc/traefik/certs/m8_app_crt.pem"
+      keyFile:  "/etc/traefik/certs/m8_app_key.pem"
+http:
+
+  # 1) Dashboard router — only on websecure, only from localhost
+  routers:
+    #traefik-dashboard:
+    #  entryPoints:
+    #    - dashboard
+    #  rule: "Host(`localhost`) && PathPrefix(`/dashboard`)"
+    #  service: api@internal
+    #  middlewares:
+    #    - ip-allowlist
+
+  # 2) Auth-User-Service router
+    auth-router:
+      entryPoints:
+        - api
+      rule: "PathPrefix(`/user`)"
+      service: auth-service
+    #  tls: {}
+
+    # 3) fastapi-Service router
+    fastapi-router:
+      entryPoints:
+        - api
+      rule: "PathPrefix(`/fastapi`)"
+      service: fastapi-service
+    #  tls: {}
+
+  services:
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://auth_user_service:8000"
+    fastapi-service:
+      loadBalancer:
+        servers:
+          - url: "http://fastapi_service:8000"
+
+  middlewares:
+    ip-allowlist:
+      IPAllowList:
+        # Only allow dashboard from the Docker host itself
+        sourceRange:
+          - "127.0.0.1/32"
+          - "::1/128"

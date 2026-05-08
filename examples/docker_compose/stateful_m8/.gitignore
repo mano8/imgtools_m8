@@ -1,0 +1,8 @@
+
+prometheus/data/*
+grafana/data/*
+mysql_db/*
+db/*
+redis/*
+*.pem
+*README_DEV*

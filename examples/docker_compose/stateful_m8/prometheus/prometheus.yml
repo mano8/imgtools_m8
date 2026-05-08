@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+
+  - job_name: traefik
+    static_configs:
+      - targets:
+          - traefik:8082
+
+  #- job_name: auth_user_service
+  #  static_configs:
+  #    - targets:
+  #        - auth_user_service:8000
+
+  #- job_name: fastapi_service
+  #  static_configs:
+  #    - targets:
+  #        - fastapi_service:8000

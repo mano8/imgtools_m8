@@ -4,21 +4,18 @@ services:
     ports:
       - "8000:80"
       - "4430:443"
+      - "8080:8080"   # Dashboard
       - "9000:9000"   # services entryPoint
-      # Dashboard ONLY localhost
-      - "127.0.0.1:8080:8080"   # Dashboard
-      
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic_conf.yml:/etc/traefik/dynamic_conf.yml:ro
       - ./traefik/certs:/etc/traefik/certs:ro
-      - ./traefik/acme.json:/etc/traefik/acme.json
     networks:
       - m8_app_network
 
   m8_db:
-    image: bitnami/mariadb:12.2
+    image: bitnami/mariadb:latest
     volumes:
       - ./mysql_db:/bitnami/mariadb
     environment:
@@ -39,6 +36,7 @@ services:
     networks:
       - m8_app_network
 
+  
   redis_cache:
     image: redis:7.4-alpine
     volumes:
@@ -62,7 +60,44 @@ services:
       retries: 5
     networks:
       - m8_app_network
+  
+  
+  prometheus:
+    image: ubuntu/prometheus:3.11-24.04_stable
 
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/data:/prometheus
+
+    ports:
+      - "127.0.0.1:9090:9090"
+
+    networks:
+      - m8_app_network
+
+    restart: unless-stopped
+  
+  grafana:
+    image: grafana/grafana:main-ubuntu
+
+    depends_on:
+      - prometheus
+
+    env_file:
+      - ./grafana/config.monitoring
+
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    networks:
+      - m8_app_network
+
+    restart: unless-stopped
+  
   auth_user_service:
     build:
       context: ../../../
@@ -86,8 +121,6 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       FIRST_SUPERUSER: ${FIRST_SUPERUSER}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
-      PRIVATE_API_SECRET: ${PRIVATE_API_SECRET}
-      TOKENS_ENCRYPTION_KEY: ${TOKENS_ENCRYPTION_KEY}
       ACCESS_SECRET_KEY: ${ACCESS_SECRET_KEY:-}
       ACCESS_PRIVATE_KEY: ${ACCESS_PRIVATE_KEY:-}
       ACCESS_PUBLIC_KEY: ${ACCESS_PUBLIC_KEY:-}
@@ -163,6 +196,31 @@ services:
         condition: service_started
     networks:
       - m8_app_network
+  # ── Consumer service (optional) ───────────────────────────────────────────
+  # Uncomment and configure for your own FastAPI application.
+  # Set TOKEN_MODE=stateless and provide ACCESS_SECRET_KEY (HS256) or
+  # ACCESS_PUBLIC_KEY (RS256/ES256) matching the auth service.
+  #
+  # fastapi_service:
+  #   build:
+  #     context: <path-to-your-service>
+  #     dockerfile: ./Dockerfile
+  #   env_file:
+  #     - ./api.env
+  #   environment:
+  #     TOKEN_MODE: stateless
+  #     ACCESS_SECRET_KEY: ${ACCESS_SECRET_KEY:-}
+  #     REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY}
+  #     ACCESS_TOKEN_ALGORITHM: ${ACCESS_TOKEN_ALGORITHM:-HS256}
+  #     AUTH_PREFIX: /user
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.fastapi-service.entrypoints=api,websecure"
+  #     - "traefik.http.services.fastapi-service.loadbalancer.server.port=8000"
+  #   depends_on:
+  #     - auth_user_service
+  #   networks:
+  #     - m8_app_network
 
 networks:
   m8_app_network:
