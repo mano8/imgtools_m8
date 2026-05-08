@@ -5,6 +5,7 @@ This module sets up logging, initializes the database using the
 `initial_user_db` function, and provides a main function to run the
 initialization.
 """
+
 import logging
 from sqlmodel import Session
 from auth_user_service.core.init_db import initial_user_db

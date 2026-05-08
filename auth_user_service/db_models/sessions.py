@@ -2,15 +2,23 @@
 Client session models for managing user sessions and tokens.
 This module defines the database models and schemas for client sessions,
 """
+
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 import uuid
 from sqlmodel import Column, Field, ForeignKey, Relationship, SQLModel
 from auth_sdk_m8.schemas.base import AuthProviderType
 from auth_sdk_m8.models.shared import TimestampMixin
-from auth_user_service.core.db_utils import UUIDChar, get_table_args, prefixed_fk, prefixed_tables
+from auth_user_service.core.db_utils import (
+    UUIDChar,
+    get_table_args,
+    prefixed_fk,
+    prefixed_tables,
+)
+
 if TYPE_CHECKING:
     from auth_user_service.db_models.users import User
+
 
 # ---------------------------------------------------------------
 # ---------------------- SESSION MODELS ------------------------
@@ -20,6 +28,7 @@ class ClientSessionBase(TimestampMixin, SQLModel):
     Shared fields for session schemas, now including both
     internal (JWT) and external (Google) token tracking.
     """
+
     provider: AuthProviderType = Field(
         sa_column_kwargs={"nullable": False},
         description="Login provider for this session",
@@ -73,6 +82,7 @@ class ClientSessionCreate(SQLModel):
     Input schema for creating a new client session,
     now accepting external Google tokens too.
     """
+
     jwt_jti: str = Field(
         sa_column_kwargs={"nullable": False},
         min_length=16,
@@ -114,6 +124,7 @@ class ClientSessionUpdateExternal(SQLModel):
     Input schema for creating a new client session,
     now accepting external Google tokens too.
     """
+
     external_access_token: Optional[str] = Field(
         default=None,
         max_length=2048,
@@ -129,10 +140,12 @@ class ClientSessionUpdateExternal(SQLModel):
         description="Google OAuth token expiration",
     )
 
+
 class ClientSession(ClientSessionBase, SQLModel, table=True):
     """
     Database model for storing user sessions with full token metadata.
     """
+
     __tablename__ = prefixed_tables("client_session")
     __table_args__ = (get_table_args(),)
     id: str = Field(
@@ -147,7 +160,7 @@ class ClientSession(ClientSessionBase, SQLModel, table=True):
             UUIDChar(),
             ForeignKey(prefixed_fk("user", "id"), ondelete="CASCADE"),
             nullable=False,
-            index=True
+            index=True,
         ),
         description="Owner user ID",
     )
@@ -161,6 +174,7 @@ class ClientSessionPublic(ClientSessionBase, SQLModel):
     """
     Public representation of a session (no token hashes).
     """
+
     id: uuid.UUID = Field(description="ClientSession ID")
 
 
@@ -172,5 +186,6 @@ class ClientSessionsPublic(SQLModel):
         data (list[LoginClientSessionPublic]): List of public item models.
         count (int): Total count of items.
     """
+
     data: list[ClientSession]
     count: int

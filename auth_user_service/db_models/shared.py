@@ -1,6 +1,7 @@
 """
 Shared models and enums for the application.
 """
+
 from sqlmodel import Field, SQLModel
 
 
@@ -17,6 +18,7 @@ class NewPassword(SQLModel):
         token (str): Reset token sent to user.
         new_password (str): New password to set.
     """
+
     token: str = Field(
         description="Password reset token",
     )

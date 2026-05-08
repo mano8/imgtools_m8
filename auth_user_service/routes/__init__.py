@@ -7,7 +7,7 @@ from auth_user_service.routes import (
     profile,
     users,
     google_auth,
-    dashboard
+    dashboard,
 )
 
 api_router = APIRouter()

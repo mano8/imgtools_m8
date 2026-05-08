@@ -5,6 +5,7 @@ These endpoints are NOT exposed to the public internet. They must be
 protected at the network level (Docker internal network) AND require
 the X-Internal-Token header to match PRIVATE_API_SECRET.
 """
+
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -23,6 +24,7 @@ router = APIRouter(
 
 class PrivateUserCreate(BaseModel):
     """Private Create user"""
+
     email: EmailStr
     password: str
     full_name: str

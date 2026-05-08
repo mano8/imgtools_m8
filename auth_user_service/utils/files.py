@@ -1,4 +1,5 @@
 """File-upload utilities specific to auth_user_service."""
+
 from os import scandir
 from os.path import getsize, isdir, isfile, splitext
 

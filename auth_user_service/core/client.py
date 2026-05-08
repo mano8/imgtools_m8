@@ -72,6 +72,7 @@ class PKCEStore:
     """
     Persistent store for PKCE code_verifiers, using Redis with TTL.
     """
+
     def __init__(self, client: Redis) -> None:
         """
         Initialize the RedisRateLimiter.
