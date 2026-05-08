@@ -8,6 +8,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Prometheus observability** via `auth_sdk_m8.observability` (SDK `[observability]` extra):
+  - `auth_user_service` exposes `GET /user/metrics` when `METRICS_ENABLED=true`.  Auth-specific
+    counters (`login_attempts_total`, `token_refresh_total`, `logout_total`,
+    `token_validation_failures_total`, `oauth_attempts_total`) are incremented in route handlers
+    and `get_current_user`.
+  - `examples/fastapi_service` exposes `GET /fastapi/metrics`.  HTTP groups only (`traffic`,
+    `performance`, `reliability`, `health`) — no auth counters.
+  - Both services inherit `METRICS_ENABLED` and `METRICS_GROUPS` from
+    `ObservabilitySettingsMixin` (MRO-safe multiple inheritance).
+  - Zero overhead when disabled: no middleware registered, no counters allocated, `get()` returns
+    `None` so all call sites short-circuit in O(1).
+  - `examples/docker_compose/stateful_m8/prometheus/prometheus.yml` updated with correct
+    `metrics_path` for each service (`/user/metrics` and `/fastapi/metrics`).
 - **`TOKEN_MODE` configuration** (`stateless` | `hybrid` | `stateful`): controls whether Redis
   is required at startup, whether JTI blacklist checks run per-request, and whether DB sessions
   are persisted on login.  Defaults to `stateful` for backward compatibility.
