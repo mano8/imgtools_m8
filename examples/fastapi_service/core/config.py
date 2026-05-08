@@ -2,16 +2,18 @@
 Configuration settings for the FastAPI application.
 This module loads environment settings securely and applies best practices.
 """
+
 from pathlib import Path
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 from auth_sdk_m8.core.config import CommonSettings, settings_customise_sources
 from auth_sdk_m8.schemas.shared import ValidationConstants
 from auth_sdk_m8.utils.paths import find_dotenv
+from auth_sdk_m8.observability.settings import ObservabilitySettingsMixin
 # pylint: disable=invalid-name
 
 
-class Settings(CommonSettings):
+class Settings(ObservabilitySettingsMixin, CommonSettings):
     """Settings for the fastapi_service: adds only new fields."""
 
     # Override env file directory if necessary
@@ -27,21 +29,20 @@ class Settings(CommonSettings):
     )
 
     # Extend validation lists
-    required_fields = CommonSettings.required_fields + [
-        "AUTH_PREFIX"
-    ]
+    required_fields = CommonSettings.required_fields + ["AUTH_PREFIX"]
     secret_fields = CommonSettings.secret_fields
     # Declare only service-specific fields
-    AUTH_PREFIX: str = Field(..., pattern=ValidationConstants.URL_PATH_STR_REGEX.pattern)
-    TABLES_PREFIX:str = "dcnt"
+    AUTH_PREFIX: str = Field(
+        ..., pattern=ValidationConstants.URL_PATH_STR_REGEX.pattern
+    )
+    TABLES_PREFIX: str = "dcnt"
 
 
 try:
     settings = Settings()
 except Exception as e:
     # Raise with a clear error message if validation fails.
-    raise RuntimeError(
-        f"Configuration validation error:\n {str(e)}") from e
+    raise RuntimeError(f"Configuration validation error:\n {str(e)}") from e
 
 if __name__ == "__main__":
     # For debugging, print out public settings without exposing secrets.

@@ -33,6 +33,9 @@ jinja2>=3.1.6
 google-auth>=2.39.0
 auth-sdk-m8>=0.3.0
 
+# Optional observability (required when METRICS_ENABLED=true)
+prometheus-client>=0.21.0
+
 # DB drivers (ALL included → runtime choice)
 pymysql>=1.1.1
 psycopg2-binary>=2.9.0

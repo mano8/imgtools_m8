@@ -69,3 +69,16 @@ REDIS_HOST="127.0.0.1"
 REDIS_PORT=6379
 REDIS_USER="appuser"
 REDIS_PASSWORD="changethis"
+
+# Observability — Prometheus metrics
+# Master switch. When false the /metrics endpoint is not registered and there
+# is zero runtime overhead. Default: false
+#METRICS_ENABLED=false
+# Which metric groups to collect. Comma-separated list or "all".
+# Valid values: all | traffic | performance | reliability | health
+# Examples:
+#   METRICS_GROUPS="all"
+#   METRICS_GROUPS="traffic,performance"
+#   METRICS_GROUPS="reliability,health"
+# Default: "all" (only matters when METRICS_ENABLED=true)
+#METRICS_GROUPS="all"
