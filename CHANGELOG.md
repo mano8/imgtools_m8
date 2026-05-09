@@ -8,6 +8,65 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Consumer JTI blacklist enforcement** (`examples/fastapi_service/core/deps.py`): `get_current_user`
+  previously never checked the JTI blacklist, leaving revoked access tokens valid at consumer services
+  until natural expiry — a silent security gap in `stateful` mode.  `get_current_user` now accepts
+  `RedisDep` and calls `AccessTokenBlacklist(redis).is_revoked(payload.jti)` before returning the
+  user.  Returns 403 `"Token has been revoked."` when the JTI is in the blacklist.
+- **`build_access_validator(settings, hooks=None)` factory** (`auth_sdk_m8/security/factory.py`,
+  SDK v0.4.2): consolidates the duplicated validator-construction logic (algorithm selection,
+  asymmetric vs symmetric key choice, iss/aud enforcement wiring) into a single canonical function
+  exported from `auth_sdk_m8.security`.  Both services now use it instead of copy-pasted boilerplate.
+- **`AccessTokenBlacklist`** (`auth_sdk_m8/security/blacklist.py`, SDK v0.4.2): thin Redis wrapper
+  exported from `auth_sdk_m8.security`.  Consumer services use it to check revocation using the same
+  `"jwt:blacklist:"` prefix written by `auth_user_service`'s `RedisSessionManager.blacklist_jti()`.
+- **Opt-in `iss`/`aud` JWT claim enforcement** — `TOKEN_ISSUER` and `TOKEN_AUDIENCE` are now defined
+  once in `CommonSettings` (SDK v0.4.2) and inherited by both services.  When set, issued tokens
+  embed the corresponding `iss`/`aud` claims and validation requires an exact match — preventing
+  token reuse across different services or issuers.  Leave unset for backward-compatible permissive
+  validation (default).
+
+### Added
+
+- **`TOKEN_ISSUER` / `TOKEN_AUDIENCE` in `CommonSettings`** (SDK v0.4.2): both optional fields with
+  `None` default are now defined at the SDK base class level.  Services that previously declared them
+  locally have had the duplicates removed.
+- **`RedisDep`** (`examples/fastapi_service/core/deps.py`): `Annotated[Optional[Redis], Depends(get_redis_client)]`
+  type alias added, matching the pattern already used in `auth_user_service`.
+
+### Changed
+
+- **`examples/fastapi_service/core/deps.py`** full rewrite:
+  - `get_redis_client()` now returns `Optional[Redis]` with a `ping()` check (previously returned
+    bare `Redis` and raised `ConnectionError` on every request when Redis was down).
+  - `get_current_user` signature extended with `redis: RedisDep`; checks `AccessTokenBlacklist` in
+    stateful mode.
+  - `_validator` construction simplified to `build_access_validator(settings, _hooks)` — eliminates
+    the private `_access_validation_secret()` helper and manual `TokenValidationConfig` wiring.
+  - Unused import `ASYMMETRIC_ALGORITHMS`, `TokenSecret`, `TokenValidationConfig`, `TokenValidator`,
+    `SecretStr` removed.
+- **`auth_user_service/core/deps.py`**: `_access_validation_secret()` helper removed; `_access_validator`
+  construction reduced to `build_access_validator(settings, _hooks)`.
+- **`auth_user_service/core/config.py`**: `TOKEN_ISSUER` / `TOKEN_AUDIENCE` fields removed — they
+  are now inherited from `CommonSettings`.
+- **`examples/fastapi_service/core/config.py`**: same — duplicate `TOKEN_ISSUER` / `TOKEN_AUDIENCE`
+  and unused `Optional` import removed.
+- **All env files** updated with `TOKEN_MODE="stateful"` (active) and commented
+  `#TOKEN_ISSUER` / `#TOKEN_AUDIENCE` hints for opt-in claim enforcement:
+  - `auth_user_service/.env`
+  - `examples/fastapi_service/.env`
+  - `examples/fastapi_service/.example_env`
+  - `examples/docker_compose/stateful_m8/example.env.txt`
+  - `examples/docker_compose/local_mysql_m8/example.env.txt`
+  - `examples/docker_compose/dev_postgres_m8/.env`
+- **`tests/core/deps_test.py`**: `TestAccessValidationSecret` class removed (tested a private helper
+  that no longer exists after the refactor).
+
+### Breaking (auth-sdk-m8 consumer services)
+
+- `auth-sdk-m8` bumped to `v0.4.2`.  Reinstall with `pip install -e .` (local) or update the wheel
+  reference in consuming services before deploying.
+
 - **Timing-attack prevention on login** (`services/auth.py`): a module-level `_DUMMY_HASH`
   constant (bcrypt of a random secret) is always passed to `verify_password` when the email is
   not found.  Response time is now constant (~185 ms) regardless of whether the user exists,

@@ -53,6 +53,13 @@ REFRESH_SECRET_KEY="changethis"
 TOKEN_ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_MINUTES=3600
+# Must match auth_user_service TOKEN_MODE exactly.
+# stateless | hybrid | stateful (default)
+TOKEN_MODE="stateful"
+# Must match auth_user_service TOKEN_ISSUER / TOKEN_AUDIENCE exactly.
+# Leave commented to skip claim enforcement (backward-compatible default).
+#TOKEN_ISSUER="https://auth.example.com"
+#TOKEN_AUDIENCE="https://api.example.com"
 
 FIRST_SUPERUSER="changethis"
 FIRST_SUPERUSER_PASSWORD="changethis"

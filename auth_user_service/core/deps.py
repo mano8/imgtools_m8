@@ -7,18 +7,20 @@ and role/privilege guards for auth_user_service routes.
 
 import logging
 import secrets
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
-from pydantic import SecretStr
 from redis import ConnectionPool, Redis
 
 from auth_sdk_m8.core.exceptions import InvalidToken
-from auth_sdk_m8.schemas.auth import ASYMMETRIC_ALGORITHMS, TokenSecret
 from auth_sdk_m8.schemas.user import UserModel
-from auth_sdk_m8.security import TokenValidationConfig, TokenValidator, ValidationHooks
+from auth_sdk_m8.security import (
+    ValidationHooks,
+    build_access_validator,
+)
 
 from auth_user_service.core.client import RedisSessionManager
 from auth_user_service.core.config import settings
@@ -41,13 +43,26 @@ class _LoggingHooks:
     """Emit structured log lines for every token validation outcome."""
 
     def on_success(self, *, jti: str, sub: str, token_type: str) -> None:
-        _logger.debug("token.valid type=%s sub=%s jti=%s", token_type, sub, jti)
+        _logger.info(
+            "event=token.valid type=%s sub=%s jti=%s ts=%s",
+            token_type,
+            sub,
+            jti,
+            datetime.now(timezone.utc).isoformat(),
+        )
 
     def on_failure(self, *, reason: str, token_type: str) -> None:
-        _logger.warning("token.invalid type=%s reason=%s", token_type, reason)
+        _logger.warning(
+            "event=token.invalid type=%s reason=%s ts=%s",
+            token_type,
+            reason,
+            datetime.now(timezone.utc).isoformat(),
+        )
 
 
 _hooks: ValidationHooks = _LoggingHooks()
+
+_redis_degraded_since: Optional[datetime] = None
 
 # Redis pool is skipped entirely in stateless mode.
 _redis_pool: Optional[ConnectionPool] = (
@@ -63,29 +78,10 @@ _redis_pool: Optional[ConnectionPool] = (
 )
 
 
-def _access_validation_secret() -> TokenSecret:
-    """Return the TokenSecret used to *validate* access tokens.
-
-    HS256  → symmetric ACCESS_SECRET_KEY.
-    RS256/ES256 → public key only; the private key never leaves the auth signer.
-    """
-    algo = settings.ACCESS_TOKEN_ALGORITHM
-    if algo in ASYMMETRIC_ALGORITHMS:
-        return TokenSecret(
-            secret_key=SecretStr(settings.ACCESS_PUBLIC_KEY or ""),
-            algorithm=algo,
-        )
-    return TokenSecret(secret_key=settings.ACCESS_SECRET_KEY, algorithm=algo)
-
-
 # Module-level validator — created once at startup from validated settings.
-_access_validator = TokenValidator(
-    secrets=_access_validation_secret(),
-    config=TokenValidationConfig(
-        allowed_algorithms=[settings.ACCESS_TOKEN_ALGORITHM],
-    ),
-    hooks=_hooks,
-)
+# iss/aud enforcement is opt-in: set TOKEN_ISSUER / TOKEN_AUDIENCE in env to
+# enable.  When unset, validation is permissive for backward compatibility.
+_access_validator = build_access_validator(settings, _hooks)
 
 
 def get_redis_client() -> Optional[Redis]:
@@ -95,15 +91,24 @@ def get_redis_client() -> Optional[Redis]:
     routes correctly reflect the actual connection state rather than always
     passing because the pool object exists.
     """
+    global _redis_degraded_since
     if _redis_pool is None:
         return None
     try:
         client = Redis(connection_pool=_redis_pool)
         client.ping()
+        _redis_degraded_since = None
         return client
     except Exception:
+        if _redis_degraded_since is None:
+            _redis_degraded_since = datetime.now(timezone.utc)
         _logger.warning("redis.unavailable degraded_mode=true")
         return None
+
+
+def get_redis_degraded_since() -> Optional[datetime]:
+    """Return the UTC timestamp when Redis first became unreachable, or None."""
+    return _redis_degraded_since
 
 
 RedisDep = Annotated[Optional[Redis], Depends(get_redis_client)]

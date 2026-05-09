@@ -180,6 +180,8 @@ class AuthController:
             ),
             expires_delta=access_token_expires,
             secrets=access_signing_secret,
+            issuer=settings.TOKEN_ISSUER or None,
+            audience=settings.TOKEN_AUDIENCE or None,
         )
         refresh_token, _ = SecurityHelper.create_refresh_token(
             data=TokenMinimalData(
