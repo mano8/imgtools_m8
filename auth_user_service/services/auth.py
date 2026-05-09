@@ -78,10 +78,16 @@ class AuthController:
             raise HTTPException(
                 status_code=503, detail="Google OAuth is not configured."
             )
+        redis = get_redis_client()
+        if redis is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Google OAuth requires Redis which is currently unavailable.",
+            )
         state = cls.create_state()
         code_verifier = cls.generate_code_verifier()
         code_challenge = cls.generate_code_challenge(code_verifier)
-        pkce_store = PKCEStore(get_redis_client())
+        pkce_store = PKCEStore(redis)
         pkce_store.store(state, code_verifier)
 
         params = {

@@ -7,6 +7,7 @@ from sqlmodel import col, delete, func, select
 from auth_sdk_m8.schemas.base import AuthProviderType
 from auth_sdk_m8.models.shared import Message
 from auth_sdk_m8.controllers.base import BaseController
+from auth_user_service.core.exceptions import handle_route_exception
 from auth_user_service.core.config import settings
 from auth_user_service.core.security import SecurityHelper
 from auth_user_service.core.deps import (
@@ -47,7 +48,7 @@ def session_list(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.get(
@@ -73,7 +74,7 @@ def get_session_by_id(
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.get(
@@ -95,7 +96,7 @@ def get_session_by_user(
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.get(
@@ -121,7 +122,7 @@ def get_my_session(session: SessionDep, current_user: CurrentUser) -> Any:
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.post(
@@ -180,7 +181,7 @@ def refresh_google_session_tokens(
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.delete(
@@ -200,7 +201,7 @@ def delete_sessions_by_user(session: SessionDep, user_id: uuid.UUID) -> Message:
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.delete(
@@ -222,4 +223,4 @@ def delete_session(session: SessionDep, session_id: uuid.UUID) -> Message:
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)

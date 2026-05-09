@@ -89,10 +89,21 @@ _access_validator = TokenValidator(
 
 
 def get_redis_client() -> Optional[Redis]:
-    """Return a Redis client from the shared pool, or None in stateless mode."""
+    """Return a Redis client from the shared pool, or None when unavailable.
+
+    A ping is issued on every call so that ``if redis is not None:`` guards in
+    routes correctly reflect the actual connection state rather than always
+    passing because the pool object exists.
+    """
     if _redis_pool is None:
         return None
-    return Redis(connection_pool=_redis_pool)
+    try:
+        client = Redis(connection_pool=_redis_pool)
+        client.ping()
+        return client
+    except Exception:
+        _logger.warning("redis.unavailable degraded_mode=true")
+        return None
 
 
 RedisDep = Annotated[Optional[Redis], Depends(get_redis_client)]

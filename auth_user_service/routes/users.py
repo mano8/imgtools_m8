@@ -21,6 +21,7 @@ from auth_user_service.db_models.users import (
     UserUpdate,
 )
 from auth_sdk_m8.controllers.base import BaseController
+from auth_user_service.core.exceptions import handle_route_exception
 
 # pylint: disable=not-callable, broad-exception-caught
 
@@ -46,7 +47,7 @@ def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
 
         return UsersPublic(data=users, count=count)
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.post(
@@ -70,7 +71,7 @@ def create_new_user_with_password(*, session: SessionDep, user_in: UserCreate) -
         user = UserController.create_user(session=session, user_create=user_in)
         return user
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.post(
@@ -94,7 +95,7 @@ def register_user(session: SessionDep, user_in: UserRegister) -> Any:
         user = UserController.create_user(session=session, user_create=user_create)
         return user
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.get(
@@ -156,7 +157,7 @@ def update_current_user(
         )
         return db_user
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.delete(
@@ -185,4 +186,4 @@ def delete_user(
         session.commit()
         return Message(message="User deleted successfully")
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)

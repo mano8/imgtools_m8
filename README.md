@@ -47,6 +47,7 @@ All routes are prefixed with `API_PREFIX` (default `/user`).
 
 | Tag | Method | Path | Description |
 | --- | ------ | ---- | ----------- |
+| health | GET | `/health/` | Service health — Redis, database, effective token mode (no auth required) |
 | login | POST | `/login/access-token` | Email/password login — returns access token, sets refresh cookie |
 | login | POST | `/login/refresh-token/` | Refresh access token from cookie |
 | login | POST | `/login/logout/` | Revoke session and clear cookie |
@@ -182,6 +183,60 @@ openssl rsa -in private.pem -pubout -out public.pem
 | -------- | -------- | ----------- |
 | `STATIC_BASE_PATH` | yes | Absolute path to static files directory |
 | `TEMPLATES_BASE_PATH` | yes | Absolute path to Jinja2 templates directory |
+
+---
+
+## Infrastructure Resilience
+
+The service is designed to degrade gracefully when Redis or the database is temporarily unavailable rather than crashing with opaque 500 errors.
+
+### Redis unavailable
+
+| `TOKEN_MODE` | Login | Refresh | Logout | Google OAuth |
+| ------------ | ----- | ------- | ------ | ------------ |
+| `stateless` | ✅ unaffected | ✅ unaffected | ✅ unaffected | ❌ 503 (PKCE requires Redis) |
+| `hybrid` | ✅ works, rate limiting skipped | ✅ works, JTI check skipped | ✅ works | ❌ 503 |
+| `stateful` | ✅ works, rate limiting skipped | ✅ works, JTI allowlist check skipped | ✅ works | ❌ 503 |
+
+> In `stateful`/`hybrid` mode with Redis down, login still succeeds but token revocation is unavailable.  The `/health/` endpoint reflects this with `effective_mode: stateless_degraded`.  A `CRITICAL` log line is emitted at startup when this condition is detected.
+
+### Database unavailable
+
+All routes that touch the database return `503 Service Unavailable` with a clear message.  A `CRITICAL` log line is emitted at startup.
+
+### Health endpoint
+
+```http
+GET {API_PREFIX}/health/
+```
+
+Example response when fully operational:
+
+```json
+{
+  "status": "ok",
+  "token_mode": "stateful",
+  "effective_mode": "stateful",
+  "redis": "ok",
+  "database": "ok",
+  "revocation_available": true,
+  "rate_limiting_available": true
+}
+```
+
+Example response with Redis down in stateful mode:
+
+```json
+{
+  "status": "degraded",
+  "token_mode": "stateful",
+  "effective_mode": "stateless_degraded",
+  "redis": "unavailable",
+  "database": "ok",
+  "revocation_available": false,
+  "rate_limiting_available": false
+}
+```
 
 ---
 

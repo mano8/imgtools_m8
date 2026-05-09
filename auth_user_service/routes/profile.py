@@ -21,6 +21,7 @@ from auth_user_service.schemas.user import ResponseUploadedAvatar, ResponseUser
 from auth_user_service.utils.files import FilesHelper
 from auth_sdk_m8.controllers.base import BaseController
 from auth_sdk_m8.models.shared import Message
+from auth_user_service.core.exceptions import handle_route_exception
 
 # pylint: disable=not-callable, broad-exception-caught
 
@@ -79,7 +80,7 @@ def update_avatar(
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
     finally:
         file.file.close()
 
@@ -119,7 +120,7 @@ def update_user_me(
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.patch(
@@ -153,7 +154,7 @@ def update_password_me(
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
 
 
 @router.get("/get/me/", response_model=UserPublic)
@@ -188,4 +189,4 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     except HTTPException:
         raise
     except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+        return handle_route_exception(ex=ex, session=session)
