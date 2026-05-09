@@ -12,13 +12,14 @@ from typing import Annotated, Optional
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
-from pydantic import SecretStr
 from redis import ConnectionPool, Redis
 
 from auth_sdk_m8.core.exceptions import InvalidToken
-from auth_sdk_m8.schemas.auth import ASYMMETRIC_ALGORITHMS, TokenSecret
 from auth_sdk_m8.schemas.user import UserModel
-from auth_sdk_m8.security import TokenValidationConfig, TokenValidator, ValidationHooks
+from auth_sdk_m8.security import (
+    ValidationHooks,
+    build_access_validator,
+)
 
 from auth_user_service.core.client import RedisSessionManager
 from auth_user_service.core.config import settings
@@ -63,29 +64,10 @@ _redis_pool: Optional[ConnectionPool] = (
 )
 
 
-def _access_validation_secret() -> TokenSecret:
-    """Return the TokenSecret used to *validate* access tokens.
-
-    HS256  → symmetric ACCESS_SECRET_KEY.
-    RS256/ES256 → public key only; the private key never leaves the auth signer.
-    """
-    algo = settings.ACCESS_TOKEN_ALGORITHM
-    if algo in ASYMMETRIC_ALGORITHMS:
-        return TokenSecret(
-            secret_key=SecretStr(settings.ACCESS_PUBLIC_KEY or ""),
-            algorithm=algo,
-        )
-    return TokenSecret(secret_key=settings.ACCESS_SECRET_KEY, algorithm=algo)
-
-
 # Module-level validator — created once at startup from validated settings.
-_access_validator = TokenValidator(
-    secrets=_access_validation_secret(),
-    config=TokenValidationConfig(
-        allowed_algorithms=[settings.ACCESS_TOKEN_ALGORITHM],
-    ),
-    hooks=_hooks,
-)
+# iss/aud enforcement is opt-in: set TOKEN_ISSUER / TOKEN_AUDIENCE in env to
+# enable.  When unset, validation is permissive for backward compatibility.
+_access_validator = build_access_validator(settings, _hooks)
 
 
 def get_redis_client() -> Optional[Redis]:

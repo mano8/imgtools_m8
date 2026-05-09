@@ -13,7 +13,7 @@ This module provides functions for:
 import base64
 import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import Union
+from typing import Optional, Union
 import uuid
 
 import bcrypt
@@ -32,7 +32,11 @@ class SecurityHelper(ComSecurityHelper):
 
     @staticmethod
     def create_access_token(
-        data: TokenAccessData, expires_delta: timedelta, secrets: TokenSecret
+        data: TokenAccessData,
+        expires_delta: timedelta,
+        secrets: TokenSecret,
+        issuer: Optional[str] = None,
+        audience: Optional[str] = None,
     ) -> Union[jwt.PyJWT, str]:
         """
         Create a JWT access token.
@@ -42,6 +46,8 @@ class SecurityHelper(ComSecurityHelper):
                 The payload data for the token.
             expires_delta (timedelta):
                 The time duration after which the token expires.
+            issuer: Optional ``iss`` claim embedded in the token.
+            audience: Optional ``aud`` claim embedded in the token.
 
         Returns:
             str:
@@ -51,6 +57,10 @@ class SecurityHelper(ComSecurityHelper):
         jti = str(uuid.uuid4())
         to_encode = data.model_dump()
         to_encode.update({"exp": expire, "jti": jti, "type": "access"})
+        if issuer:
+            to_encode["iss"] = issuer
+        if audience:
+            to_encode["aud"] = audience
         encoded_jwt = jwt.encode(
             to_encode,
             secrets.secret_key.get_secret_value(),

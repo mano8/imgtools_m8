@@ -9,7 +9,6 @@ import pytest
 from fastapi import HTTPException
 
 from auth_user_service.core.deps import (
-    _access_validation_secret,
     get_current_active_superuser,
     get_current_user,
     get_redis_client,
@@ -137,18 +136,6 @@ class TestGetCurrentUser:
                 get_current_user(token=token)
 
         assert exc_info.value.status_code == 403
-
-
-class TestAccessValidationSecret:
-    def test_rs256_returns_public_key_token_secret(self):
-        fake_pub = "-----BEGIN PUBLIC KEY-----\nfakepub\n-----END PUBLIC KEY-----"
-        with patch("auth_user_service.core.deps.settings") as mock_cfg:
-            mock_cfg.ACCESS_TOKEN_ALGORITHM = "RS256"
-            mock_cfg.ACCESS_PUBLIC_KEY = fake_pub
-            secret = _access_validation_secret()
-
-        assert secret.algorithm == "RS256"
-        assert secret.secret_key.get_secret_value() == fake_pub
 
 
 class TestGetCurrentActiveSuperuser:

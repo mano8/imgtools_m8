@@ -4,6 +4,7 @@ This module loads environment settings securely and applies best practices.
 """
 
 from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 from auth_sdk_m8.core.config import CommonSettings, settings_customise_sources

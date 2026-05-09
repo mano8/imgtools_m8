@@ -5,19 +5,21 @@ helpers for service routes.
 """
 
 import logging
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
-from pydantic import SecretStr
 from redis import Redis
 
 from auth_sdk_m8.core.exceptions import InvalidToken
-from auth_sdk_m8.schemas.auth import ASYMMETRIC_ALGORITHMS, TokenSecret
 from auth_sdk_m8.schemas.base import RoleType
 from auth_sdk_m8.schemas.user import UserModel
-from auth_sdk_m8.security import TokenValidationConfig, TokenValidator, ValidationHooks
+from auth_sdk_m8.security import (
+    AccessTokenBlacklist,
+    ValidationHooks,
+    build_access_validator,
+)
 
 from fastapi_service.core.config import settings
 
@@ -41,43 +43,49 @@ class _LoggingHooks:
 
 _hooks: ValidationHooks = _LoggingHooks()
 
-
-def _access_validation_secret() -> TokenSecret:
-    """Return the TokenSecret for validating access tokens.
-
-    HS256  → symmetric ACCESS_SECRET_KEY.
-    RS256/ES256 → public key only; consumer services never hold the private key.
-    """
-    algo = settings.ACCESS_TOKEN_ALGORITHM
-    if algo in ASYMMETRIC_ALGORITHMS:
-        return TokenSecret(
-            secret_key=SecretStr(settings.ACCESS_PUBLIC_KEY or ""),
-            algorithm=algo,
-        )
-    return TokenSecret(secret_key=settings.ACCESS_SECRET_KEY, algorithm=algo)
-
-
 # Module-level validator — created once at startup, not per-request.
-_validator = TokenValidator(
-    secrets=_access_validation_secret(),
-    config=TokenValidationConfig(
-        allowed_algorithms=[settings.ACCESS_TOKEN_ALGORITHM],
-    ),
-    hooks=_hooks,
-)
+# iss/aud enforcement is opt-in via TOKEN_ISSUER / TOKEN_AUDIENCE settings.
+_validator = build_access_validator(settings, _hooks)
 
 
-def get_current_user(token: TokenDep) -> UserModel:
+def get_redis_client() -> Optional[Redis]:
+    """Return a Redis client, or None when Redis is unavailable.
+
+    A ping check ensures routes that guard on ``if redis is not None:``
+    correctly reflect the actual connection state.
+    """
+    try:
+        client = Redis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            username=settings.REDIS_USER,
+            password=settings.REDIS_PASSWORD.get_secret_value() or None,
+            encoding="utf-8",
+            decode_responses=True,
+            socket_connect_timeout=1,
+        )
+        client.ping()
+        return client
+    except Exception:
+        _logger.warning("redis.unavailable blacklist_check=skipped")
+        return None
+
+
+RedisDep = Annotated[Optional[Redis], Depends(get_redis_client)]
+
+
+def get_current_user(token: TokenDep, redis: RedisDep) -> UserModel:
     """Retrieve the current user from the JWT access token.
 
     Args:
         token: JWT string extracted from the Authorization header.
+        redis: Optional Redis client; None when Redis is unavailable.
 
     Returns:
         Authenticated ``UserModel``.
 
     Raises:
-        HTTPException 403: Token invalid, expired, or user inactive.
+        HTTPException 403: Token invalid, expired, revoked, or user inactive.
     """
     try:
         payload = _validator.validate_access_token(token)
@@ -86,6 +94,14 @@ def get_current_user(token: TokenDep) -> UserModel:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials.",
         ) from ex
+
+    # In stateful mode, verify the JTI has not been blacklisted by auth service.
+    if settings.TOKEN_MODE == "stateful" and redis is not None:
+        if AccessTokenBlacklist(redis).is_revoked(payload.jti):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Token has been revoked.",
+            )
 
     payload_dict = payload.model_dump(exclude={"exp", "jti", "type", "sub"})
     payload_dict["id"] = payload.sub
@@ -144,15 +160,3 @@ class UserRoleHelper:
 def get_templates() -> Jinja2Templates:
     """Return the Jinja2 template engine bound to the configured directory."""
     return Jinja2Templates(directory=settings.TEMPLATES_BASE_PATH)
-
-
-def get_redis_client() -> Redis:
-    """Create a Redis connection from service settings."""
-    return Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        username=settings.REDIS_USER,
-        password=settings.REDIS_PASSWORD.get_secret_value() or None,
-        encoding="utf-8",
-        decode_responses=True,
-    )
