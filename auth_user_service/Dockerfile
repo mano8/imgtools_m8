@@ -3,13 +3,6 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /install
 
-# System deps for building wheels (only here, not in final image)
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 # Build arg to select environment
 ARG ENVIRONMENT=production
 
@@ -32,6 +25,7 @@ RUN pip install --upgrade pip && \
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 ENV PATH="/home/appuser/.local/bin:$PATH"
 ENV PYTHONPATH=/opt/auth_user_service
 
