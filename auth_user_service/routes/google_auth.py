@@ -46,8 +46,13 @@ async def google_auth_callback(
         state: Anti-CSRF / PKCE state parameter.
     """
     try:
-        pkce_store = PKCEStore(get_redis_client())
-        code_verifier = pkce_store.pop(state)
+        redis = get_redis_client()
+        if redis is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Cache service unavailable. Cannot complete OAuth flow.",
+            )
+        code_verifier = PKCEStore(redis).pop(state)
         if not code_verifier:
             raise HTTPException(
                 status_code=400,

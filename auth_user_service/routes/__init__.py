@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from auth_user_service.routes import (
+    health,
     login,
     oauth_login,
     sessions,
@@ -11,6 +12,7 @@ from auth_user_service.routes import (
 )
 
 api_router = APIRouter()
+api_router.include_router(health.router)
 api_router.include_router(profile.router)
 api_router.include_router(users.router)
 api_router.include_router(login.router)

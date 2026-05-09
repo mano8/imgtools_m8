@@ -6,8 +6,50 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **Timing-attack prevention on login** (`services/auth.py`): a module-level `_DUMMY_HASH`
+  constant (bcrypt of a random secret) is always passed to `verify_password` when the email is
+  not found.  Response time is now constant (~185 ms) regardless of whether the user exists,
+  eliminating the timing oracle that previously allowed valid-email enumeration.
+- **Redis key namespace pollution fix** (`core/client.py` — `LoginRateLimiter._key`): raw user-
+  supplied email was used verbatim as a Redis key suffix.  Non-printable characters (CRLF, NUL)
+  are now stripped and keys are capped at 255 characters to prevent namespace injection and
+  memory exhaustion attacks.
+- **HTTPException swallowing in route handlers** (`routes/profile.py`, `routes/sessions.py`,
+  `routes/users.py`): broad `except Exception` clauses were silently converting `HTTPException`
+  (404, 403, 409) into 500 responses via `BaseController.handle_exception`.  All routes now
+  re-raise `HTTPException` before delegating to the exception helper.
+- **Profile mutation endpoints crashed on `CurrentUser` type** (`routes/profile.py`): `CurrentUser`
+  resolves to the Pydantic `UserModel` from the SDK, not the SQLAlchemy `User` ORM model.
+  Calling `.sqlmodel_update()` or `session.add(current_user)` on a Pydantic object raised
+  `AttributeError` → 500 on every write.  All mutation routes now fetch `db_user = session.get(User,
+  current_user.id)` before any write.
+- **Dead SQLModel query in sessions route** (`routes/sessions.py`): `statement.where(...)` returns
+  a new object — the result was discarded, so `get_session_by_user` returned all sessions instead
+  of filtering by user.  Dead code removed; the route already carries the
+  `get_current_active_superuser` dependency so no functional restriction was bypassed.
+- **Logout always returned 401** (`routes/login.py`): `SecurityHelper.get_refresh_token_from_cookie`
+  was used directly as `Depends()`.  FastAPI treated its unannotated `str` parameter as a query
+  param, never reading the cookie.  Fixed with a `_get_refresh_cookie` wrapper annotated with
+  `Cookie(None, alias="refresh_token")`.
+
 ### Added
 
+- **`GET /health/` endpoint** (`routes/health.py`): reports operational status without requiring
+  authentication.  Response fields: `status` (`ok` | `degraded`), `token_mode`, `effective_mode`
+  (`stateless_degraded` when Redis is unreachable in `stateful`/`hybrid` mode), `redis`,
+  `database`, `revocation_available`, `rate_limiting_available`.
+- **`handle_route_exception()` helper** (`core/exceptions.py`): unified exception mapper used by
+  all route handlers.  Maps `OperationalError` → 503 (database unreachable), `RedisConnectionError`
+  → 503 (cache unreachable), re-raises `HTTPException`, delegates everything else to
+  `BaseController.handle_exception` (500).
+- **Global exception handlers in `main.py`**: `SQLAlchemyOperationalError` and
+  `RedisConnectionError` are caught at the application level and return a structured 503 JSON
+  response — a backstop for any infra error that escapes a route's own `try/except`.
+- **Lifespan startup check** (`main.py`): at startup, the service logs `CRITICAL` when Redis is
+  unreachable but `TOKEN_MODE` requires it, and `CRITICAL` when the database is unreachable.
+  This makes misconfigured or partially-started stacks immediately visible in container logs.
 - **Prometheus observability** via `auth_sdk_m8.observability` (SDK `[observability]` extra):
   - `auth_user_service` exposes `GET /user/metrics` when `METRICS_ENABLED=true`.  Auth-specific
     counters (`login_attempts_total`, `token_refresh_total`, `logout_total`,
@@ -43,6 +85,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **`get_redis_client()`** (`core/deps.py`): now issues a `ping()` before returning the client.
+  Returns `None` when the server is unreachable so all `if redis is not None:` guards in routes
+  correctly reflect actual connectivity — previously the pool object was always returned,
+  making guards useless when Redis was down.
+- **Google OAuth PKCE** (`services/auth.py`, `routes/google_auth.py`): both `get_google_login_url`
+  and the callback route now explicitly check that Redis is available before touching `PKCEStore`.
+  A missing Redis connection raises `HTTPException(503)` with a clear message instead of
+  crashing with 500 or returning a misleading "Invalid state parameter" (400).
 - **`auth_user_service/core/deps.py`**: Redis connection pool is only created when
   `TOKEN_MODE != "stateless"`.  JTI blacklist check is only performed when
   `TOKEN_MODE == "stateful"`.  `get_current_user` no longer accepts a `redis` dependency

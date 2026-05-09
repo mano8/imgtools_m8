@@ -1,12 +1,16 @@
 """auth_user_service/fastapi/main.py"""
 
+import logging
 import uvicorn
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.routing import APIRoute
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from redis.exceptions import ConnectionError as RedisConnectionError
+from sqlalchemy.exc import OperationalError as SQLAlchemyOperationalError
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from auth_user_service.routes import api_router
@@ -14,11 +18,46 @@ from auth_user_service.core.config import settings
 from auth_sdk_m8.observability import metrics as _metrics
 from auth_sdk_m8.observability.middleware import MetricsMiddleware
 
+_logger = logging.getLogger(__name__)
+
 _metrics.setup(
     enabled=settings.METRICS_ENABLED,
     groups_str=settings.METRICS_GROUPS,
     api_prefix=settings.API_PREFIX,
 )
+
+
+def _startup_checks() -> None:
+    """Log warnings when required infrastructure is unreachable at startup."""
+    from auth_user_service.core.deps import get_redis_client
+    from auth_user_service.core.engine_sync import engine
+    from sqlmodel import text
+
+    if settings.TOKEN_MODE != "stateless":
+        redis = get_redis_client()
+        if redis is None:
+            _logger.critical(
+                "STARTUP: Redis unreachable but TOKEN_MODE=%s — "
+                "rate limiting and token revocation are disabled",
+                settings.TOKEN_MODE,
+            )
+        else:
+            _logger.info(
+                "STARTUP: Redis connected OK (TOKEN_MODE=%s)", settings.TOKEN_MODE
+            )
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        _logger.info("STARTUP: Database connected OK")
+    except Exception as ex:
+        _logger.critical("STARTUP: Database unreachable: %s", ex)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _startup_checks()
+    yield
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -43,6 +82,7 @@ app = FastAPI(
     docs_url=f"{settings.API_PREFIX}/docs",
     redoc_url=f"{settings.API_PREFIX}/redoc",
     generate_unique_id_function=custom_generate_unique_id,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -73,7 +113,11 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 
 if settings.METRICS_ENABLED:
 
-    @app.get(f"{settings.API_PREFIX}/metrics", include_in_schema=False, tags=["observability"])
+    @app.get(
+        f"{settings.API_PREFIX}/metrics",
+        include_in_schema=False,
+        tags=["observability"],
+    )
     def metrics_endpoint() -> Response:
         """Expose Prometheus metrics."""
         content, content_type = _metrics.render()
@@ -95,6 +139,30 @@ async def custom_error_handler(
         status_code=exc.status_code,
         content={"detail": exc.detail},
         headers=headers,
+    )
+
+
+@app.exception_handler(SQLAlchemyOperationalError)
+async def db_unavailable_handler(
+    request: Request, exc: SQLAlchemyOperationalError
+) -> JSONResponse:
+    """Return 503 when the database is unreachable."""
+    _logger.critical("db.unavailable path=%s error=%s", request.url.path, exc.orig)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database temporarily unavailable. Please try again."},
+    )
+
+
+@app.exception_handler(RedisConnectionError)
+async def redis_unavailable_handler(
+    request: Request, exc: RedisConnectionError
+) -> JSONResponse:
+    """Return 503 when Redis is unreachable."""
+    _logger.warning("redis.unavailable path=%s error=%s", request.url.path, exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Cache service temporarily unavailable. Please try again."},
     )
 
 
