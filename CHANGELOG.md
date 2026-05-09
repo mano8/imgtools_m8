@@ -8,6 +8,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Google OAuth refresh JTI missing from Redis allowlist** (`routes/google_auth.py`):
+  `google_auth_callback` called `create_auth_session` but never registered the refresh JTI in
+  `RedisRefreshStore`.  In `stateful`/`hybrid` mode this caused the first refresh after an OAuth
+  login to be rejected with "Token revoked or reused" (allowlist miss), while simultaneously
+  allowing refresh in degraded mode (Redis down → allowlist skipped → fail-open).  The callback
+  now calls `RedisRefreshStore.register(jti, _REFRESH_TTL_SECONDS)` immediately after session
+  creation, matching the password-login flow.
+- **Consumer service Redis connection leak / fail-open bypass** (`examples/fastapi_service/core/deps.py`):
+  `get_redis_client()` created a new `Redis(host=…)` TCP connection on every HTTP request.
+  Under connection exhaustion the `except Exception` branch returned `None`, which caused the
+  `if redis is not None` guard in `get_current_user` to pass and silently skip the JTI blacklist
+  check — a fail-open revocation bypass.  Replaced with a module-level `ConnectionPool`
+  (matching `auth_user_service`), so `get_redis_client()` draws from the shared pool and the
+  blacklist check is only skipped when Redis is genuinely unreachable.
 - **Consumer JTI blacklist enforcement** (`examples/fastapi_service/core/deps.py`): `get_current_user`
   previously never checked the JTI blacklist, leaving revoked access tokens valid at consumer services
   until natural expiry — a silent security gap in `stateful` mode.  `get_current_user` now accepts

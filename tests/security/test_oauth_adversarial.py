@@ -10,9 +10,11 @@ Verifies that:
 - The callback returns 400 for an unknown / consumed state parameter
 - The callback returns 400 when the state was stored but the verifier is gone
 - store() registers the key with the correct prefix and TTL
+- Successful OAuth callback registers the refresh JTI in the Redis allowlist
+- Stateless mode skips allowlist registration
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import HTTPException
 
@@ -245,3 +247,144 @@ async def test_400_detail_mentions_state():
             )
     detail = exc_info.value.detail.lower()
     assert "state" in detail or "expired" in detail or "invalid" in detail
+
+
+# ---------------------------------------------------------------------------
+# Allowlist registration — Fix #2 regression tests
+# ---------------------------------------------------------------------------
+
+
+def _make_oauth_mocks():
+    """Return a consistent set of mocks for a full successful OAuth callback."""
+    request = MagicMock()
+    request.url_for.return_value = "http://testserver/success/123"
+
+    oauth_token = MagicMock()
+    oauth_token.email = "user@example.com"
+    oauth_token.user_id = "google-uid-1"
+    oauth_token.email_verified = True
+    oauth_token.name = "Test User"
+    oauth_token.expires_in = 3600
+    oauth_token.access_token = "goog-access"
+    oauth_token.refresh_token = "goog-refresh"
+
+    session_data = MagicMock()
+    session_data.id = "session-uuid-1"
+
+    return request, oauth_token, session_data
+
+
+@pytest.mark.anyio
+async def test_successful_oauth_registers_refresh_jti_in_allowlist():
+    """A stateful OAuth login must register the refresh JTI so rotation works."""
+    request, oauth_token, session_data = _make_oauth_mocks()
+    mock_redis = MagicMock()
+    mock_pkce = MagicMock()
+    mock_pkce.pop.return_value = "code-verifier"
+    mock_user = MagicMock()
+    mock_refresh_store = MagicMock()
+
+    with (
+        patch(
+            "auth_user_service.routes.google_auth.get_redis_client",
+            return_value=mock_redis,
+        ),
+        patch("auth_user_service.routes.google_auth.PKCEStore", return_value=mock_pkce),
+        patch(
+            "auth_user_service.routes.google_auth.OAuthController.get_google_access_token",
+            new_callable=AsyncMock,
+            return_value=oauth_token,
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.UserController.get_user_by_email",
+            return_value=mock_user,
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.AuthController.create_auth_tokens",
+            return_value=("access-tok", "refresh-tok", "test-jti-oauth"),
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.AuthController.create_auth_session",
+            return_value=session_data,
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.RedisRefreshStore",
+            return_value=mock_refresh_store,
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.SessionController.purge_expired_sessions"
+        ),
+        patch("auth_user_service.routes.google_auth.settings") as mock_settings,
+    ):
+        mock_settings.TOKEN_MODE = "stateful"
+        mock_settings.ENVIRONMENT = "local"
+        mock_settings.REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS = 604800
+        mock_settings.ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+        await google_auth_callback(
+            request=request,
+            session=MagicMock(),
+            code="auth-code",
+            state="valid-state",
+        )
+
+    mock_refresh_store.register.assert_called_once()
+    jti_arg = mock_refresh_store.register.call_args[0][0]
+    assert jti_arg == "test-jti-oauth"
+
+
+@pytest.mark.anyio
+async def test_stateless_mode_skips_allowlist_registration():
+    """In stateless mode the allowlist registration must be skipped entirely."""
+    request, oauth_token, session_data = _make_oauth_mocks()
+    mock_redis = MagicMock()
+    mock_pkce = MagicMock()
+    mock_pkce.pop.return_value = "code-verifier"
+    mock_user = MagicMock()
+    mock_refresh_store = MagicMock()
+
+    with (
+        patch(
+            "auth_user_service.routes.google_auth.get_redis_client",
+            return_value=mock_redis,
+        ),
+        patch("auth_user_service.routes.google_auth.PKCEStore", return_value=mock_pkce),
+        patch(
+            "auth_user_service.routes.google_auth.OAuthController.get_google_access_token",
+            new_callable=AsyncMock,
+            return_value=oauth_token,
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.UserController.get_user_by_email",
+            return_value=mock_user,
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.AuthController.create_auth_tokens",
+            return_value=("access-tok", "refresh-tok", "jti-stateless"),
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.AuthController.create_auth_session",
+            return_value=session_data,
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.RedisRefreshStore",
+            return_value=mock_refresh_store,
+        ),
+        patch(
+            "auth_user_service.routes.google_auth.SessionController.purge_expired_sessions"
+        ),
+        patch("auth_user_service.routes.google_auth.settings") as mock_settings,
+    ):
+        mock_settings.TOKEN_MODE = "stateless"
+        mock_settings.ENVIRONMENT = "local"
+        mock_settings.REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS = 604800
+        mock_settings.ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+        await google_auth_callback(
+            request=request,
+            session=MagicMock(),
+            code="auth-code",
+            state="valid-state",
+        )
+
+    mock_refresh_store.register.assert_not_called()
