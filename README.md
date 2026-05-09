@@ -135,6 +135,8 @@ Update `DB_HOST`, `DB_PORT`, and `DB_DATABASE` accordingly. Both drivers ship in
 | `REFRESH_TOKEN_EXPIRE_MINUTES` | no | `120` | Refresh token lifetime |
 | `REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS` | no | `3600` | Refresh cookie max-age |
 | `TOKENS_ENCRYPTION_KEY` | yes | — | Token payload encryption key |
+| `TOKEN_ISSUER` | no | — | When set, embeds `iss` in issued tokens and requires a match on validation |
+| `TOKEN_AUDIENCE` | no | — | When set, embeds `aud` in issued tokens and requires a match on validation |
 
 **HS256 (default)** — set `ACCESS_SECRET_KEY` and `REFRESH_SECRET_KEY`; leave `ACCESS_PRIVATE_KEY` / `ACCESS_PUBLIC_KEY` blank.
 
@@ -246,6 +248,38 @@ Endpoints under `/user/private/` are intended for inter-service calls only:
 
 - They **must not** be exposed to the public internet — enforce this at the reverse proxy / Docker network level.
 - Every request must include the header `X-Internal-Token: <PRIVATE_API_SECRET>`.
+
+---
+
+## Consumer Service Integration
+
+`examples/fastapi_service` is a reference implementation showing how a downstream microservice integrates with `auth_user_service` using `auth-sdk-m8`.
+
+### Token validation
+
+```python
+from auth_sdk_m8.security import build_access_validator, ValidationHooks
+
+_validator = build_access_validator(settings, hooks=_hooks)
+```
+
+`build_access_validator` reads `ACCESS_TOKEN_ALGORITHM`, `ACCESS_SECRET_KEY` / `ACCESS_PUBLIC_KEY`, `TOKEN_ISSUER`, and `TOKEN_AUDIENCE` directly from a `CommonSettings` instance.  No boilerplate needed.
+
+### Revocation check (stateful mode)
+
+Consumer services must share the same Redis instance as `auth_user_service` and set `TOKEN_MODE="stateful"`.  The `AccessTokenBlacklist` class checks whether a JTI has been blacklisted by the auth service:
+
+```python
+from auth_sdk_m8.security import AccessTokenBlacklist
+
+if settings.TOKEN_MODE == "stateful" and redis is not None:
+    if AccessTokenBlacklist(redis).is_revoked(payload.jti):
+        raise HTTPException(status_code=403, detail="Token has been revoked.")
+```
+
+### Issuer / audience enforcement (opt-in)
+
+Set `TOKEN_ISSUER` and `TOKEN_AUDIENCE` to the **same values** in both `auth_user_service` and every consumer service.  When set, the auth service embeds `iss`/`aud` claims in issued tokens and all validators require an exact match — preventing token reuse across services or issuers.  Leaving them unset (default) skips enforcement for backward compatibility.
 
 ---
 

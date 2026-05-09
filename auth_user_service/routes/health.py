@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from sqlmodel import text
 
 from auth_user_service.core.config import settings
-from auth_user_service.core.deps import get_redis_client
+from auth_user_service.core.deps import get_redis_client, get_redis_degraded_since
 from auth_user_service.core.engine_sync import engine
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -41,6 +41,8 @@ def health_check() -> dict[str, Any]:
 
     overall = "ok" if (redis_ok and db_ok) else "degraded"
 
+    degraded_since = get_redis_degraded_since()
+
     return {
         "status": overall,
         "token_mode": settings.TOKEN_MODE,
@@ -49,4 +51,5 @@ def health_check() -> dict[str, Any]:
         "database": "ok" if db_ok else "unavailable",
         "revocation_available": redis_ok and redis_required,
         "rate_limiting_available": redis_ok and redis_required,
+        "degraded_since": degraded_since.isoformat() if degraded_since else None,
     }

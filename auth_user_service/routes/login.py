@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from auth_sdk_m8.core.exceptions import InvalidToken
@@ -53,8 +53,17 @@ def _get_refresh_cookie(
     return SecurityHelper.get_refresh_token_from_cookie(t)
 
 
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
 @router.post("/access-token", response_model=Token)
 def login_access_token(
+    request: Request,
     response: Response,
     session: SessionDep,
     redis: RedisDep,
@@ -62,14 +71,18 @@ def login_access_token(
 ) -> Token:
     """Authenticate via email/password and issue JWT tokens."""
     email = form_data.username
+    ip = _client_ip(request)
 
     _m = _get_metrics()
 
-    if redis is not None:
+    if redis is not None and settings.TOKEN_MODE != "stateless":
         rate_limiter = LoginRateLimiter(redis)
         if not rate_limiter.is_allowed(email):
             if _m and _m.login_attempts_total:
                 _m.login_attempts_total.labels(result="rate_limited").inc()
+            logger.warning(
+                "event=login.rate_limited ip=%s ts=%s", ip, _now_iso()
+            )
             raise HTTPException(
                 status_code=429,
                 detail="Too many login attempts. Try again in 15 minutes.",
@@ -82,19 +95,26 @@ def login_access_token(
     )
 
     if not user or not user.is_active:
+        reason = "inactive_user" if user else "wrong_credentials"
         if _m and _m.login_attempts_total:
-            result = "inactive_user" if user else "wrong_credentials"
-            _m.login_attempts_total.labels(result=result).inc()
+            _m.login_attempts_total.labels(result=reason).inc()
+        logger.warning(
+            "event=login.failure reason=%s ip=%s ts=%s", reason, ip, _now_iso()
+        )
         raise HTTPException(
             status_code=400,
             detail="Invalid credentials or inactive user",
         )
 
-    if redis is not None:
+    if redis is not None and settings.TOKEN_MODE != "stateless":
         LoginRateLimiter(redis).reset(email)
 
     if _m and _m.login_attempts_total:
         _m.login_attempts_total.labels(result="success").inc()
+
+    logger.info(
+        "event=login.success user_id=%s ip=%s ts=%s", str(user.id), ip, _now_iso()
+    )
 
     access_token, refresh_token, jti = AuthController.create_auth_tokens(user=user)
 
@@ -122,6 +142,7 @@ def login_access_token(
 
 @router.post("/refresh-token/", response_model=Token)
 def login_refresh_token(
+    request: Request,
     response: Response,
     session: SessionDep,
     redis: RedisDep,
@@ -133,6 +154,7 @@ def login_refresh_token(
     Presenting an already-consumed JTI is treated as a reuse attack and
     immediately rejected — the allowlist entry will be absent.
     """
+    ip = _client_ip(request)
     _m = _get_metrics()
 
     try:
@@ -170,6 +192,13 @@ def login_refresh_token(
             if not rotated:
                 if _m and _m.token_refresh_total:
                     _m.token_refresh_total.labels(result="revoked").inc()
+                logger.warning(
+                    "event=token.reuse user_id=%s old_jti=%s ip=%s ts=%s",
+                    str(user_id),
+                    old_jti,
+                    ip,
+                    _now_iso(),
+                )
                 # Reuse confirmed — invalidate every session for this user so the
                 # attacker's already-rotated tokens also stop working.
                 SessionController.revoke_all_user_sessions(

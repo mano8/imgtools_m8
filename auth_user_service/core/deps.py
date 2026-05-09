@@ -7,6 +7,7 @@ and role/privilege guards for auth_user_service routes.
 
 import logging
 import secrets
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 from fastapi import Depends, Header, HTTPException, status
@@ -42,13 +43,26 @@ class _LoggingHooks:
     """Emit structured log lines for every token validation outcome."""
 
     def on_success(self, *, jti: str, sub: str, token_type: str) -> None:
-        _logger.debug("token.valid type=%s sub=%s jti=%s", token_type, sub, jti)
+        _logger.info(
+            "event=token.valid type=%s sub=%s jti=%s ts=%s",
+            token_type,
+            sub,
+            jti,
+            datetime.now(timezone.utc).isoformat(),
+        )
 
     def on_failure(self, *, reason: str, token_type: str) -> None:
-        _logger.warning("token.invalid type=%s reason=%s", token_type, reason)
+        _logger.warning(
+            "event=token.invalid type=%s reason=%s ts=%s",
+            token_type,
+            reason,
+            datetime.now(timezone.utc).isoformat(),
+        )
 
 
 _hooks: ValidationHooks = _LoggingHooks()
+
+_redis_degraded_since: Optional[datetime] = None
 
 # Redis pool is skipped entirely in stateless mode.
 _redis_pool: Optional[ConnectionPool] = (
@@ -77,15 +91,24 @@ def get_redis_client() -> Optional[Redis]:
     routes correctly reflect the actual connection state rather than always
     passing because the pool object exists.
     """
+    global _redis_degraded_since
     if _redis_pool is None:
         return None
     try:
         client = Redis(connection_pool=_redis_pool)
         client.ping()
+        _redis_degraded_since = None
         return client
     except Exception:
+        if _redis_degraded_since is None:
+            _redis_degraded_since = datetime.now(timezone.utc)
         _logger.warning("redis.unavailable degraded_mode=true")
         return None
+
+
+def get_redis_degraded_since() -> Optional[datetime]:
+    """Return the UTC timestamp when Redis first became unreachable, or None."""
+    return _redis_degraded_since
 
 
 RedisDep = Annotated[Optional[Redis], Depends(get_redis_client)]
