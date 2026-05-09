@@ -1,14 +1,10 @@
 """Users routes"""
+
 import uuid
 from typing import Any
 from os.path import join as PathJoin
 from pathlib import Path
-from fastapi import (
-    APIRouter,
-    File,
-    HTTPException,
-    UploadFile
-)
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import ValidationError
 
 from auth_user_service.core.config import settings
@@ -17,6 +13,7 @@ from auth_user_service.core.deps import CurrentUser, SessionDep
 from auth_user_service.core.security import SecurityHelper
 from auth_user_service.db_models.users import (
     UpdatePassword,
+    User,
     UserPublic,
     UserUpdateMe,
 )
@@ -33,13 +30,10 @@ router = APIRouter(prefix="/profile", tags=["profile"])
 @router.post(
     "/upload_avatar/",
     response_model=ResponseUploadedAvatar,
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
 def update_avatar(
-    *,
-    session: SessionDep,
-    current_user: CurrentUser,
-    file: UploadFile = File(...)
+    *, session: SessionDep, current_user: CurrentUser, file: UploadFile = File(...)
 ) -> Any:
     """
     Update own user.
@@ -65,27 +59,27 @@ def update_avatar(
         file.file.seek(0)
         unique_filename = f"{uuid.uuid4().hex}{ext}"
         file_path = PathJoin(
-            Path(settings.STATIC_BASE_PATH),
-            "avatars",
-            unique_filename
+            Path(settings.STATIC_BASE_PATH), "avatars", unique_filename
         )
 
         with open(file_path, "wb") as buffer:
             while chunk := file.file.read(1024 * 1024):
                 buffer.write(chunk)
-        current_user.avatar = str(unique_filename)
-        session.add(current_user)
+        db_user = session.get(User, current_user.id)
+        if db_user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        db_user.avatar = str(unique_filename)
+        session.add(db_user)
         session.commit()
         return ResponseUploadedAvatar(
             success=True,
             msg=f"Successfully uploaded {file.filename}",
-            avatar=unique_filename
+            avatar=unique_filename,
         )
+    except HTTPException:
+        raise
     except Exception as ex:
-        return BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        return BaseController.handle_exception(ex=ex, session=session)
     finally:
         file.file.close()
 
@@ -93,13 +87,10 @@ def update_avatar(
 @router.patch(
     "/update/me/",
     response_model=ResponseUser,
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
 def update_user_me(
-    *,
-    session: SessionDep,
-    current_user: CurrentUser,
-    user_in: UserUpdateMe
+    *, session: SessionDep, current_user: CurrentUser, user_in: UserUpdateMe
 ) -> Any:
     """
     Update own user.
@@ -108,75 +99,65 @@ def update_user_me(
     try:
         if user_in.email:
             existing_user = UserController.get_user_by_email(
-                session=session,
-                email=user_in.email
+                session=session, email=user_in.email
             )
             if existing_user and existing_user.id != current_user.id:
                 raise HTTPException(
-                    status_code=409,
-                    detail="User with this email already exists"
+                    status_code=409, detail="User with this email already exists"
                 )
+        db_user = session.get(User, current_user.id)
+        if db_user is None:
+            raise HTTPException(status_code=404, detail="User not found")
         user_data = user_in.model_dump(exclude_unset=True)
-        current_user.sqlmodel_update(user_data)
-        session.add(current_user)
+        for field, value in user_data.items():
+            if field in set(type(db_user).model_fields):
+                setattr(db_user, field, value)
+        session.add(db_user)
         session.commit()
-        session.refresh(current_user)
-        return ResponseUser(
-            success=True,
-            user=current_user
-        )
+        session.refresh(db_user)
+        return ResponseUser(success=True, user=db_user)
+    except HTTPException:
+        raise
     except Exception as ex:
-        return BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        return BaseController.handle_exception(ex=ex, session=session)
 
 
 @router.patch(
     "/me/password/",
     response_model=Message,
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
 def update_password_me(
-    *,
-    session: SessionDep,
-    body: UpdatePassword,
-    current_user: CurrentUser
+    *, session: SessionDep, body: UpdatePassword, current_user: CurrentUser
 ) -> Any:
     """
     Update own password.
     """
     try:
+        db_user = session.get(User, current_user.id)
+        if db_user is None:
+            raise HTTPException(status_code=404, detail="User not found")
         if not SecurityHelper.verify_password(
-            body.current_password,
-            current_user.hashed_password
+            body.current_password, db_user.hashed_password
         ):
             raise HTTPException(status_code=400, detail="Incorrect password")
         if body.current_password == body.new_password:
             raise HTTPException(
                 status_code=400,
-                detail="New password cannot be the same as the current one"
+                detail="New password cannot be the same as the current one",
             )
-        hashed_password = SecurityHelper.get_password_hash(
-            body.new_password)
-        current_user.hashed_password = hashed_password
-        session.add(current_user)
+        db_user.hashed_password = SecurityHelper.get_password_hash(body.new_password)
+        session.add(db_user)
         session.commit()
         return Message(message="Password updated successfully")
+    except HTTPException:
+        raise
     except Exception as ex:
-        return BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        return BaseController.handle_exception(ex=ex, session=session)
 
 
-@router.get(
-    "/get/me/",
-    response_model=UserPublic
-)
-def read_user_me(
-    current_user: CurrentUser
-) -> Any:
+@router.get("/get/me/", response_model=UserPublic)
+def read_user_me(current_user: CurrentUser) -> Any:
     """
     Get current user.
     """
@@ -186,12 +167,9 @@ def read_user_me(
 @router.delete(
     "/delete/me/",
     response_model=Message,
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
-def delete_user_me(
-    session: SessionDep,
-    current_user: CurrentUser
-) -> Any:
+def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     Delete own user.
     """
@@ -199,13 +177,15 @@ def delete_user_me(
         if current_user.is_superuser:
             raise HTTPException(
                 status_code=403,
-                detail="Super users are not allowed to delete themselves"
+                detail="Super users are not allowed to delete themselves",
             )
-        session.delete(current_user)
+        db_user = session.get(User, current_user.id)
+        if db_user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        session.delete(db_user)
         session.commit()
         return Message(message="User deleted successfully")
+    except HTTPException:
+        raise
     except Exception as ex:
-        return BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        return BaseController.handle_exception(ex=ex, session=session)

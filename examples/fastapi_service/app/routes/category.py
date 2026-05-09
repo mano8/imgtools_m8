@@ -1,4 +1,5 @@
 """Category api routes."""
+
 from typing import Any, Optional, Union
 from fastapi import APIRouter, HTTPException
 from sqlmodel import select
@@ -12,10 +13,7 @@ from fastapi_service.db_models.categories import (
     CategoryUpdate,
     CategoriesPublic,
 )
-from auth_sdk_m8.schemas.base import (
-    ResponseMessage,
-    ResponseModelBase
-)
+from auth_sdk_m8.schemas.base import ResponseMessage, ResponseModelBase
 from auth_sdk_m8.controllers.base import BaseController
 
 router = APIRouter(prefix="/category", tags=["category"])
@@ -25,13 +23,10 @@ router = APIRouter(prefix="/category", tags=["category"])
 @router.get(
     "/",
     response_model=Optional[CategoriesPublic],
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
 async def read_root(
-    session: SessionDep,
-    current_user: CurrentUser,
-    skip: int = 0,
-    limit: int = 100
+    session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
 ) -> dict:
     """Retrieve category list."""
     try:
@@ -57,86 +52,57 @@ async def read_root(
 
         return CategoriesPublic(data=items, count=count)
     except Exception as ex:
-        BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        BaseController.handle_exception(ex=ex, session=session)
 
 
 @router.get(
     "/get/{item_id}/",
     response_model=Union[ResponseModelBase, ResponseMessage],
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
-def read_item(
-    session: SessionDep,
-    current_user: CurrentUser,
-    item_id: int
-) -> Any:
+def read_item(session: SessionDep, current_user: CurrentUser, item_id: int) -> Any:
     """
     Get item by ID.
     """
     try:
         item = session.get(Category, item_id)
         if not item:
-            return ResponseMessage(
-                success=False,
-                msg="Item not found."
-            )
-        if not current_user.is_superuser\
-                and (item.owner_id != current_user.id):
-            raise HTTPException(
-                status_code=401, detail="Not enough permissions")
-        return ResponseModelBase(
-            success=True,
-            data=dict(item)
-        )
+            return ResponseMessage(success=False, msg="Item not found.")
+        if not current_user.is_superuser and (item.owner_id != current_user.id):
+            raise HTTPException(status_code=401, detail="Not enough permissions")
+        return ResponseModelBase(success=True, data=dict(item))
     except HTTPException as ex:
         a = 1
         raise ex
     except Exception as ex:
-        return BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        return BaseController.handle_exception(ex=ex, session=session)
 
 
 @router.post(
     "/add/",
     response_model=ResponseModelBase,
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
 def create_item(
-    *,
-    session: SessionDep,
-    current_user: CurrentUser,
-    item_in: CategoryCreate
+    *, session: SessionDep, current_user: CurrentUser, item_in: CategoryCreate
 ) -> Any:
     """
     Create new item.
     """
     try:
-        item = Category.model_validate(
-            item_in, update={"owner_id": current_user.id}
-        )
+        item = Category.model_validate(item_in, update={"owner_id": current_user.id})
         session.add(item)
         session.commit()
         session.refresh(item)
-        return ResponseModelBase(
-            success=True,
-            data=dict(item)
-        )
+        return ResponseModelBase(success=True, data=dict(item))
     except Exception as ex:
-        BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        BaseController.handle_exception(ex=ex, session=session)
 
 
 @router.put(
     "/edit/{item_id}/",
     response_model=ResponseModelBase,
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
 def update_item(
     *,
@@ -151,37 +117,26 @@ def update_item(
     try:
         item = session.get(Category, item_id)
         if not item:
-            raise HTTPException(
-                status_code=404, detail="Item not found")
-        if not current_user.is_superuser\
-                and (item.owner_id != current_user.id):
-            raise HTTPException(
-                status_code=400, detail="Not enough permissions")
+            raise HTTPException(status_code=404, detail="Item not found")
+        if not current_user.is_superuser and (item.owner_id != current_user.id):
+            raise HTTPException(status_code=400, detail="Not enough permissions")
         update_dict = item_in.model_dump(exclude_unset=True)
         item.sqlmodel_update(update_dict)
         session.add(item)
         session.commit()
         session.refresh(item)
-        return ResponseModelBase(
-            success=True,
-            data=dict(item)
-        )
+        return ResponseModelBase(success=True, data=dict(item))
     except Exception as ex:
-        BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        BaseController.handle_exception(ex=ex, session=session)
 
 
 @router.delete(
     "/delete/{item_id}/",
     response_model=ResponseMessage,
-    responses=BaseController.get_error_responses()
+    responses=BaseController.get_error_responses(),
 )
 def delete_item(
-    session: SessionDep,
-    current_user: CurrentUser,
-    item_id: int
+    session: SessionDep, current_user: CurrentUser, item_id: int
 ) -> ResponseMessage:
     """
     Delete an item.
@@ -189,20 +144,11 @@ def delete_item(
     try:
         item = session.get(Category, item_id)
         if not item:
-            raise HTTPException(
-                status_code=404, detail="Item not found")
-        if not current_user.is_superuser\
-                and (item.owner_id != current_user.id):
-            raise HTTPException(
-                status_code=400, detail="Not enough permissions")
+            raise HTTPException(status_code=404, detail="Item not found")
+        if not current_user.is_superuser and (item.owner_id != current_user.id):
+            raise HTTPException(status_code=400, detail="Not enough permissions")
         session.delete(item)
         session.commit()
-        return ResponseMessage(
-            success=True,
-            msg="Category deleted successfully"
-        )
+        return ResponseMessage(success=True, msg="Category deleted successfully")
     except Exception as ex:
-        BaseController.handle_exception(
-            ex=ex,
-            session=session
-        )
+        BaseController.handle_exception(ex=ex, session=session)

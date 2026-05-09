@@ -1,13 +1,23 @@
 """fastapi_service/fastapi/main.py"""
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Response
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi_service.app.main import api_router
 from fastapi_service.core.config import settings
+from auth_sdk_m8.observability import metrics as _metrics
+from auth_sdk_m8.observability.middleware import MetricsMiddleware
 
 # pylint: disable=line-too-long
+
+_metrics.setup(
+    enabled=settings.METRICS_ENABLED,
+    groups_str=settings.METRICS_GROUPS,
+    api_prefix=settings.API_PREFIX,
+)
+
 
 def custom_generate_unique_id(route: APIRoute) -> str:
     """
@@ -30,7 +40,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_PREFIX}/openapi.json",
     docs_url=f"{settings.API_PREFIX}/docs",
     redoc_url=f"{settings.API_PREFIX}/redoc",
-    generate_unique_id_function=custom_generate_unique_id
+    generate_unique_id_function=custom_generate_unique_id,
 )
 
 app.add_middleware(
@@ -41,6 +51,10 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
     max_age=3600,  # cache preflight requests for 1 hour
 )
+
+if settings.METRICS_ENABLED:
+    app.add_middleware(MetricsMiddleware)
+
 
 def custom_openapi(current_app: FastAPI):
     """Custom openapi"""
@@ -54,18 +68,23 @@ def custom_openapi(current_app: FastAPI):
     )
     # Update tokenUrl to point to external auth service
     # "http://127.0.0.1:9000/user/login/access-token"
-    schema["components"]["securitySchemes"]["OAuth2PasswordBearer"]["flows"]["password"]["tokenUrl"] = \
-        f"{settings.BACKEND_HOST}{settings.AUTH_PREFIX}/login/access-token"
+    schema["components"]["securitySchemes"]["OAuth2PasswordBearer"]["flows"][
+        "password"
+    ]["tokenUrl"] = f"{settings.BACKEND_HOST}{settings.AUTH_PREFIX}/login/access-token"
     current_app.openapi_schema = schema
     return current_app.openapi_schema
 
+
 app.openapi = lambda: custom_openapi(app)
 
-app.mount(
-    '/static',
-    StaticFiles(directory=settings.STATIC_BASE_PATH),
-    name="static"
-)
+app.mount("/static", StaticFiles(directory=settings.STATIC_BASE_PATH), name="static")
 
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
+if settings.METRICS_ENABLED:
+
+    @app.get(f"{settings.API_PREFIX}/metrics", include_in_schema=False, tags=["observability"])
+    def metrics_endpoint() -> Response:
+        """Expose Prometheus metrics."""
+        content, content_type = _metrics.render()
+        return Response(content=content, media_type=content_type)

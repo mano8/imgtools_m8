@@ -5,10 +5,12 @@ This module provides the configuration for Alembic to run database
 migrations in both offline and online modes. It sets up the logging,
 database engine, and migration context.
 """
+
 # pylint: disable=no-member
 from logging.config import fileConfig
 import sys
 import os
+
 # add your project to PYTHONPATH if needed
 sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))
 
@@ -34,7 +36,7 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 # from fastapi_service.schemas.users import SQLModel  # noqa
- # noqa
+# noqa
 
 target_metadata = SQLModel.metadata
 VERSION_TABLE = config.get_main_option("version_table")
@@ -118,7 +120,7 @@ def run_migrations_online():
             compare_type=True,
             include_object=include_object,
             version_table=VERSION_TABLE,
-            version_locations=VERSION_LOCATIONS
+            version_locations=VERSION_LOCATIONS,
         )
 
         with context.begin_transaction():

@@ -1,4 +1,5 @@
 """Google OAuth token schemas"""
+
 from pydantic import BaseModel
 
 
@@ -6,6 +7,7 @@ class OAuthGoogleToken(BaseModel):
     """
     Schema for Google OAuth token response data.
     """
+
     access_token: str
     expires_in: int
     refresh_token: str

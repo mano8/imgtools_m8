@@ -1,8 +1,13 @@
 """Tests for schemas.user and schemas.google."""
+
 import uuid
 import pytest
 
-from auth_user_service.schemas.user import OAuthGoogleToken, ResponseUploadedAvatar, ResponseUser
+from auth_user_service.schemas.user import (
+    OAuthGoogleToken,
+    ResponseUploadedAvatar,
+    ResponseUser,
+)
 from auth_user_service.db_models.users import UserPublic
 from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
 

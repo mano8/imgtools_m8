@@ -1,4 +1,5 @@
 """Initialise the async database connection."""
+
 from sqlalchemy.ext.asyncio import create_async_engine
 from auth_user_service.core.config import settings
 

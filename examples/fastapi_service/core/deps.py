@@ -41,6 +41,7 @@ class _LoggingHooks:
 
 _hooks: ValidationHooks = _LoggingHooks()
 
+
 def _access_validation_secret() -> TokenSecret:
     """Return the TokenSecret for validating access tokens.
 

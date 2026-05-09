@@ -1,4 +1,5 @@
 """Unit tests for services.client_sessions.SessionController."""
+
 import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
@@ -34,7 +35,9 @@ class TestCreateClientSession:
         assert result.jwt_jti == session_data.jwt_jti
         assert str(result.user_id) == str(sample_user.id)
 
-    def test_updates_existing_session(self, db_session, sample_client_session, sample_user):
+    def test_updates_existing_session(
+        self, db_session, sample_client_session, sample_user
+    ):
         new_jti = str(uuid.uuid4())
         session_data = _make_session_create(jti=new_jti)
 
@@ -73,8 +76,14 @@ class TestRevokeSessionJti:
         future = datetime.now(timezone.utc) + timedelta(minutes=30)
         mock_manager = MagicMock()
 
-        with patch("auth_user_service.services.client_sessions.get_redis_client") as mock_get_redis, \
-             patch("auth_user_service.services.client_sessions.RedisSessionManager") as mock_cls:
+        with (
+            patch(
+                "auth_user_service.services.client_sessions.get_redis_client"
+            ) as mock_get_redis,
+            patch(
+                "auth_user_service.services.client_sessions.RedisSessionManager"
+            ) as mock_cls,
+        ):
             mock_cls.return_value = mock_manager
             SessionController.revoke_session_jti("my-jti", future)
 
@@ -87,8 +96,12 @@ class TestRevokeSessionJti:
         past = datetime.now(timezone.utc) - timedelta(minutes=30)
         mock_manager = MagicMock()
 
-        with patch("auth_user_service.services.client_sessions.get_redis_client"), \
-             patch("auth_user_service.services.client_sessions.RedisSessionManager") as mock_cls:
+        with (
+            patch("auth_user_service.services.client_sessions.get_redis_client"),
+            patch(
+                "auth_user_service.services.client_sessions.RedisSessionManager"
+            ) as mock_cls,
+        ):
             mock_cls.return_value = mock_manager
             SessionController.revoke_session_jti("old-jti", past)
 
@@ -99,8 +112,12 @@ class TestRevokeSessionJti:
         assert naive_future.tzinfo is None
 
         mock_manager = MagicMock()
-        with patch("auth_user_service.services.client_sessions.get_redis_client"), \
-             patch("auth_user_service.services.client_sessions.RedisSessionManager") as mock_cls:
+        with (
+            patch("auth_user_service.services.client_sessions.get_redis_client"),
+            patch(
+                "auth_user_service.services.client_sessions.RedisSessionManager"
+            ) as mock_cls,
+        ):
             mock_cls.return_value = mock_manager
             SessionController.revoke_session_jti("naive-jti", naive_future)
 
@@ -110,8 +127,12 @@ class TestRevokeSessionJti:
         exactly_now = datetime.now(timezone.utc)
         mock_manager = MagicMock()
 
-        with patch("auth_user_service.services.client_sessions.get_redis_client"), \
-             patch("auth_user_service.services.client_sessions.RedisSessionManager") as mock_cls:
+        with (
+            patch("auth_user_service.services.client_sessions.get_redis_client"),
+            patch(
+                "auth_user_service.services.client_sessions.RedisSessionManager"
+            ) as mock_cls,
+        ):
             mock_cls.return_value = mock_manager
             SessionController.revoke_session_jti("zero-jti", exactly_now)
 
@@ -124,8 +145,12 @@ class TestIsSessionRevoked:
         mock_manager = MagicMock()
         mock_manager.is_blacklisted.return_value = True
 
-        with patch("auth_user_service.services.client_sessions.get_redis_client"), \
-             patch("auth_user_service.services.client_sessions.RedisSessionManager") as mock_cls:
+        with (
+            patch("auth_user_service.services.client_sessions.get_redis_client"),
+            patch(
+                "auth_user_service.services.client_sessions.RedisSessionManager"
+            ) as mock_cls,
+        ):
             mock_cls.return_value = mock_manager
             result = SessionController.is_session_revoked("some-jti")
 
@@ -135,8 +160,12 @@ class TestIsSessionRevoked:
         mock_manager = MagicMock()
         mock_manager.is_blacklisted.return_value = False
 
-        with patch("auth_user_service.services.client_sessions.get_redis_client"), \
-             patch("auth_user_service.services.client_sessions.RedisSessionManager") as mock_cls:
+        with (
+            patch("auth_user_service.services.client_sessions.get_redis_client"),
+            patch(
+                "auth_user_service.services.client_sessions.RedisSessionManager"
+            ) as mock_cls,
+        ):
             mock_cls.return_value = mock_manager
             result = SessionController.is_session_revoked("fresh-jti")
 
@@ -168,7 +197,9 @@ class TestPurgeExpiredSessions:
 
 
 class TestGetUserActiveSessions:
-    def test_returns_active_sessions(self, db_session, sample_user, sample_client_session):
+    def test_returns_active_sessions(
+        self, db_session, sample_user, sample_client_session
+    ):
         sessions = SessionController.get_user_active_sessions(
             session=db_session, user_id=str(sample_user.id)
         )

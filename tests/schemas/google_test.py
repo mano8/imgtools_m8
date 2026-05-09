@@ -1,4 +1,5 @@
 """Tests for schemas.google."""
+
 from auth_user_service.schemas.google import OAuthGoogleToken
 
 

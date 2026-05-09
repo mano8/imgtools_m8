@@ -1,6 +1,7 @@
 """
 dm_model's helpers
 """
+
 import uuid
 from typing import Any, Dict, Optional
 from sqlmodel import SQLModel
@@ -36,7 +37,10 @@ class UUIDChar(types.TypeDecorator):
 def get_table_args() -> Dict[str, Any]:
     """Return engine-specific table args for the selected database."""
     if settings.SELECTED_DB == "Mysql":
-        return {"mysql_engine": settings.DB_ENGINE, "mysql_charset": settings.DB_CHARSET}
+        return {
+            "mysql_engine": settings.DB_ENGINE,
+            "mysql_charset": settings.DB_CHARSET,
+        }
     return {}
 
 
@@ -44,6 +48,7 @@ class PrefixedBase(SQLModel):
     """
     Automatiquelly prefix table names.
     """
+
     @declared_attr
     @classmethod
     def __tablename__(cls) -> str:

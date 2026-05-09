@@ -1,4 +1,5 @@
 """Tests for schemas.dashboard models and enums."""
+
 import pytest
 
 from auth_user_service.schemas.dashboard import (

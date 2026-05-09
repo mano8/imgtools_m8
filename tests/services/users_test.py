@@ -1,4 +1,5 @@
 """Unit tests for services.users.UserController."""
+
 import uuid
 
 import pytest
@@ -91,17 +92,13 @@ class TestUpdateUser:
 
 class TestGetUser:
     def test_returns_user_by_id(self, db_session, sample_user):
-        result = UserController.get_user(
-            session=db_session, user_id=sample_user.id
-        )
+        result = UserController.get_user(session=db_session, user_id=sample_user.id)
 
         assert result is not None
         assert str(result.id) == str(sample_user.id)
 
     def test_returns_none_for_unknown_id(self, db_session):
-        result = UserController.get_user(
-            session=db_session, user_id=uuid.uuid4()
-        )
+        result = UserController.get_user(session=db_session, user_id=uuid.uuid4())
 
         assert result is None
 

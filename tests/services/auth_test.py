@@ -1,4 +1,5 @@
 """Unit tests for services.auth.AuthController."""
+
 import base64
 import hashlib
 import uuid
@@ -78,8 +79,10 @@ class TestCreateState:
 
 class TestGetGoogleLoginUrl:
     def test_returns_google_oauth_url(self):
-        with patch("auth_user_service.services.auth.get_redis_client") as mock_get_redis, \
-             patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls:
+        with (
+            patch("auth_user_service.services.auth.get_redis_client") as mock_get_redis,
+            patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls,
+        ):
             mock_pkce = MagicMock()
             mock_pkce_cls.return_value = mock_pkce
 
@@ -92,8 +95,10 @@ class TestGetGoogleLoginUrl:
         assert "prompt=consent" in url
 
     def test_stores_pkce_verifier(self):
-        with patch("auth_user_service.services.auth.get_redis_client"), \
-             patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls:
+        with (
+            patch("auth_user_service.services.auth.get_redis_client"),
+            patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls,
+        ):
             mock_pkce = MagicMock()
             mock_pkce_cls.return_value = mock_pkce
 
@@ -105,8 +110,10 @@ class TestGetGoogleLoginUrl:
         assert isinstance(verifier_arg, str)
 
     def test_url_without_redirect_uri(self):
-        with patch("auth_user_service.services.auth.get_redis_client"), \
-             patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls:
+        with (
+            patch("auth_user_service.services.auth.get_redis_client"),
+            patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls,
+        ):
             mock_pkce_cls.return_value = MagicMock()
             url = AuthController.get_google_login_url()
 
@@ -222,14 +229,24 @@ class TestCreateAuthTokens:
         user.role = "user"
 
         fake_jti = str(uuid.uuid4())
-        fake_priv = SecretStr("-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----")
+        fake_priv = SecretStr(
+            "-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----"
+        )
         fake_refresh = SecretStr("Zz1_fake-refresh-secret-long-enough-12345678")
 
-        with patch("auth_user_service.services.auth.settings") as mock_cfg, \
-             patch.object(_auth_module.SecurityHelper, "create_access_token",
-                          return_value=("acc_tok", fake_jti)), \
-             patch.object(_auth_module.SecurityHelper, "create_refresh_token",
-                          return_value=("ref_tok", fake_jti)):
+        with (
+            patch("auth_user_service.services.auth.settings") as mock_cfg,
+            patch.object(
+                _auth_module.SecurityHelper,
+                "create_access_token",
+                return_value=("acc_tok", fake_jti),
+            ),
+            patch.object(
+                _auth_module.SecurityHelper,
+                "create_refresh_token",
+                return_value=("ref_tok", fake_jti),
+            ),
+        ):
             mock_cfg.ACCESS_TOKEN_ALGORITHM = "RS256"
             mock_cfg.ACCESS_PRIVATE_KEY = fake_priv
             mock_cfg.ACCESS_TOKEN_EXPIRE_MINUTES = 30

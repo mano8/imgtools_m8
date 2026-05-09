@@ -9,6 +9,7 @@ This module provides functions for:
 - Decoding refresh tokens (subject and JTI).
 - Password hashing and verification.
 """
+
 import base64
 import hashlib
 from datetime import datetime, timedelta, timezone
@@ -19,11 +20,7 @@ import bcrypt
 import jwt
 from cryptography.fernet import Fernet
 
-from auth_sdk_m8.schemas.auth import (
-    TokenMinimalData,
-    TokenAccessData,
-    TokenSecret
-)
+from auth_sdk_m8.schemas.auth import TokenMinimalData, TokenAccessData, TokenSecret
 from auth_sdk_m8.core.security import ComSecurityHelper
 
 
@@ -32,11 +29,10 @@ class SecurityHelper(ComSecurityHelper):
     A helper class for security-related operations, including token creation,
     hashing, and password verification.
     """
+
     @staticmethod
     def create_access_token(
-        data: TokenAccessData,
-        expires_delta: timedelta,
-        secrets: TokenSecret
+        data: TokenAccessData, expires_delta: timedelta, secrets: TokenSecret
     ) -> Union[jwt.PyJWT, str]:
         """
         Create a JWT access token.
@@ -54,15 +50,11 @@ class SecurityHelper(ComSecurityHelper):
         expire = datetime.now(timezone.utc) + expires_delta
         jti = str(uuid.uuid4())
         to_encode = data.model_dump()
-        to_encode.update({
-            "exp": expire,
-            "jti": jti,
-            "type": "access"
-        })
+        to_encode.update({"exp": expire, "jti": jti, "type": "access"})
         encoded_jwt = jwt.encode(
             to_encode,
             secrets.secret_key.get_secret_value(),
-            algorithm=secrets.algorithm
+            algorithm=secrets.algorithm,
         )
         return encoded_jwt, jti
 
@@ -71,7 +63,7 @@ class SecurityHelper(ComSecurityHelper):
         data: TokenMinimalData,
         expires_delta: timedelta,
         secrets: TokenSecret,
-        jti: str = None
+        jti: str = None,
     ) -> Union[jwt.PyJWT, str]:
         """
         Create a JWT refresh token.
@@ -90,23 +82,16 @@ class SecurityHelper(ComSecurityHelper):
         if jti is None:
             jti = str(uuid.uuid4())
         to_encode = data.model_dump()
-        to_encode.update({
-            "exp": expire,
-            "jti": jti,
-            "type": "refresh"
-        })
+        to_encode.update({"exp": expire, "jti": jti, "type": "refresh"})
         encoded_jwt = jwt.encode(
             to_encode,
             secrets.secret_key.get_secret_value(),
-            algorithm=secrets.algorithm
+            algorithm=secrets.algorithm,
         )
         return encoded_jwt, jti
 
     @staticmethod
-    def verify_password(
-        plain_password: str,
-        hashed_password: str
-    ) -> bool:
+    def verify_password(plain_password: str, hashed_password: str) -> bool:
         """
         Verify a plain text password against a hashed password.
 
@@ -123,8 +108,7 @@ class SecurityHelper(ComSecurityHelper):
         """
         try:
             return bcrypt.checkpw(
-                plain_password.encode("utf-8"),
-                hashed_password.encode("utf-8")
+                plain_password.encode("utf-8"), hashed_password.encode("utf-8")
             )
         except Exception:
             return False
@@ -139,21 +123,23 @@ class SecurityHelper(ComSecurityHelper):
     @staticmethod
     def encrypt_token(token: str, encryption_key: str) -> str:
         """Encrypt a plaintext token for secure storage."""
-        return SecurityHelper._fernet(encryption_key).encrypt(
-            token.encode("utf-8")
-        ).decode("utf-8")
+        return (
+            SecurityHelper._fernet(encryption_key)
+            .encrypt(token.encode("utf-8"))
+            .decode("utf-8")
+        )
 
     @staticmethod
     def decrypt_token(encrypted: str, encryption_key: str) -> str:
         """Decrypt a stored token back to plaintext."""
-        return SecurityHelper._fernet(encryption_key).decrypt(
-            encrypted.encode("utf-8")
-        ).decode("utf-8")
+        return (
+            SecurityHelper._fernet(encryption_key)
+            .decrypt(encrypted.encode("utf-8"))
+            .decode("utf-8")
+        )
 
     @staticmethod
-    def get_password_hash(
-        password: str
-    ) -> str:
+    def get_password_hash(password: str) -> str:
         """
         Generate a hashed password from a plain text password.
 
@@ -166,7 +152,4 @@ class SecurityHelper(ComSecurityHelper):
                 The generated hashed password.
         """
         salt = bcrypt.gensalt(rounds=12)
-        return bcrypt.hashpw(
-            password.encode("utf-8"),
-            salt
-        ).decode("utf-8")
+        return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")

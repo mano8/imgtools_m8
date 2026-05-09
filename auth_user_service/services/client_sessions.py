@@ -4,30 +4,26 @@ Session Controller
 Handles creation and management of secure user sessions using
 Redis for revocation and SQLModel for persistence.
 """
+
 import logging
 from datetime import datetime, timezone
 
 from sqlmodel import Session, select, delete
 from auth_user_service.db_models.users import User
-from auth_user_service.db_models.sessions import (
-    ClientSessionCreate,
-    ClientSession
-)
+from auth_user_service.db_models.sessions import ClientSessionCreate, ClientSession
 from auth_user_service.core.client import RedisSessionManager
 from auth_user_service.core.deps import CurrentUser, get_redis_client
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
+
 class SessionController:
     """Manage user login sessions combining DB and Redis logic."""
 
     @staticmethod
     def create_client_session(
-        *,
-        session: Session,
-        current_user: User,
-        session_data: ClientSessionCreate
+        *, session: Session, current_user: User, session_data: ClientSessionCreate
     ) -> ClientSession:
         """
         Persist a new session for the current user, storing both
@@ -55,7 +51,9 @@ class SessionController:
             db_session.refresh_expires_at = session_data.refresh_expires_at
             db_session.external_access_token = session_data.external_access_token
             db_session.external_refresh_token = session_data.external_refresh_token
-            db_session.external_token_expires_at = session_data.external_token_expires_at
+            db_session.external_token_expires_at = (
+                session_data.external_token_expires_at
+            )
         else:
             db_session = ClientSession(
                 user_id=current_user.id,
@@ -67,7 +65,7 @@ class SessionController:
                 external_access_token=session_data.external_access_token,
                 external_refresh_token=session_data.external_refresh_token,
                 external_token_expires_at=session_data.external_token_expires_at,
-                revoked=False
+                revoked=False,
             )
         session.add(db_session)
         session.commit()
@@ -95,8 +93,7 @@ class SessionController:
             RedisSessionManager(get_redis_client()).blacklist_jti(jti, safe_ttl)
         else:
             logger.warning(
-                "Not blacklisting JTI %s because TTL was %d seconds",
-                jti, raw_ttl
+                "Not blacklisting JTI %s because TTL was %d seconds", jti, raw_ttl
             )
 
     @staticmethod
@@ -129,7 +126,7 @@ class SessionController:
     def purge_expired_sessions(
         session: Session,
         current_user: CurrentUser,
-        ) -> int:
+    ) -> int:
         """
         Remove expired sessions from the database.
 
@@ -145,7 +142,7 @@ class SessionController:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         stmt = delete(ClientSession).where(
             ClientSession.user_id == current_user.id,
-            ClientSession.refresh_expires_at < now
+            ClientSession.refresh_expires_at < now,
         )
         result = session.exec(stmt)
         deleted = result.rowcount or 0
@@ -154,9 +151,7 @@ class SessionController:
         return deleted
 
     @staticmethod
-    def get_user_active_sessions(
-        session: Session, user_id: str
-    ) -> list[ClientSession]:
+    def get_user_active_sessions(session: Session, user_id: str) -> list[ClientSession]:
         """
         Retrieve all non-revoked, non-expired sessions for a user.
 
@@ -171,6 +166,6 @@ class SessionController:
         stmt = select(ClientSession).where(
             ClientSession.user_id == user_id,
             ClientSession.revoked == False,  # noqa: E712
-            ClientSession.refresh_expires_at > now
+            ClientSession.refresh_expires_at > now,
         )
         return session.exec(stmt).all()

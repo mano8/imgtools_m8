@@ -2,20 +2,19 @@
 Configuration settings for the FastAPI application.
 This module loads environment settings securely and applies best practices.
 """
+
 from pathlib import Path
 from typing import Optional
 
-from pydantic import (
-    EmailStr,
-    SecretStr
-)
+from pydantic import EmailStr, SecretStr
 from pydantic_settings import SettingsConfigDict
 from auth_sdk_m8.utils.paths import find_dotenv
 from auth_sdk_m8.core.config import CommonSettings, settings_customise_sources
+from auth_sdk_m8.observability.settings import ObservabilitySettingsMixin
 # pylint: disable=invalid-name, import-outside-toplevel
 
 
-class Settings(CommonSettings):
+class Settings(ObservabilitySettingsMixin, CommonSettings):
     """Settings for the auth_user_service: adds only new fields."""
 
     # Override env file directory if necessary
@@ -33,17 +32,20 @@ class Settings(CommonSettings):
     # Extend validation lists
     required_fields = CommonSettings.required_fields
     secret_fields = CommonSettings.secret_fields + [
-        "FIRST_SUPERUSER", "FIRST_SUPERUSER_PASSWORD",
-        "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET",
-        "PRIVATE_API_SECRET", "TOKENS_ENCRYPTION_KEY",
+        "FIRST_SUPERUSER",
+        "FIRST_SUPERUSER_PASSWORD",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "PRIVATE_API_SECRET",
+        "TOKENS_ENCRYPTION_KEY",
     ]
-    passwords = CommonSettings.passwords + [
-        "FIRST_SUPERUSER_PASSWORD"
-    ]
+    passwords = CommonSettings.passwords + ["FIRST_SUPERUSER_PASSWORD"]
     secret_keys = CommonSettings.secret_keys + [
-        "PRIVATE_API_SECRET", "TOKENS_ENCRYPTION_KEY",
+        "PRIVATE_API_SECRET",
+        "TOKENS_ENCRYPTION_KEY",
     ]
     TABLES_PREFIX: str = "auth"
+
     # Declare only service-specific fields
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: SecretStr
@@ -57,8 +59,7 @@ try:
     settings = Settings()
 except Exception as e:
     # Raise with a clear error message if validation fails.
-    raise RuntimeError(
-        f"Configuration validation error:\n {str(e)}") from e
+    raise RuntimeError(f"Configuration validation error:\n {str(e)}") from e
 
 if __name__ == "__main__":
     # For debugging, print out public settings without exposing secrets.

@@ -3,6 +3,7 @@ User-related database models and schemas.
 These models define the structure of user data in the database and
 the validation rules for user-related operations.
 """
+
 from typing import List, Optional, TYPE_CHECKING
 import uuid
 
@@ -13,6 +14,7 @@ from sqlmodel import Field, Relationship, SQLModel
 from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
 from auth_sdk_m8.models.shared import TimestampMixin
 from auth_user_service.core.db_utils import UUIDChar, get_table_args, prefixed_tables
+
 if TYPE_CHECKING:
     from auth_user_service.db_models.api_keys import ApiKey, RateLimit
     from auth_user_service.db_models.sessions import ClientSession
@@ -29,6 +31,7 @@ class UserBase(TimestampMixin, SQLModel):
     """
     Shared fields for all User schemas.
     """
+
     provider: AuthProviderType = Field(
         default=AuthProviderType.PASSWORD,
         sa_column_kwargs={"nullable": False},
@@ -67,7 +70,6 @@ class UserBase(TimestampMixin, SQLModel):
     )
 
 
-
 class UserCreate(UserBase):
     """
     Schema for creating a new user.
@@ -75,6 +77,7 @@ class UserCreate(UserBase):
     - PASSWORD provider requires `password` and disallows `oauth_user_id`.
     - GOOGLE provider requires `oauth_user_id` and disallows `password`.
     """
+
     password: Optional[str] = Field(
         default=None,
         min_length=8,
@@ -97,40 +100,48 @@ class UserCreate(UserBase):
         if self.provider == AuthProviderType.PASSWORD:
             if not self.password:
                 raise ValidationError(
-                    [{
-                        "loc": ("password",),
-                        "msg": "Password required for PASSWORD provider",
-                        "type": "value_error.missing",
-                    }],
+                    [
+                        {
+                            "loc": ("password",),
+                            "msg": "Password required for PASSWORD provider",
+                            "type": "value_error.missing",
+                        }
+                    ],
                     model=type(self),
                 )
             if self.oauth_user_id is not None:
                 raise ValidationError(
-                    [{
-                        "loc": ("oauth_user_id",),
-                        "msg": "oauth_user_id must be None for PASSWORD provider",
-                        "type": "value_error",
-                    }],
+                    [
+                        {
+                            "loc": ("oauth_user_id",),
+                            "msg": "oauth_user_id must be None for PASSWORD provider",
+                            "type": "value_error",
+                        }
+                    ],
                     model=type(self),
                 )
 
         if self.provider == AuthProviderType.GOOGLE:
             if not self.oauth_user_id:
                 raise ValidationError(
-                    [{
-                        "loc": ("oauth_user_id",),
-                        "msg": "oauth_user_id required for GOOGLE provider",
-                        "type": "value_error.missing",
-                    }],
+                    [
+                        {
+                            "loc": ("oauth_user_id",),
+                            "msg": "oauth_user_id required for GOOGLE provider",
+                            "type": "value_error.missing",
+                        }
+                    ],
                     model=type(self),
                 )
             if self.password is not None:
                 raise ValidationError(
-                    [{
-                        "loc": ("password",),
-                        "msg": "password must be None for GOOGLE provider",
-                        "type": "value_error",
-                    }],
+                    [
+                        {
+                            "loc": ("password",),
+                            "msg": "password must be None for GOOGLE provider",
+                            "type": "value_error",
+                        }
+                    ],
                     model=type(self),
                 )
 
@@ -141,9 +152,8 @@ class UserRegister(SQLModel):
     """
     Payload for new user self-registration.
     """
-    email: EmailStr = Field(
-        ..., max_length=255, description="User email address"
-    )
+
+    email: EmailStr = Field(..., max_length=255, description="User email address")
     password: str = Field(
         ..., min_length=8, max_length=128, description="Plain-text password"
     )
@@ -152,12 +162,12 @@ class UserRegister(SQLModel):
     )
 
 
-
 class UserUpdate(SQLModel):
     """
     Fields allowed for updating a user record.
     Pass current `provider` to enforce proper validation.
     """
+
     email: Optional[EmailStr] = Field(
         default=None,
         max_length=255,
@@ -202,24 +212,25 @@ class UserUpdate(SQLModel):
             and self.oauth_user_id is not None
         ):
             raise ValidationError(
-                [{
-                    "loc": ("oauth_user_id",),
-                    "msg": "Cannot set oauth_user_id on PASSWORD provider",
-                    "type": "value_error",
-                }],
+                [
+                    {
+                        "loc": ("oauth_user_id",),
+                        "msg": "Cannot set oauth_user_id on PASSWORD provider",
+                        "type": "value_error",
+                    }
+                ],
                 model=type(self),
             )
 
-        if (
-            self.provider == AuthProviderType.GOOGLE
-            and self.password is not None
-        ):
+        if self.provider == AuthProviderType.GOOGLE and self.password is not None:
             raise ValidationError(
-                [{
-                    "loc": ("password",),
-                    "msg": "Cannot set password on GOOGLE provider",
-                    "type": "value_error",
-                }],
+                [
+                    {
+                        "loc": ("password",),
+                        "msg": "Cannot set password on GOOGLE provider",
+                        "type": "value_error",
+                    }
+                ],
                 model=type(self),
             )
 
@@ -230,6 +241,7 @@ class UserUpdateMe(SQLModel):
     """
     Payload allowing users to update their own profile fields.
     """
+
     email: Optional[EmailStr] = Field(
         default=None,
         max_length=255,
@@ -251,12 +263,17 @@ class UpdatePassword(SQLModel):
     """
     Schema for password change endpoint.
     """
+
     current_password: str = Field(
-        ..., min_length=8, max_length=128,
+        ...,
+        min_length=8,
+        max_length=128,
         description="Existing password to validate identity",
     )
     new_password: str = Field(
-        ..., min_length=8, max_length=128,
+        ...,
+        min_length=8,
+        max_length=128,
         description="New password to replace the existing one",
     )
 
@@ -266,6 +283,7 @@ class User(UserBase, table=True):
     Database model representing a user record.
     Contains hashed credentials and relationships.
     """
+
     __tablename__ = prefixed_tables("user")
     __table_args__ = (get_table_args(),)
     id: uuid.UUID = Field(
@@ -274,7 +292,7 @@ class User(UserBase, table=True):
             UUIDChar(),
             default=lambda: str(uuid.uuid4()),
             primary_key=True,
-            index=True
+            index=True,
         ),
         description="Unique user identifier (UUID)",
     )
@@ -306,10 +324,12 @@ class User(UserBase, table=True):
         back_populates="user",
     )
 
+
 class UserPublic(UserBase):
     """
     Public representation of a user (safely excludes private fields).
     """
+
     id: uuid.UUID
 
 
@@ -317,6 +337,7 @@ class UsersPublic(SQLModel):
     """
     Wrapper for paginated user lists.
     """
+
     data: List[UserPublic] = Field(
         description="List of public user objects",
     )

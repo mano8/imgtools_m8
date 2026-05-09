@@ -1,6 +1,7 @@
 """
 dm_model's helpers
 """
+
 from sqlmodel import SQLModel
 from sqlalchemy.ext.declarative import declared_attr
 from fastapi_service.core.config import settings
@@ -10,6 +11,7 @@ class PrefixedBase(SQLModel):
     """
     Automatiquelly prefix table names.
     """
+
     @declared_attr
     @classmethod
     def __tablename__(cls) -> str:

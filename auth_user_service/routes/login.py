@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from auth_sdk_m8.core.exceptions import InvalidToken
@@ -19,6 +19,7 @@ from auth_sdk_m8.schemas.base import ResponseMessage
 
 from auth_user_service.core.client import LoginRateLimiter, RedisRefreshStore
 from auth_user_service.core.config import settings
+from auth_sdk_m8.observability.metrics import get as _get_metrics
 from auth_user_service.core.deps import (
     CurrentUser,
     RedisDep,
@@ -45,6 +46,13 @@ _REFRESH_SECRETS = TokenSecret(
 )
 
 
+def _get_refresh_cookie(
+    t: str = Cookie(None, alias="refresh_token"),
+) -> str:
+    """Extract refresh token from HttpOnly cookie for FastAPI dependency injection."""
+    return SecurityHelper.get_refresh_token_from_cookie(t)
+
+
 @router.post("/access-token", response_model=Token)
 def login_access_token(
     response: Response,
@@ -55,9 +63,13 @@ def login_access_token(
     """Authenticate via email/password and issue JWT tokens."""
     email = form_data.username
 
+    _m = _get_metrics()
+
     if redis is not None:
         rate_limiter = LoginRateLimiter(redis)
         if not rate_limiter.is_allowed(email):
+            if _m and _m.login_attempts_total:
+                _m.login_attempts_total.labels(result="rate_limited").inc()
             raise HTTPException(
                 status_code=429,
                 detail="Too many login attempts. Try again in 15 minutes.",
@@ -70,6 +82,9 @@ def login_access_token(
     )
 
     if not user or not user.is_active:
+        if _m and _m.login_attempts_total:
+            result = "inactive_user" if user else "wrong_credentials"
+            _m.login_attempts_total.labels(result=result).inc()
         raise HTTPException(
             status_code=400,
             detail="Invalid credentials or inactive user",
@@ -77,6 +92,9 @@ def login_access_token(
 
     if redis is not None:
         LoginRateLimiter(redis).reset(email)
+
+    if _m and _m.login_attempts_total:
+        _m.login_attempts_total.labels(result="success").inc()
 
     access_token, refresh_token, jti = AuthController.create_auth_tokens(user=user)
 
@@ -107,7 +125,7 @@ def login_refresh_token(
     response: Response,
     session: SessionDep,
     redis: RedisDep,
-    refresh_token: str = Depends(SecurityHelper.get_refresh_token_from_cookie),
+    refresh_token: str = Depends(_get_refresh_cookie),
 ) -> Token:
     """Refresh access token using a valid refresh token.
 
@@ -115,6 +133,8 @@ def login_refresh_token(
     Presenting an already-consumed JTI is treated as a reuse attack and
     immediately rejected — the allowlist entry will be absent.
     """
+    _m = _get_metrics()
+
     try:
         user_id, old_jti = SecurityHelper.decode_refresh_token(
             refresh_token,
@@ -122,11 +142,15 @@ def login_refresh_token(
             return_jti=True,
         )
     except InvalidToken as err:
+        if _m and _m.token_refresh_total:
+            _m.token_refresh_total.labels(result="invalid").inc()
         raise HTTPException(status_code=401, detail=str(err)) from err
 
     # Allowlist check: stateful/hybrid modes require the JTI to be registered.
     if settings.TOKEN_MODE != "stateless" and redis is not None:
         if not RedisRefreshStore(redis).is_valid(old_jti):
+            if _m and _m.token_refresh_total:
+                _m.token_refresh_total.labels(result="revoked").inc()
             response.delete_cookie(key="refresh_token")
             raise HTTPException(status_code=401, detail="Token revoked or reused")
 
@@ -134,7 +158,9 @@ def login_refresh_token(
     if user is None or user.is_active is not True:
         raise HTTPException(status_code=401, detail="Invalid user or inactive user")
 
-    access_token, new_refresh_token, new_jti = AuthController.create_auth_tokens(user=user)
+    access_token, new_refresh_token, new_jti = AuthController.create_auth_tokens(
+        user=user
+    )
 
     if settings.TOKEN_MODE != "stateless":
         AuthController.create_auth_session(
@@ -146,6 +172,9 @@ def login_refresh_token(
         # Atomically swap old JTI for new one — any reuse of old_jti is now detectable.
         if redis is not None:
             RedisRefreshStore(redis).rotate(old_jti, new_jti, _REFRESH_TTL_SECONDS)
+
+    if _m and _m.token_refresh_total:
+        _m.token_refresh_total.labels(result="success").inc()
 
     response.set_cookie(
         key="refresh_token",
@@ -164,7 +193,7 @@ def logout(
     session: SessionDep,
     token: TokenDep,
     redis: RedisDep,
-    refresh_token: str = Depends(SecurityHelper.get_refresh_token_from_cookie),
+    refresh_token: str = Depends(_get_refresh_cookie),
 ) -> ResponseMessage:
     """Revoke both tokens, delete the DB session, and clear the cookie."""
     jti: str | None = None
@@ -204,6 +233,10 @@ def logout(
             SessionController.delete_session_by_jti(session=session, jti=jti)
         except Exception:  # noqa: BLE001
             logger.warning("Could not delete DB session on logout.")
+
+    _m = _get_metrics()
+    if _m and _m.logout_total:
+        _m.logout_total.inc()
 
     response.delete_cookie(key="refresh_token")
     return ResponseMessage(success=True, msg="Logged out successfully")

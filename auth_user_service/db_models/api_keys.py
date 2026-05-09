@@ -2,6 +2,7 @@
 Api key and rate limit models for the database.
 These models are used to manage API keys and their associated rate limits.
 """
+
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 import uuid
@@ -9,7 +10,13 @@ from sqlmodel import Column, Field, ForeignKey, Relationship, SQLModel
 
 from auth_sdk_m8.schemas.base import Period
 from auth_sdk_m8.models.shared import TimestampMixin
-from auth_user_service.core.db_utils import UUIDChar, get_table_args, prefixed_fk, prefixed_tables
+from auth_user_service.core.db_utils import (
+    UUIDChar,
+    get_table_args,
+    prefixed_fk,
+    prefixed_tables,
+)
+
 if TYPE_CHECKING:
     from auth_user_service.db_models.users import User
 
@@ -21,6 +28,7 @@ class ApiKeyBase(TimestampMixin, SQLModel):
     """
     Shared fields for API key schemas.
     """
+
     name: str = Field(
         default=None,
         min_length=3,
@@ -42,6 +50,7 @@ class ApiKeyCreate(SQLModel):
     """
     Schema for creating a new API key.
     """
+
     name: Optional[str] = Field(
         default=None,
         min_length=3,
@@ -59,6 +68,7 @@ class ApiKey(ApiKeyBase, SQLModel, table=True):
     """
     Database model for storing API keys.
     """
+
     __tablename__ = prefixed_tables("api_key")
     __table_args__ = (get_table_args(),)
     id: str = Field(
@@ -79,7 +89,7 @@ class ApiKey(ApiKeyBase, SQLModel, table=True):
             UUIDChar(),
             ForeignKey(prefixed_fk("user", "id"), ondelete="CASCADE"),
             nullable=False,
-            index=True
+            index=True,
         ),
         description="Owner user ID",
     )
@@ -97,6 +107,7 @@ class ApiKeyPublic(ApiKeyBase, SQLModel):
     """
     Public representation of an API key (no key hash).
     """
+
     id: uuid.UUID = Field(
         description="Unique API key ID",
     )
@@ -113,6 +124,7 @@ class RateLimit(SQLModel, table=True):
     """
     Database model for storing rate limit configurations per user.
     """
+
     __tablename__ = prefixed_tables("rate_limit")
     __table_args__ = (get_table_args(),)
     id: Optional[int] = Field(
@@ -126,7 +138,7 @@ class RateLimit(SQLModel, table=True):
             UUIDChar(),
             ForeignKey(prefixed_fk("user", "id"), ondelete="CASCADE"),
             nullable=False,
-            index=True
+            index=True,
         ),
         description="User to whom the limit applies",
     )

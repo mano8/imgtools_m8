@@ -4,18 +4,19 @@ services:
     ports:
       - "8000:80"
       - "4430:443"
-      - "8080:8080"   # Dashboard
-      - "9000:9000"   # services entryPoint
+      - "127.0.0.1:8080:8080"   # Dashboard — localhost only
+      - "9000:9000"             # services entryPoint
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic_conf.yml:/etc/traefik/dynamic_conf.yml:ro
       - ./traefik/certs:/etc/traefik/certs:ro
+    restart: unless-stopped
     networks:
       - m8_app_network
 
   m8_db:
-    image: bitnami/mariadb:latest
+    image: mariadb:12-ubi
     volumes:
       - ./mysql_db:/bitnami/mariadb
     environment:
@@ -33,6 +34,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    restart: unless-stopped
     networks:
       - m8_app_network
 
@@ -58,6 +60,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - m8_app_network
   
@@ -78,7 +81,7 @@ services:
     restart: unless-stopped
   
   grafana:
-    image: grafana/grafana:main-ubuntu
+    image: grafana/grafana:13.1.0-25530058790
 
     depends_on:
       - prometheus

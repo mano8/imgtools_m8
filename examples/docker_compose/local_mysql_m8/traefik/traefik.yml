@@ -1,10 +1,19 @@
 # traefik.yml — Development
 log:
-  level: DEBUG
+  level: WARNING
 
 api:
   dashboard: true
-  insecure: true
+  insecure: true    # safe — port 8080 is bound to 127.0.0.1 in docker-compose
+
+ping: {}
+
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    entryPoint: metrics
 
 providers:
   docker:
@@ -16,9 +25,17 @@ providers:
 entryPoints:
   web:
     address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
   websecure:
     address: ":443"
     http3: {}            # Enable HTTP/3
   api:
     address: ":9000"
     http3: {}
+  metrics:
+    address: ":8082"     # Prometheus scrapes traefik:8082 — internal only, not host-exposed

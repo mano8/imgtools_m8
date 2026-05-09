@@ -2,7 +2,6 @@
 User models
 """
 
-
 from pydantic import BaseModel
 
 from auth_user_service.db_models.users import UserPublic
@@ -14,9 +13,11 @@ class OAuthGoogleToken(BaseModel):
 
     Inherits from ResponseModelBase and adds id and owner_id fields.
     """
+
     access_token: str
     expires_in: int
     refresh_token: str
+
 
 class ResponseUploadedAvatar(BaseModel):
     """
@@ -24,6 +25,7 @@ class ResponseUploadedAvatar(BaseModel):
 
     Inherits from ResponseModelBase and adds id and owner_id fields.
     """
+
     success: bool
     msg: str
     avatar: str
@@ -35,5 +37,6 @@ class ResponseUser(BaseModel):
 
     Inherits from ResponseModelBase and adds id and owner_id fields.
     """
+
     success: bool
     user: UserPublic
