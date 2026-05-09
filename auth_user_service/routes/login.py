@@ -170,8 +170,16 @@ def login_refresh_token(
             if not rotated:
                 if _m and _m.token_refresh_total:
                     _m.token_refresh_total.labels(result="revoked").inc()
+                # Reuse confirmed — invalidate every session for this user so the
+                # attacker's already-rotated tokens also stop working.
+                SessionController.revoke_all_user_sessions(
+                    session, str(user_id), redis
+                )
                 response.delete_cookie(key="refresh_token")
-                raise HTTPException(status_code=401, detail="Token revoked or reused")
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token reuse detected. All sessions revoked. Please log in again.",
+                )
         AuthController.create_auth_session(
             session=session,
             user=user,

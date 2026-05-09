@@ -7,11 +7,13 @@ Redis for revocation and SQLModel for persistence.
 
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
+from redis import Redis
 from sqlmodel import Session, select, delete
 from auth_user_service.db_models.users import User
 from auth_user_service.db_models.sessions import ClientSessionCreate, ClientSession
-from auth_user_service.core.client import RedisSessionManager
+from auth_user_service.core.client import RedisRefreshStore, RedisSessionManager
 from auth_user_service.core.deps import CurrentUser, get_redis_client
 
 logging.basicConfig(level=logging.WARNING)
@@ -169,3 +171,41 @@ class SessionController:
             ClientSession.refresh_expires_at > now,
         )
         return session.exec(stmt).all()
+
+    @staticmethod
+    def revoke_all_user_sessions(
+        session: Session, user_id: str, redis: Optional[Redis]
+    ) -> int:
+        """Revoke every active session for *user_id* — reuse-attack response.
+
+        Blacklists all access JTIs and removes all refresh allowlist entries
+        from Redis, then deletes the DB records.  Returns the number of
+        sessions revoked.
+
+        The access JTI and refresh JTI are the same value per token pair
+        (``create_refresh_token`` is called with the access token's JTI), so
+        ``ClientSession.jwt_jti`` covers both stores.
+
+        Args:
+            session: SQLModel DB session.
+            user_id: UUID of the compromised user (string form).
+            redis: Live Redis client, or None when Redis is unavailable.
+        """
+        active = SessionController.get_user_active_sessions(session, user_id)
+        if redis is not None and active:
+            access_mgr = RedisSessionManager(redis)
+            refresh_store = RedisRefreshStore(redis)
+            now = datetime.now(timezone.utc)
+            for s in active:
+                expires_at = s.jwt_expires_at
+                if expires_at.tzinfo is None:
+                    expires_at = expires_at.replace(tzinfo=timezone.utc)
+                ttl = int((expires_at - now).total_seconds())
+                if ttl > 0:
+                    access_mgr.blacklist_jti(s.jwt_jti, ttl)
+                refresh_store.revoke(s.jwt_jti)
+
+        stmt = delete(ClientSession).where(ClientSession.user_id == user_id)
+        result = session.exec(stmt)
+        session.commit()
+        return result.rowcount or 0

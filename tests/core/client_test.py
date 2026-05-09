@@ -106,22 +106,23 @@ class TestPKCEStore:
         args = self.mock_redis.setex.call_args[0]
         assert args[1] == timedelta(minutes=10)
 
-    def test_pop_returns_verifier_and_deletes_key(self):
-        self.mock_redis.get.return_value = "myverifier"
+    def test_pop_returns_verifier_via_getdel(self):
+        """pop() must use atomic GETDEL, not separate GET + DELETE."""
+        self.mock_redis.getdel.return_value = "myverifier"
 
         result = self.store.pop("mystate")
 
         assert result == "myverifier"
-        self.mock_redis.get.assert_called_once_with("pkce:mystate")
-        self.mock_redis.delete.assert_called_once_with("pkce:mystate")
+        self.mock_redis.getdel.assert_called_once_with("pkce:mystate")
+        self.mock_redis.get.assert_not_called()
+        self.mock_redis.delete.assert_not_called()
 
     def test_pop_returns_none_when_key_not_found(self):
-        self.mock_redis.get.return_value = None
+        self.mock_redis.getdel.return_value = None
 
         result = self.store.pop("nonexistent")
 
         assert result is None
-        self.mock_redis.delete.assert_not_called()
 
     def test_prefix_constant(self):
         assert PKCEStore.PREFIX == "pkce:"
