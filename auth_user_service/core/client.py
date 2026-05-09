@@ -143,6 +143,19 @@ class LoginRateLimiter:
         self.client.delete(self._key(identifier))
 
 
+_ROTATE_SCRIPT = """
+local old = KEYS[1]
+local new = KEYS[2]
+local ttl = tonumber(ARGV[1])
+if redis.call('exists', old) == 0 then
+  return 0
+end
+redis.call('del', old)
+redis.call('setex', new, ttl, '1')
+return 1
+"""
+
+
 class RedisRefreshStore:
     """Allowlist-based refresh token store backed by Redis.
 
@@ -171,16 +184,25 @@ class RedisRefreshStore:
         """Return True if *jti* is a known, active refresh token."""
         return bool(self.client.exists(self._key(jti)))
 
-    def rotate(self, old_jti: str, new_jti: str, ttl_seconds: int) -> None:
+    def rotate(self, old_jti: str, new_jti: str, ttl_seconds: int) -> bool:
         """Atomically invalidate *old_jti* and register *new_jti*.
 
-        Using a pipeline ensures both operations succeed or fail together,
-        preventing a window where neither JTI is valid.
+        Executes a Lua script so the check-and-swap is serializable — no
+        concurrent request can interleave between the existence check and
+        the key swap.
+
+        Returns True if the rotation succeeded.  Returns False if *old_jti*
+        was already absent, indicating a concurrent rotation won the race or
+        a genuine reuse attack.
         """
-        pipe = self.client.pipeline()
-        pipe.delete(self._key(old_jti))
-        pipe.setex(self._key(new_jti), ttl_seconds, "1")
-        pipe.execute()
+        result = self.client.eval(
+            _ROTATE_SCRIPT,
+            2,
+            self._key(old_jti),
+            self._key(new_jti),
+            str(ttl_seconds),
+        )
+        return bool(result)
 
     def revoke(self, jti: str) -> None:
         """Permanently revoke *jti* (e.g. on explicit logout)."""

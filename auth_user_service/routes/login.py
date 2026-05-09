@@ -163,15 +163,21 @@ def login_refresh_token(
     )
 
     if settings.TOKEN_MODE != "stateless":
+        # Rotate first: if the Lua script finds old_jti already gone, a concurrent
+        # request won the race or this is a reuse attack — reject before any DB write.
+        if redis is not None:
+            rotated = RedisRefreshStore(redis).rotate(old_jti, new_jti, _REFRESH_TTL_SECONDS)
+            if not rotated:
+                if _m and _m.token_refresh_total:
+                    _m.token_refresh_total.labels(result="revoked").inc()
+                response.delete_cookie(key="refresh_token")
+                raise HTTPException(status_code=401, detail="Token revoked or reused")
         AuthController.create_auth_session(
             session=session,
             user=user,
             jti=new_jti,
             refresh_token=new_refresh_token,
         )
-        # Atomically swap old JTI for new one — any reuse of old_jti is now detectable.
-        if redis is not None:
-            RedisRefreshStore(redis).rotate(old_jti, new_jti, _REFRESH_TTL_SECONDS)
 
     if _m and _m.token_refresh_total:
         _m.token_refresh_total.labels(result="success").inc()
