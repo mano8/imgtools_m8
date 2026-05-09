@@ -109,18 +109,15 @@ def read_user_by_id(
     """
     Get a specific user by id.
     """
-    try:
-        user = session.get(User, user_id)
-        if user == current_user:
-            return user
-        if not current_user.is_superuser:
-            raise HTTPException(
-                status_code=403,
-                detail="The user doesn't have enough privileges",
-            )
-        return user
-    except Exception as ex:
-        return BaseController.handle_exception(ex=ex, session=session)
+    user = session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id != current_user.id and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=403,
+            detail="The user doesn't have enough privileges",
+        )
+    return user
 
 
 @router.patch(

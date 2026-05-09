@@ -44,6 +44,8 @@ def session_list(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
         users = session.exec(statement).all()
 
         return ClientSessionsPublic(data=users, count=count)
+    except HTTPException:
+        raise
     except Exception as ex:
         return BaseController.handle_exception(ex=ex, session=session)
 
@@ -68,6 +70,8 @@ def get_session_by_id(
                 detail="The user doesn't have enough privileges",
             )
         return client_session
+    except HTTPException:
+        raise
     except Exception as ex:
         return BaseController.handle_exception(ex=ex, session=session)
 
@@ -86,15 +90,10 @@ def get_session_by_user(
     """
     try:
         statement = select(ClientSession).where(ClientSession.user_id == user_id)
-        if not current_user.is_superuser:
-            statement.where(ClientSession.user_id == current_user.id)
         client_session = session.exec(statement).first()
-        if not current_user.is_superuser:
-            raise HTTPException(
-                status_code=403,
-                detail="The user doesn't have enough privileges",
-            )
         return client_session
+    except HTTPException:
+        raise
     except Exception as ex:
         return BaseController.handle_exception(ex=ex, session=session)
 
@@ -110,7 +109,7 @@ def get_my_session(session: SessionDep, current_user: CurrentUser) -> Any:
     """
     try:
         statement = select(ClientSession).where(
-            ClientSession.user_id == str(current_user.id)
+            ClientSession.user_id == current_user.id
         )
         client_session = session.exec(statement).first()
         if client_session is None:
@@ -119,6 +118,8 @@ def get_my_session(session: SessionDep, current_user: CurrentUser) -> Any:
                 detail="The user session unavelable",
             )
         return client_session
+    except HTTPException:
+        raise
     except Exception as ex:
         return BaseController.handle_exception(ex=ex, session=session)
 
@@ -139,7 +140,7 @@ def refresh_google_session_tokens(
     """
     try:
         statement = select(ClientSession).where(
-            ClientSession.user_id == str(current_user.id)
+            ClientSession.user_id == current_user.id
         )
         client_session = session.exec(statement).first()
         if client_session is None:
@@ -176,6 +177,8 @@ def refresh_google_session_tokens(
         session.commit()
         session.refresh(client_session)
         return client_session
+    except HTTPException:
+        raise
     except Exception as ex:
         return BaseController.handle_exception(ex=ex, session=session)
 
@@ -194,6 +197,8 @@ def delete_sessions_by_user(session: SessionDep, user_id: uuid.UUID) -> Message:
         session.exec(statement)  # type: ignore
         session.commit()
         return Message(message="User deleted successfully")
+    except HTTPException:
+        raise
     except Exception as ex:
         return BaseController.handle_exception(ex=ex, session=session)
 
@@ -214,5 +219,7 @@ def delete_session(session: SessionDep, session_id: uuid.UUID) -> Message:
         session.delete(client_session)
         session.commit()
         return Message(message="Session deleted successfully")
+    except HTTPException:
+        raise
     except Exception as ex:
         return BaseController.handle_exception(ex=ex, session=session)

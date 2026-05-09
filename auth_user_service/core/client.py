@@ -115,12 +115,16 @@ class LoginRateLimiter:
     MAX_ATTEMPTS: Final[int] = 5
     WINDOW_SECONDS: Final[int] = 900  # 15 minutes
     PREFIX: Final[str] = "login:attempts:"
+    MAX_ID_LEN: Final[int] = 255
 
     def __init__(self, client: Redis) -> None:
         self.client = client
 
     def _key(self, identifier: str) -> str:
-        return f"{self.PREFIX}{identifier}"
+        # Strip control chars (including CRLF) and cap length to prevent
+        # Redis key namespace pollution and memory exhaustion attacks.
+        safe = "".join(c for c in identifier if c.isprintable())
+        return f"{self.PREFIX}{safe[: self.MAX_ID_LEN]}"
 
     def is_allowed(self, identifier: str) -> bool:
         """

@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from auth_sdk_m8.core.exceptions import InvalidToken
@@ -44,6 +44,13 @@ _REFRESH_SECRETS = TokenSecret(
     secret_key=settings.REFRESH_SECRET_KEY,
     algorithm=settings.REFRESH_TOKEN_ALGORITHM,
 )
+
+
+def _get_refresh_cookie(
+    t: str = Cookie(None, alias="refresh_token"),
+) -> str:
+    """Extract refresh token from HttpOnly cookie for FastAPI dependency injection."""
+    return SecurityHelper.get_refresh_token_from_cookie(t)
 
 
 @router.post("/access-token", response_model=Token)
@@ -118,7 +125,7 @@ def login_refresh_token(
     response: Response,
     session: SessionDep,
     redis: RedisDep,
-    refresh_token: str = Depends(SecurityHelper.get_refresh_token_from_cookie),
+    refresh_token: str = Depends(_get_refresh_cookie),
 ) -> Token:
     """Refresh access token using a valid refresh token.
 
@@ -186,7 +193,7 @@ def logout(
     session: SessionDep,
     token: TokenDep,
     redis: RedisDep,
-    refresh_token: str = Depends(SecurityHelper.get_refresh_token_from_cookie),
+    refresh_token: str = Depends(_get_refresh_cookie),
 ) -> ResponseMessage:
     """Revoke both tokens, delete the DB session, and clear the cookie."""
     jti: str | None = None

@@ -31,6 +31,10 @@ from auth_sdk_m8.schemas.auth import (
     TokenSecret,
 )
 
+# Pre-computed hash used to run bcrypt for non-existent users, eliminating the
+# timing difference that would otherwise reveal valid email addresses.
+_DUMMY_HASH: str = SecurityHelper.get_password_hash(secrets.token_hex(32))
+
 
 class AuthController:
     """
@@ -111,9 +115,10 @@ class AuthController:
             if authentication is successful, otherwise None.
         """
         db_user = UserController.get_user_by_email(session=session, email=email)
-        if not db_user:
-            return None
-        if not SecurityHelper.verify_password(password, db_user.hashed_password):
+        # Always run bcrypt regardless of whether the user exists so that response
+        # time is constant and cannot be used to enumerate valid email addresses.
+        hash_to_check = db_user.hashed_password if db_user else _DUMMY_HASH
+        if not SecurityHelper.verify_password(password, hash_to_check):
             return None
         return db_user
 
