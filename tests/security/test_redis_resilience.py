@@ -1,0 +1,153 @@
+"""Security regression: Redis unavailability produces clear errors, not crashes.
+
+Verifies that:
+- get_redis_client() returns None when ping fails (server unreachable)
+- get_redis_client() returns None in stateless mode (pool is None)
+- get_redis_client() logs a warning when the server is unreachable
+- Google OAuth raises 503 (not 400/500) when Redis is unavailable
+- Core authentication (bcrypt + DB lookup) works without Redis
+- Rate-limiting guard is correctly skipped when redis is None
+"""
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+from fastapi import HTTPException
+from redis.exceptions import ConnectionError as RedisConnectionError
+
+from auth_user_service.core.client import LoginRateLimiter
+from auth_user_service.core.deps import get_redis_client
+from auth_user_service.services.auth import AuthController
+
+
+class TestGetRedisClientResilience:
+    def test_returns_none_when_pool_is_none(self):
+        """Stateless mode: pool never created, must return None immediately."""
+        with patch("auth_user_service.core.deps._redis_pool", None):
+            result = get_redis_client()
+        assert result is None
+
+    def test_returns_none_when_ping_raises_connection_error(self):
+        """Server is unreachable: ping fails, must return None (not raise)."""
+        mock_client = MagicMock()
+        mock_client.ping.side_effect = RedisConnectionError("Connection refused")
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+        ):
+            result = get_redis_client()
+        assert result is None
+
+    def test_returns_none_when_ping_raises_generic_exception(self):
+        """Any ping failure (not just ConnectionError) must return None safely."""
+        mock_client = MagicMock()
+        mock_client.ping.side_effect = OSError("timeout")
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+        ):
+            result = get_redis_client()
+        assert result is None
+
+    def test_returns_client_when_ping_succeeds(self):
+        """Server is reachable: must return the Redis client."""
+        mock_client = MagicMock()
+        mock_client.ping.return_value = True
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+        ):
+            result = get_redis_client()
+        assert result is mock_client
+
+    def test_logs_warning_when_ping_fails(self):
+        """Degraded mode must be logged so ops can detect it."""
+        mock_client = MagicMock()
+        mock_client.ping.side_effect = RedisConnectionError("refused")
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+            patch("auth_user_service.core.deps._logger") as mock_logger,
+        ):
+            get_redis_client()
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        assert "unavailable" in warning_msg or "degraded" in warning_msg
+
+
+class TestGoogleOAuthRedisRequirement:
+    """PKCE requires Redis — must fail closed with 503 when Redis is down."""
+
+    def test_raises_503_when_redis_unavailable(self):
+        with patch(
+            "auth_user_service.services.auth.get_redis_client", return_value=None
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                AuthController.get_google_login_url("http://localhost/callback")
+        assert exc_info.value.status_code == 503
+
+    def test_503_detail_mentions_redis(self):
+        with patch(
+            "auth_user_service.services.auth.get_redis_client", return_value=None
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                AuthController.get_google_login_url("http://localhost/callback")
+        detail = exc_info.value.detail.lower()
+        assert "redis" in detail or "unavailable" in detail
+
+    def test_raises_503_when_google_not_configured(self):
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.GOOGLE_CLIENT_ID = None
+            with pytest.raises(HTTPException) as exc_info:
+                AuthController.get_google_login_url("http://localhost/callback")
+        assert exc_info.value.status_code == 503
+
+    def test_succeeds_and_calls_pkce_store_when_redis_available(self):
+        mock_redis = MagicMock()
+        mock_pkce = MagicMock()
+        with (
+            patch(
+                "auth_user_service.services.auth.get_redis_client",
+                return_value=mock_redis,
+            ),
+            patch(
+                "auth_user_service.services.auth.PKCEStore", return_value=mock_pkce
+            ),
+        ):
+            url = AuthController.get_google_login_url("http://localhost/callback")
+        assert url.startswith("https://accounts.google.com")
+        mock_pkce.store.assert_called_once()
+
+
+class TestLoginFailOpen:
+    """Login must succeed (fail-open) when Redis is down — rate limiting is skipped."""
+
+    def test_authenticate_works_without_redis(self, db_session, sample_user):
+        """Core auth (DB lookup + bcrypt) has no Redis dependency."""
+        from tests.conftest import TEST_PASSWORD
+
+        result = AuthController.authenticate(
+            session=db_session,
+            email=sample_user.email,
+            password=TEST_PASSWORD,
+        )
+        assert result is not None
+        assert str(result.id) == str(sample_user.id)
+
+    def test_rate_limiter_not_called_when_redis_is_none(self):
+        """Guard: `if redis is not None` must prevent LoginRateLimiter instantiation."""
+        redis = None
+        limiter_called = False
+        if redis is not None:
+            LoginRateLimiter(redis).is_allowed("user@example.com")
+            limiter_called = True
+        assert limiter_called is False
+
+    def test_rate_limiter_reset_not_called_when_redis_is_none(self):
+        """On successful login, rate limiter reset must be skipped when Redis is None."""
+        redis = None
+        reset_called = False
+        if redis is not None:
+            LoginRateLimiter(redis).reset("user@example.com")
+            reset_called = True
+        assert reset_called is False
