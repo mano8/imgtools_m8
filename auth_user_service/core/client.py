@@ -93,16 +93,14 @@ class PKCEStore:
         self.client.setex(key, self.TTL, code_verifier)
 
     def pop(self, state: str) -> Optional[str]:
+        """Atomically retrieve and delete the code_verifier for *state*.
+
+        Uses GETDEL so a concurrent second callback with the same state
+        cannot retrieve the verifier after the first caller has taken it.
+        Returns None if the state is unknown or already consumed.
         """
-        Retrieve and delete the code_verifier from Redis using the state.
-        """
-        key = self.PREFIX + state
-        code_verifier = self.client.get(key)
-        if code_verifier is not None:
-            # Delete after retrieval to prevent replay
-            self.client.delete(key)
-            return code_verifier
-        return None
+        result = self.client.getdel(self.PREFIX + state)
+        return result if result is not None else None
 
 
 class LoginRateLimiter:
