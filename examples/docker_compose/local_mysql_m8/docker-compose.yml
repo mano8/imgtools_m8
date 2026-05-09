@@ -14,11 +14,12 @@ services:
       - ./traefik/dynamic_conf.yml:/etc/traefik/dynamic_conf.yml:ro
       - ./traefik/certs:/etc/traefik/certs:ro
       - ./traefik/acme.json:/etc/traefik/acme.json
+    restart: unless-stopped
     networks:
       - m8_app_network
 
   m8_db:
-    image: bitnami/mariadb:12.2
+    image: mariadb:12-ubi
     volumes:
       - ./mysql_db:/bitnami/mariadb
     environment:
@@ -36,6 +37,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    restart: unless-stopped
     networks:
       - m8_app_network
 
@@ -60,6 +62,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
     networks:
       - m8_app_network
 
