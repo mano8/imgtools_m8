@@ -185,14 +185,32 @@ class TestGetTemplates:
 
 
 class TestGetRedisClient:
-    def test_returns_redis_instance(self):
+    def test_returns_redis_instance_when_ping_succeeds(self):
         from redis import Redis
 
-        client = get_redis_client()
-        assert isinstance(client, Redis)
+        mock_client = MagicMock(spec=Redis)
+        mock_client.ping.return_value = True
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+        ):
+            client = get_redis_client()
+        assert client is mock_client
 
     def test_returns_none_when_pool_is_none(self):
         with patch("auth_user_service.core.deps._redis_pool", None):
+            result = get_redis_client()
+        assert result is None
+
+    def test_returns_none_when_ping_fails(self):
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        mock_client = MagicMock()
+        mock_client.ping.side_effect = RedisConnectionError("refused")
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+        ):
             result = get_redis_client()
         assert result is None
 
