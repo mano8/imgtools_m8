@@ -200,16 +200,29 @@ class TestRedisRefreshStore:
         self.mock_redis.exists.return_value = 0
         assert self.store.is_valid("abc-jti") is False
 
-    def test_rotate_deletes_old_and_registers_new_atomically(self):
-        mock_pipe = MagicMock()
-        self.mock_redis.pipeline.return_value = mock_pipe
-
+    def test_rotate_uses_lua_not_pipeline(self):
+        self.mock_redis.eval.return_value = 1
         self.store.rotate("old-jti", "new-jti", 3600)
+        self.mock_redis.eval.assert_called_once()
+        self.mock_redis.pipeline.assert_not_called()
 
-        self.mock_redis.pipeline.assert_called_once()
-        mock_pipe.delete.assert_called_once_with("rt:old-jti")
-        mock_pipe.setex.assert_called_once_with("rt:new-jti", 3600, "1")
-        mock_pipe.execute.assert_called_once()
+    def test_rotate_returns_true_when_old_jti_present(self):
+        self.mock_redis.eval.return_value = 1
+        assert self.store.rotate("old-jti", "new-jti", 3600) is True
+
+    def test_rotate_returns_false_when_old_jti_absent(self):
+        """Lua script returns 0 when old JTI is gone — race lost or reuse attack."""
+        self.mock_redis.eval.return_value = 0
+        assert self.store.rotate("old-jti", "new-jti", 3600) is False
+
+    def test_rotate_passes_correct_keys_and_ttl(self):
+        self.mock_redis.eval.return_value = 1
+        self.store.rotate("old-jti", "new-jti", 3600)
+        args = self.mock_redis.eval.call_args[0]
+        assert args[1] == 2  # numkeys
+        assert args[2] == "rt:old-jti"
+        assert args[3] == "rt:new-jti"
+        assert args[4] == "3600"
 
     def test_revoke_deletes_key(self):
         self.store.revoke("abc-jti")
