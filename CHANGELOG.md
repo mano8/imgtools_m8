@@ -73,6 +73,25 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   token reuse across different services or issuers.  Leave unset for backward-compatible permissive
   validation (default).
 
+- **JWKS endpoint + `kid` header for RS256/ES256** (`routes/jwks.py`, `services/auth.py`,
+  `core/security.py`): access tokens issued with asymmetric algorithms now carry a `kid`
+  header so consumer services can select the correct public key from the JWKS endpoint.
+  A `/.well-known/jwks.json` endpoint is served at `{API_PREFIX}/.well-known/jwks.json`,
+  returning the active public key in JWK Set format.  HS256 configurations return
+  `{"keys": []}` — the shared secret is never published.  The key ID is taken from
+  `ACCESS_KEY_ID` when set; otherwise derived as the first 16 hex chars of the SHA-256
+  fingerprint of the public key PEM, making it stable across restarts without configuration.
+  Consumer services set `JWKS_URI` and let `build_access_validator` wire up
+  `JwksKeyResolver` automatically (SDK v0.5.0).
+- **`JwksKeyResolver`** (`auth_sdk_m8/security/jwks_resolver.py`, SDK v0.5.0): fetches
+  the JWKS endpoint once, caches keys by `kid` for `JWKS_CACHE_TTL_SECONDS` (default 300 s),
+  and refreshes automatically on cache miss (unknown `kid`) to support zero-downtime key
+  rotation.  Uses stdlib `urllib.request` — no new runtime dependency.
+- **`ACCESS_KEY_ID` / `JWKS_URI` / `JWKS_CACHE_TTL_SECONDS` in `CommonSettings`**
+  (SDK v0.5.0): three new optional fields inherited by both services.  `JWKS_URI` enables
+  automatic `JwksKeyResolver` wiring in `build_access_validator`; `ACCESS_KEY_ID` pins a
+  fixed key ID when explicit rotation labelling is required.
+
 ### Added
 
 - **`TOKEN_ISSUER` / `TOKEN_AUDIENCE` in `CommonSettings`** (SDK v0.4.2): both optional fields with

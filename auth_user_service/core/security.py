@@ -37,6 +37,7 @@ class SecurityHelper(ComSecurityHelper):
         secrets: TokenSecret,
         issuer: Optional[str] = None,
         audience: Optional[str] = None,
+        kid: Optional[str] = None,
     ) -> Union[jwt.PyJWT, str]:
         """
         Create a JWT access token.
@@ -48,6 +49,8 @@ class SecurityHelper(ComSecurityHelper):
                 The time duration after which the token expires.
             issuer: Optional ``iss`` claim embedded in the token.
             audience: Optional ``aud`` claim embedded in the token.
+            kid: Optional key ID embedded in the JWT ``kid`` header.
+                Required for JWKS-based key rotation with RS256/ES256.
 
         Returns:
             str:
@@ -65,6 +68,7 @@ class SecurityHelper(ComSecurityHelper):
             to_encode,
             secrets.secret_key.get_secret_value(),
             algorithm=secrets.algorithm,
+            headers={"kid": kid} if kid else None,
         )
         return encoded_jwt, jti
 
