@@ -58,6 +58,12 @@ def _now_iso() -> str:
 
 
 def _client_ip(request: Request) -> str:
+    # Correctness relies on Traefik stripping client-supplied X-Forwarded-For
+    # at the entrypoint boundary (forwardedHeaders.trustedIPs in traefik.yml).
+    # The leftmost IP is the real client only because the proxy chain is trusted.
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -80,9 +86,7 @@ def login_access_token(
         if not rate_limiter.is_allowed(email):
             if _m and _m.login_attempts_total:
                 _m.login_attempts_total.labels(result="rate_limited").inc()
-            logger.warning(
-                "event=login.rate_limited ip=%s ts=%s", ip, _now_iso()
-            )
+            logger.warning("event=login.rate_limited ip=%s ts=%s", ip, _now_iso())
             raise HTTPException(
                 status_code=429,
                 detail="Too many login attempts. Try again in 15 minutes.",
@@ -188,7 +192,9 @@ def login_refresh_token(
         # Rotate first: if the Lua script finds old_jti already gone, a concurrent
         # request won the race or this is a reuse attack — reject before any DB write.
         if redis is not None:
-            rotated = RedisRefreshStore(redis).rotate(old_jti, new_jti, _REFRESH_TTL_SECONDS)
+            rotated = RedisRefreshStore(redis).rotate(
+                old_jti, new_jti, _REFRESH_TTL_SECONDS
+            )
             if not rotated:
                 if _m and _m.token_refresh_total:
                     _m.token_refresh_total.labels(result="revoked").inc()
@@ -201,9 +207,7 @@ def login_refresh_token(
                 )
                 # Reuse confirmed — invalidate every session for this user so the
                 # attacker's already-rotated tokens also stop working.
-                SessionController.revoke_all_user_sessions(
-                    session, str(user_id), redis
-                )
+                SessionController.revoke_all_user_sessions(session, str(user_id), redis)
                 response.delete_cookie(key="refresh_token")
                 raise HTTPException(
                     status_code=401,

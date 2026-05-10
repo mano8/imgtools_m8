@@ -222,7 +222,8 @@ Example response when fully operational:
   "redis": "ok",
   "database": "ok",
   "revocation_available": true,
-  "rate_limiting_available": true
+  "rate_limiting_available": true,
+  "degraded_since": null
 }
 ```
 
@@ -236,9 +237,45 @@ Example response with Redis down in stateful mode:
   "redis": "unavailable",
   "database": "ok",
   "revocation_available": false,
-  "rate_limiting_available": false
+  "rate_limiting_available": false,
+  "degraded_since": "2026-05-10T12:34:56.789123+00:00"
 }
 ```
+
+`degraded_since` is the UTC timestamp when Redis first became unreachable in the current process lifetime, or `null` when Redis is healthy.  Use it in alerting to detect silent degradation that persists beyond an acceptable window.
+
+### Running behind a reverse proxy (real client IP)
+
+Audit logs, rate-limit keys, and reuse-detection events all record the client IP.  When the service runs behind Traefik (or any reverse proxy) this requires a coordinated three-layer setup — failing to configure any one layer either breaks IP attribution or opens a spoofing path.
+
+**1. Traefik** — add `forwardedHeaders.trustedIPs` to each entrypoint in `traefik.yml`:
+
+```yaml
+entryPoints:
+  api:
+    address: ":9000"
+    forwardedHeaders:
+      trustedIPs:
+        - "127.0.0.1/32"
+        - "172.16.0.0/12"   # Docker bridge networks
+        - "::1/128"
+```
+
+This instructs Traefik to strip any `X-Forwarded-For` sent by a client and replace it with the real peer address.  Without this, clients can forge their IP.
+
+**2. Uvicorn** — the startup script (`docker_start.sh`) reads `TRUSTED_PROXY_IPS` (defaults to `172.16.0.0/12`) and passes it to uvicorn:
+
+```text
+--proxy-headers --forwarded-allow-ips=<TRUSTED_PROXY_IPS>
+```
+
+Set `TRUSTED_PROXY_IPS` in the container environment to match your actual Docker network CIDR.  Never use `*` — that would let any client spoof their IP.
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `TRUSTED_PROXY_IPS` | `172.16.0.0/12` | CIDR(s) uvicorn trusts as a reverse proxy source for `X-Forwarded-For` |
+
+**3. Application** — `_client_ip()` reads the leftmost IP from `X-Forwarded-For`, which is the real client address only because the proxy chain above has been sanitized.  Without layers 1 and 2 this value is untrustworthy.
 
 ---
 
