@@ -8,6 +8,24 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Real client IP attribution behind Traefik** (`routes/login.py`,
+  `scripts/docker_start.sh`, all three `traefik.yml` configs): audit log fields
+  (`ip=`) and rate-limit keys previously captured Traefik's Docker bridge IP
+  (`172.x.x.x`) instead of the real client address, making all forensic events,
+  abuse correlation, and rate-limit telemetry unreliable.
+  Three-layer fix applied:
+  1. **Traefik** — `forwardedHeaders.trustedIPs` added to `websecure` and `api`
+     entrypoints (`127.0.0.1/32`, `172.16.0.0/12`, `::1/128`).  Traefik will
+     now strip any client-supplied `X-Forwarded-For` and replace it with the
+     real peer address — preventing IP spoofing.
+  2. **Uvicorn** — `--proxy-headers --forwarded-allow-ips=${TRUSTED_PROXY_IPS:-172.16.0.0/12}`
+     added to both the production and debugpy startup paths in `docker_start.sh`.
+     Uvicorn now reads `X-Forwarded-For` only from the trusted CIDR (Traefik),
+     not from arbitrary clients.  Override `TRUSTED_PROXY_IPS` in env to match
+     custom deployment subnets; never use `*`.
+  3. **Application** — `_client_ip(request)` in `routes/login.py` now reads
+     `request.headers["x-forwarded-for"].split(",")[0]` first, falling back to
+     `request.client.host` when the header is absent.
 - **Google OAuth refresh JTI missing from Redis allowlist** (`routes/google_auth.py`):
   `google_auth_callback` called `create_auth_session` but never registered the refresh JTI in
   `RedisRefreshStore`.  In `stateful`/`hybrid` mode this caused the first refresh after an OAuth

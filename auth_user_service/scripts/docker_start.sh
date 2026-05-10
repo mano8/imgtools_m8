@@ -24,6 +24,10 @@ if ! ./auth_user_service/scripts/pre_start.sh; then
     exit 1  # Ensure the script exits if needed
 fi
 
+# CIDRs that uvicorn will trust as a reverse proxy for X-Forwarded-For.
+# Override via env to match your deployment network.
+TRUSTED_PROXY_IPS="${TRUSTED_PROXY_IPS:-172.16.0.0/12}"
+
 if [ "$VSCODE_DEBUG" = "true" ]; then
   echo "🔍 Starting auth_user_service under vscode debugpy…"
   # Wait for VS Code to attach before running Uvicorn
@@ -31,12 +35,17 @@ if [ "$VSCODE_DEBUG" = "true" ]; then
     --listen 0.0.0.0:5678 \
     --wait-for-client \
     -m uvicorn auth_user_service.main:app \
-      --host 0.0.0.0 --port 8000 --reload; then
+      --host 0.0.0.0 --port 8000 --reload \
+      --proxy-headers \
+      --forwarded-allow-ips="${TRUSTED_PROXY_IPS}"; then
         echo "Uvicorn failed to start auth_user_service. Dropping to a shell for debugging."
         exit 1  # Ensure the script exits if needed
     fi
 else
-    if ! uvicorn auth_user_service.main:app --host 0.0.0.0 --port 8000; then
+    if ! uvicorn auth_user_service.main:app \
+        --host 0.0.0.0 --port 8000 \
+        --proxy-headers \
+        --forwarded-allow-ips="${TRUSTED_PROXY_IPS}"; then
         echo "Uvicorn failed to start. Dropping to a shell for debugging."
         exit 1  # Ensure the script exits if needed
     fi
