@@ -36,6 +36,25 @@ from auth_sdk_m8.schemas.auth import (
 _DUMMY_HASH: str = SecurityHelper.get_password_hash(secrets.token_hex(32))
 
 
+def _resolve_kid(algo: str) -> Optional[str]:
+    """Return the key ID to embed in the JWT ``kid`` header.
+
+    Uses ``ACCESS_KEY_ID`` from settings when explicitly configured.
+    For asymmetric algorithms, falls back to a stable 16-char SHA-256
+    fingerprint of the public key so consumers can match keys via JWKS
+    without requiring a configured key ID.
+    Returns ``None`` for symmetric (HS256) algorithms — the secret must
+    not be published.
+    """
+    if algo not in ASYMMETRIC_ALGORITHMS:
+        return None
+    explicit: Optional[str] = getattr(settings, "ACCESS_KEY_ID", None) or None
+    if explicit:
+        return explicit
+    pub = settings.ACCESS_PUBLIC_KEY or ""
+    return hashlib.sha256(pub.strip().encode()).hexdigest()[:16]
+
+
 class AuthController:
     """
     Manages OAuth2 with PKCE for Google authorization.
@@ -182,6 +201,7 @@ class AuthController:
             secrets=access_signing_secret,
             issuer=settings.TOKEN_ISSUER or None,
             audience=settings.TOKEN_AUDIENCE or None,
+            kid=_resolve_kid(algo),
         )
         refresh_token, _ = SecurityHelper.create_refresh_token(
             data=TokenMinimalData(

@@ -137,6 +137,7 @@ Update `DB_HOST`, `DB_PORT`, and `DB_DATABASE` accordingly. Both drivers ship in
 | `TOKENS_ENCRYPTION_KEY` | yes | — | Token payload encryption key |
 | `TOKEN_ISSUER` | no | — | When set, embeds `iss` in issued tokens and requires a match on validation |
 | `TOKEN_AUDIENCE` | no | — | When set, embeds `aud` in issued tokens and requires a match on validation |
+| `ACCESS_KEY_ID` | no | — | Explicit `kid` embedded in JWT headers and JWKS; auto-derived from key fingerprint when unset |
 
 **HS256 (default)** — set `ACCESS_SECRET_KEY` and `REFRESH_SECRET_KEY`; leave `ACCESS_PRIVATE_KEY` / `ACCESS_PUBLIC_KEY` blank.
 
@@ -331,7 +332,20 @@ from auth_sdk_m8.security import build_access_validator, ValidationHooks
 _validator = build_access_validator(settings, hooks=_hooks)
 ```
 
-`build_access_validator` reads `ACCESS_TOKEN_ALGORITHM`, `ACCESS_SECRET_KEY` / `ACCESS_PUBLIC_KEY`, `TOKEN_ISSUER`, and `TOKEN_AUDIENCE` directly from a `CommonSettings` instance.  No boilerplate needed.
+`build_access_validator` reads `ACCESS_TOKEN_ALGORITHM`, `ACCESS_SECRET_KEY` / `ACCESS_PUBLIC_KEY`, `TOKEN_ISSUER`, `TOKEN_AUDIENCE`, and `JWKS_URI` directly from a `CommonSettings` instance.  No boilerplate needed.
+
+### JWKS-based key validation (RS256/ES256)
+
+When `JWKS_URI` is set in the consumer's settings, `build_access_validator` automatically wires up `JwksKeyResolver` instead of a static public key.  The resolver fetches `/.well-known/jwks.json` from the auth service, caches keys by `kid`, and refreshes on cache miss — supporting zero-downtime key rotation.
+
+```ini
+# consumer .env
+ACCESS_TOKEN_ALGORITHM=RS256
+JWKS_URI=http://auth-service/user/.well-known/jwks.json
+JWKS_CACHE_TTL_SECONDS=300   # optional, default 300
+```
+
+The auth service serves the JWKS endpoint at `{API_PREFIX}/.well-known/jwks.json`.  HS256 configurations return `{"keys": []}` — the shared secret is never published.
 
 ### Revocation check (stateful mode)
 
