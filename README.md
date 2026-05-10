@@ -244,6 +244,18 @@ Example response with Redis down in stateful mode:
 
 `degraded_since` is the UTC timestamp when Redis first became unreachable in the current process lifetime, or `null` when Redis is healthy.  Use it in alerting to detect silent degradation that persists beyond an acceptable window.
 
+### Deployment modes
+
+The stack supports three security postures depending on the target environment.  Configure the appropriate one before going live.
+
+| Mode | `API_BIND_IP` | TLS | HSTS | Secure cookies | Use when |
+| ---- | ------------- | --- | ---- | -------------- | -------- |
+| **Development** | `0.0.0.0` *(or omit)* | self-signed OK | off | off (`ENVIRONMENT=local`) | local machine only, Docker dev loop |
+| **Private LAN / homelab** | `0.0.0.0` or `127.0.0.1` | self-signed / local CA recommended | off | on | Raspberry Pi, NAS, private LAN, edge devices |
+| **Public / production** | `127.0.0.1` | valid cert required | on (opt-in, see below) | on | VPS, cloud, any internet-facing host |
+
+> Self-signed certificates with a local CA (e.g. [mkcert](https://github.com/FiloSottile/mkcert)) are a good fit for private LAN deployments.  Modern LANs are not uniformly trusted — IoT devices, guest Wi-Fi, and ARP spoofing are real risks even on a home network.
+
 ### Running behind a reverse proxy (real client IP)
 
 Audit logs, rate-limit keys, and reuse-detection events all record the client IP.  When the service runs behind Traefik (or any reverse proxy) this requires a coordinated three-layer setup — failing to configure any one layer either breaks IP attribution or opens a spoofing path.
@@ -273,9 +285,28 @@ Set `TRUSTED_PROXY_IPS` in the container environment to match your actual Docker
 
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
+| `API_BIND_IP` | `127.0.0.1` | Host IP Traefik binds port 9000 to. Set to `0.0.0.0` for LAN/public exposure |
 | `TRUSTED_PROXY_IPS` | `172.16.0.0/12` | CIDR(s) uvicorn trusts as a reverse proxy source for `X-Forwarded-For` |
 
 **3. Application** — `_client_ip()` reads the leftmost IP from `X-Forwarded-For`, which is the real client address only because the proxy chain above has been sanitized.  Without layers 1 and 2 this value is untrustworthy.
+
+### HSTS (opt-in, public deployments only)
+
+`Strict-Transport-Security` is **not enabled by default** because in self-hosted and LAN environments it can cause serious breakage: once a browser receives the header it will refuse all HTTP connections to that hostname for the configured period — even if you later disable HSTS or rotate to a new certificate.
+
+To enable HSTS, uncomment the relevant block in `traefik/dynamic_conf.yml`:
+
+```yaml
+# stsSeconds: 31536000       # 1 year
+# stsIncludeSubdomains: true
+# stsPreload: false
+```
+
+Only do this when:
+
+- TLS is correctly configured with a stable, trusted certificate
+- The hostname will remain HTTPS-only for the full `stsSeconds` period
+- You understand that `stsPreload: true` permanently adds the domain to browser preload lists
 
 ---
 
