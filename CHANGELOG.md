@@ -8,6 +8,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Secure-by-default API port binding** (all three `docker-compose.yml`): Traefik's
+  port 9000 was unconditionally bound to `0.0.0.0`, exposing the plaintext API entrypoint
+  on all host interfaces including public NICs.  The binding is now
+  `${API_BIND_IP:-127.0.0.1}:9000:9000` — localhost-only by default, preventing
+  accidental exposure on cloud hosts, CI runners, and multi-tenant machines.
+  Set `API_BIND_IP=0.0.0.0` in the compose env to restore LAN / homelab access.
+- **HSTS opt-in with explicit warning** (all three `traefik/dynamic_conf.yml`):
+  `Strict-Transport-Security` was absent from the security-headers middleware.  Rather
+  than enabling it unconditionally, the header is added as a commented-out block with
+  a prominent warning: once sent, browsers refuse all HTTP connections to the hostname
+  for the configured period — enabling it prematurely in self-hosted / LAN environments
+  with self-signed certificates can lock browsers out until the HSTS cache expires.
+  Operators must explicitly uncomment `stsSeconds`, `stsIncludeSubdomains`, and
+  (optionally) `stsPreload` after confirming TLS is stable and the hostname will remain
+  HTTPS-only.
 - **Real client IP attribution behind Traefik** (`routes/login.py`,
   `scripts/docker_start.sh`, all three `traefik.yml` configs): audit log fields
   (`ip=`) and rate-limit keys previously captured Traefik's Docker bridge IP
