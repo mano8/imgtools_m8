@@ -10,7 +10,7 @@ from typing import Annotated, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
-from redis import Redis
+from redis import ConnectionPool, Redis
 
 from auth_sdk_m8.core.exceptions import InvalidToken
 from auth_sdk_m8.schemas.base import RoleType
@@ -47,23 +47,31 @@ _hooks: ValidationHooks = _LoggingHooks()
 # iss/aud enforcement is opt-in via TOKEN_ISSUER / TOKEN_AUDIENCE settings.
 _validator = build_access_validator(settings, _hooks)
 
+# Shared connection pool — avoids creating a new TCP connection on every
+# request.  Skipped entirely in stateless mode (no Redis needed).
+_redis_pool: Optional[ConnectionPool] = (
+    ConnectionPool(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        username=settings.REDIS_USER,
+        password=settings.REDIS_PASSWORD.get_secret_value() or None,
+        decode_responses=True,
+    )
+    if settings.TOKEN_MODE != "stateless"
+    else None
+)
+
 
 def get_redis_client() -> Optional[Redis]:
-    """Return a Redis client, or None when Redis is unavailable.
+    """Return a Redis client from the shared pool, or None when unavailable.
 
-    A ping check ensures routes that guard on ``if redis is not None:``
+    A ping is issued on every call so that ``if redis is not None:`` guards
     correctly reflect the actual connection state.
     """
+    if _redis_pool is None:
+        return None
     try:
-        client = Redis(
-            host=settings.REDIS_HOST,
-            port=settings.REDIS_PORT,
-            username=settings.REDIS_USER,
-            password=settings.REDIS_PASSWORD.get_secret_value() or None,
-            encoding="utf-8",
-            decode_responses=True,
-            socket_connect_timeout=1,
-        )
+        client = Redis(connection_pool=_redis_pool)
         client.ping()
         return client
     except Exception:

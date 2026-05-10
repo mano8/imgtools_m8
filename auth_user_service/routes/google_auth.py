@@ -13,7 +13,7 @@ from auth_user_service.core.deps import SessionDep
 from auth_user_service.services.client_sessions import SessionController
 from auth_user_service.services.users import UserController
 from auth_user_service.services.oauth import OAuthController
-from auth_user_service.core.client import PKCEStore
+from auth_user_service.core.client import PKCEStore, RedisRefreshStore
 from auth_user_service.core.deps import get_redis_client
 from auth_user_service.core.config import settings
 from auth_sdk_m8.observability.metrics import get as _get_metrics
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/google-auth", tags=["google-auth"])
 
 _SECURE_COOKIE = settings.ENVIRONMENT != "local"
+_REFRESH_TTL_SECONDS = settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60
 
 
 @router.get("/oauth-callback/")
@@ -98,6 +99,11 @@ async def google_auth_callback(
                 refresh=SecretStr(oauth_token.refresh_token),
             ),
         )
+
+        # Register the refresh JTI in the Redis allowlist so rotation can
+        # validate it — mirrors the login flow (login.py line 129-130).
+        if settings.TOKEN_MODE != "stateless":
+            RedisRefreshStore(redis).register(jti, _REFRESH_TTL_SECONDS)
 
         SessionController.purge_expired_sessions(
             session=session,
