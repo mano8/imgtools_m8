@@ -5,7 +5,7 @@ services:
       - "8000:80"
       - "4430:443"
       - "127.0.0.1:8080:8080"   # Dashboard — localhost only
-      - "9000:9000"             # services entryPoint
+      - "${API_BIND_IP:-127.0.0.1}:9000:9000"   # services entryPoint — override API_BIND_IP for LAN/public exposure
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro

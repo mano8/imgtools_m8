@@ -62,3 +62,16 @@ http:
         customResponseHeaders:
           X-Robots-Tag: "noindex,nofollow"
           Server: ""
+        # ── HSTS — opt-in, public/production deployments only ────────────────
+        # WARNING: enabling HSTS instructs browsers to refuse all HTTP connections
+        # to this host for the duration of stsSeconds — even after you disable it.
+        # Do NOT enable unless:
+        #   - TLS is correctly configured with a stable, trusted certificate
+        #   - this hostname will remain HTTPS-only for the full stsSeconds period
+        # In self-hosted / LAN deployments, enabling HSTS prematurely can lock
+        # browsers out until the HSTS cache expires (up to 1 year).
+        # Uncomment the block below only when the above conditions are met:
+        #
+        # stsSeconds: 31536000       # 1 year
+        # stsIncludeSubdomains: true
+        # stsPreload: false          # only set true after submitting to HSTS preload list
