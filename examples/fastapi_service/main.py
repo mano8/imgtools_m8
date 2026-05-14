@@ -120,7 +120,11 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 
 if settings.METRICS_ENABLED:
 
-    @app.get(f"{settings.API_PREFIX}/metrics", include_in_schema=False, tags=["observability"])
+    @app.get(
+        f"{settings.API_PREFIX}/metrics",
+        include_in_schema=False,
+        tags=["observability"],
+    )
     def metrics_endpoint() -> Response:
         """Expose Prometheus metrics."""
         content, content_type = _metrics.render()
