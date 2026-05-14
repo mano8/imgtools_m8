@@ -30,7 +30,7 @@ def _startup_checks() -> None:
 
     check_config_health(settings, _logger)
 
-    if settings.TOKEN_MODE != "stateless":
+    if settings.requires_redis:
         try:
             from fastapi_service.core.deps import get_redis_client  # type: ignore[import]
 

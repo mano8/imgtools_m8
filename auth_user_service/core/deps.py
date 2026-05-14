@@ -73,7 +73,7 @@ _redis_pool: Optional[ConnectionPool] = (
         password=settings.REDIS_PASSWORD.get_secret_value() or None,
         decode_responses=True,
     )
-    if settings.TOKEN_MODE != "stateless"
+    if settings.requires_redis
     else None
 )
 
@@ -140,7 +140,7 @@ def get_current_user(token: TokenDep) -> UserModel:
 
     # JTI blacklist check only applies in stateful mode.
     # In hybrid mode, access tokens are stateless; only refresh JTIs are tracked.
-    if settings.TOKEN_MODE == "stateful":
+    if settings.is_stateful:
         redis = get_redis_client()
         if redis is not None and RedisSessionManager(redis).is_blacklisted(payload.jti):
             _m = _get_metrics()

@@ -157,6 +157,7 @@ class TestJWTRevocation:
             patch("auth_user_service.core.deps.get_redis_client") as mock_get_redis,
         ):
             mock_cfg.TOKEN_MODE = "hybrid"
+            mock_cfg.is_stateful = False
             get_current_user(token=token)
         mock_get_redis.assert_not_called()
 
@@ -167,6 +168,7 @@ class TestJWTRevocation:
             patch("auth_user_service.core.deps.get_redis_client") as mock_get_redis,
         ):
             mock_cfg.TOKEN_MODE = "stateless"
+            mock_cfg.is_stateful = False
             get_current_user(token=token)
         mock_get_redis.assert_not_called()
 

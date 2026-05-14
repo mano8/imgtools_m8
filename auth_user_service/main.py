@@ -36,7 +36,7 @@ def _startup_checks() -> None:
 
     check_config_health(settings, _logger)
 
-    if settings.TOKEN_MODE != "stateless":
+    if settings.requires_redis:
         redis = get_redis_client()
         if redis is None:
             _logger.critical(
@@ -51,7 +51,7 @@ def _startup_checks() -> None:
 
     if not (
         settings.AUTH_SERVICE_ROLE == "consumer"
-        and settings.TOKEN_MODE == "stateless"
+        and settings.is_stateless
     ):
         try:
             with engine.connect() as conn:

@@ -102,7 +102,7 @@ async def google_auth_callback(
 
         # Register the refresh JTI in the Redis allowlist so rotation can
         # validate it — mirrors the login flow (login.py line 129-130).
-        if settings.TOKEN_MODE != "stateless":
+        if not settings.is_stateless:
             RedisRefreshStore(redis).register(jti, _REFRESH_TTL_SECONDS)
 
         SessionController.purge_expired_sessions(
