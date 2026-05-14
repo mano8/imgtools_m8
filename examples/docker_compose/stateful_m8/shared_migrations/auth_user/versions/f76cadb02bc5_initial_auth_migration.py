@@ -1,8 +1,8 @@
 """Initial auth migration
 
-Revision ID: 0edf58af7e6c
+Revision ID: f76cadb02bc5
 Revises:
-Create Date: 2026-05-07 18:39:24.379593
+Create Date: 2026-05-11 12:27:31.727421
 
 """
 
@@ -11,11 +11,10 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 import sqlmodel
-import auth_user_service.core.db_utils
 
 
 # revision identifiers, used by Alembic.
-revision: str = "0edf58af7e6c"
+revision: str = "f76cadb02bc5"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -59,9 +58,7 @@ def upgrade() -> None:
             sa.Enum("SUPERADMIN", "ADMIN", "WRITER", "READER", "USER", name="roletype"),
             nullable=False,
         ),
-        sa.Column(
-            "id", auth_user_service.core.db_utils.UUIDChar(length=36), nullable=False
-        ),
+        sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column(
             "hashed_password",
             sqlmodel.sql.sqltypes.AutoString(length=255),
@@ -102,11 +99,7 @@ def upgrade() -> None:
         sa.Column(
             "key_hash", sqlmodel.sql.sqltypes.AutoString(length=128), nullable=False
         ),
-        sa.Column(
-            "user_id",
-            auth_user_service.core.db_utils.UUIDChar(length=36),
-            nullable=False,
-        ),
+        sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column("last_used_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["auth_user.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -160,11 +153,7 @@ def upgrade() -> None:
         ),
         sa.Column("external_token_expires_at", sa.DateTime(), nullable=True),
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column(
-            "user_id",
-            auth_user_service.core.db_utils.UUIDChar(length=36),
-            nullable=False,
-        ),
+        sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["auth_user.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         mysql_charset="utf8mb4",
@@ -182,11 +171,7 @@ def upgrade() -> None:
     op.create_table(
         "auth_rate_limit",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column(
-            "user_id",
-            auth_user_service.core.db_utils.UUIDChar(length=36),
-            nullable=False,
-        ),
+        sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column(
             "period", sa.Enum("MINUTE", "HOUR", "DAY", name="period"), nullable=False
         ),
