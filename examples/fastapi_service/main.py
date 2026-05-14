@@ -1,5 +1,8 @@
 """fastapi_service/fastapi/main.py"""
 
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Response
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
@@ -12,11 +15,44 @@ from auth_sdk_m8.observability.middleware import MetricsMiddleware
 
 # pylint: disable=line-too-long
 
+_logger = logging.getLogger(__name__)
+
 _metrics.setup(
     enabled=settings.METRICS_ENABLED,
     groups_str=settings.METRICS_GROUPS,
     api_prefix=settings.API_PREFIX,
 )
+
+
+def _startup_checks() -> None:
+    """Log env-var consistency warnings and verify Redis when needed."""
+    from auth_sdk_m8.core.config import check_config_health
+
+    check_config_health(settings, _logger)
+
+    if settings.TOKEN_MODE != "stateless":
+        try:
+            from fastapi_service.core.deps import get_redis_client  # type: ignore[import]
+
+            redis = get_redis_client()
+            if redis is None:
+                _logger.critical(
+                    "STARTUP: Redis unreachable but TOKEN_MODE=%s — "
+                    "token revocation checks are disabled",
+                    settings.TOKEN_MODE,
+                )
+            else:
+                _logger.info(
+                    "STARTUP: Redis connected OK (TOKEN_MODE=%s)", settings.TOKEN_MODE
+                )
+        except ImportError:
+            _logger.debug("STARTUP: no Redis dep module — skipping Redis check")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _startup_checks()
+    yield
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -41,6 +77,7 @@ app = FastAPI(
     docs_url=f"{settings.API_PREFIX}/docs",
     redoc_url=f"{settings.API_PREFIX}/redoc",
     generate_unique_id_function=custom_generate_unique_id,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
