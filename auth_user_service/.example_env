@@ -51,6 +51,8 @@ SECRET_KEY="changethis"
 ACCESS_SECRET_KEY="changethis"
 REFRESH_SECRET_KEY="changethis"
 TOKEN_ALGORITHM="HS256"
+# issuer — this service signs tokens and serves /.well-known/jwks.json
+AUTH_SERVICE_ROLE="issuer"
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_MINUTES=3600
 

@@ -51,6 +51,8 @@ SECRET_KEY="changethis"
 ACCESS_SECRET_KEY="changethis"
 REFRESH_SECRET_KEY="changethis"
 TOKEN_ALGORITHM="HS256"
+# consumer — this service only validates tokens; it must not hold a private key
+AUTH_SERVICE_ROLE="consumer"
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_MINUTES=3600
 # Must match auth_user_service TOKEN_MODE exactly.
