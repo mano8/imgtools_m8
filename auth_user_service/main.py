@@ -107,6 +107,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=settings.TOKENS_ENCRYPTION_KEY.get_secret_value(),
     max_age=3600,
+    https_only=settings.SESSION_COOKIE_SECURE,
 )
 
 if settings.METRICS_ENABLED:
