@@ -49,12 +49,16 @@ def _startup_checks() -> None:
                 "STARTUP: Redis connected OK (TOKEN_MODE=%s)", settings.TOKEN_MODE
             )
 
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        _logger.info("STARTUP: Database connected OK")
-    except Exception as ex:
-        _logger.critical("STARTUP: Database unreachable: %s", ex)
+    if not (
+        settings.AUTH_SERVICE_ROLE == "consumer"
+        and settings.TOKEN_MODE == "stateless"
+    ):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            _logger.info("STARTUP: Database connected OK")
+        except Exception as ex:
+            _logger.critical("STARTUP: Database unreachable: %s", ex)
 
 
 @asynccontextmanager
@@ -81,9 +85,11 @@ def custom_generate_unique_id(route: APIRoute) -> str:
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_PREFIX}/openapi.json",
-    docs_url=f"{settings.API_PREFIX}/docs",
-    redoc_url=f"{settings.API_PREFIX}/redoc",
+    openapi_url=(
+        f"{settings.API_PREFIX}/openapi.json" if settings.SET_OPEN_API else None
+    ),
+    docs_url=f"{settings.API_PREFIX}/docs" if settings.SET_DOCS else None,
+    redoc_url=f"{settings.API_PREFIX}/redoc" if settings.SET_REDOC else None,
     generate_unique_id_function=custom_generate_unique_id,
     lifespan=lifespan,
 )

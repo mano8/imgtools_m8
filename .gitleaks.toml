@@ -1,0 +1,19 @@
+title = "fa-auth-m8 gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Project-wide allowlist"
+paths = [
+  # Example env files contain placeholder values, not real secrets
+  '''\.(example_env)$''',
+  # Test fixtures may contain deterministic low-entropy test values
+  '''tests/''',
+  # Docker compose example readmes and docs
+  '''examples/docker_compose/.+/README''',
+]
+# Add SHAs of any prior accidental secret commits here after rotation:
+# commits = [
+#   "abc123def456",  # description of what was rotated and when
+# ]

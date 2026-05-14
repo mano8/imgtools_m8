@@ -10,9 +10,9 @@ DOMAIN="localhost"
 ENVIRONMENT="local"
 
 API_PREFIX="/user"
-SET_OPEN_API=true
-SET_DOCS=true
-SET_REDOC=true
+SET_OPEN_API=true    # set false in production to hide the schema endpoint
+SET_DOCS=true        # set false in production to disable Swagger UI
+SET_REDOC=true       # set false in production to disable ReDoc
 PROJECT_NAME="M8App"
 STACK_NAME="full-stack-m8-app"
 
