@@ -49,10 +49,7 @@ def _startup_checks() -> None:
                 "STARTUP: Redis connected OK (TOKEN_MODE=%s)", settings.TOKEN_MODE
             )
 
-    if not (
-        settings.AUTH_SERVICE_ROLE == "consumer"
-        and settings.is_stateless
-    ):
+    if not (settings.AUTH_SERVICE_ROLE == "consumer" and settings.is_stateless):
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
