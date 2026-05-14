@@ -6,17 +6,20 @@ A self-contained FastAPI authentication microservice designed to run as a Docker
 
 ## Features
 
-- Email/password login with bcrypt password hashing
-- Google OAuth2 login
-- JWT access + refresh token pair (refresh token delivered via HttpOnly cookie, rotated on every use)
-- Session tracking and revocation via Redis
-- Login rate limiting per email (Redis-backed)
+- Email/password login with bcrypt password hashing (timing-attack safe)
+- Google OAuth2 login with PKCE
+- JWT access + refresh token pair (refresh token in HttpOnly cookie, atomically rotated on every use)
+- RS256 / ES256 asymmetric signing with JWKS endpoint for zero-downtime key rotation
+- Opt-in `iss`/`aud` JWT claim enforcement to prevent cross-service token reuse
+- Session tracking and JTI revocation via Redis
+- Login rate limiting per email (Redis-backed, namespace-hardened)
 - Role-based access control (`user`, `admin`, `superuser`)
 - User management CRUD (superuser only)
 - Dashboard activity endpoints
 - Private inter-service API (protected by shared secret + Docker network isolation)
 - MySQL **or** PostgreSQL — switchable via a single env var
-- Alembic migrations (auto-generated on first start)
+- Prometheus metrics (`METRICS_ENABLED=true`)
+- Alembic migrations auto-applied on first start
 - VS Code remote debugger support
 
 ---
@@ -24,20 +27,41 @@ A self-contained FastAPI authentication microservice designed to run as a Docker
 ## Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│            Docker Compose               │
-│                                         │
-│  ┌──────────────┐   ┌────────────────┐  │
-│  │  auth-service│   │  MySQL/Postgres │  │
-│  │  :8000       │──▶│  :3306 / :5432 │  │
-│  └──────┬───────┘   └────────────────┘  │
-│         │           ┌────────────────┐  │
-│         └──────────▶│  Redis :6379   │  │
-│                     └────────────────┘  │
-└─────────────────────────────────────────┘
+                        Internet
+                           │
+                    ┌──────▼──────┐
+                    │   Traefik   │  TLS termination, IP forwarding
+                    └──────┬──────┘
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+   ┌──────▼──────┐  ┌──────▼──────┐  ┌─────▼──────┐
+   │ auth-service│  │  consumer   │  │  Prometheus │
+   │  :8000      │  │  service    │  │  + Grafana  │
+   └──┬──────┬───┘  └─────────────┘  └────────────┘
+      │      │
+┌─────▼──┐ ┌─▼──────────┐
+│ MySQL/ │ │ Redis :6379 │
+│ Postgres│ └────────────┘
+└────────┘
 ```
 
-Other services on the same Docker network can call the private API at `http://auth-service:8000/user/private/`.
+Other services on the same Docker network call the private API at `http://auth-service:8000/user/private/`.
+
+---
+
+## Docker Compose Stacks
+
+Four ready-to-run stacks are provided under `examples/docker_compose/`:
+
+| Stack | Database | Token mode | Notes |
+| ----- | -------- | ---------- | ----- |
+| `local_mysql_m8` | MariaDB | `stateful` (HS256) | Simplest starting point |
+| `dev_postgres_m8` | PostgreSQL 16 | `stateful` (HS256) | PostgreSQL variant with Traefik |
+| `stateful_m8` | MariaDB | `stateful` (HS256) | + Prometheus + Grafana |
+| `RS256_m8` | MariaDB | `hybrid` (RS256) | Asymmetric signing + JWKS + Prometheus + Grafana |
+
+Each stack ships its own `example.env.txt`, `traefik/`, and Alembic migrations.
 
 ---
 
@@ -52,6 +76,7 @@ All routes are prefixed with `API_PREFIX` (default `/user`).
 | login | POST | `/login/refresh-token/` | Refresh access token from cookie |
 | login | POST | `/login/logout/` | Revoke session and clear cookie |
 | login | POST | `/login/test-token/` | Validate access token |
+| jwks | GET | `/.well-known/jwks.json` | JWKS endpoint (RS256/ES256 public key; `{"keys":[]}` for HS256) |
 | oauth-login | * | `/oauth/...` | OAuth2 password-flow endpoints |
 | google-auth | GET | `/google/login` | Initiate Google OAuth2 flow |
 | google-auth | GET | `/google/callback` | Google OAuth2 callback |
@@ -60,21 +85,22 @@ All routes are prefixed with `API_PREFIX` (default `/user`).
 | sessions | GET/DELETE | `/sessions/...` | List and revoke own sessions |
 | users | GET/POST/PATCH/DELETE | `/users/...` | User management (superuser only) |
 | dashboard | GET | `/dashboard/users/activity/` | User activity stats (superuser only) |
+| metrics | GET | `/metrics` | Prometheus metrics (`METRICS_ENABLED=true` only) |
 | private | * | `/private/...` | Inter-service endpoints — Docker network + `X-Internal-Token` header |
 
-Interactive docs are available at `{BACKEND_HOST}{API_PREFIX}/docs` when `SET_DOCS=true`.
+Interactive docs at `{BACKEND_HOST}{API_PREFIX}/docs` when `SET_DOCS=true`.
 
 ---
 
 ## Quick Start
 
-### 1. Copy and configure the environment file
+### 1. Choose a stack and copy the env file
 
 ```bash
-cp auth_user_service/.env.example auth_user_service/.env
+cd examples/docker_compose/stateful_m8
+cp example.env.txt .env
+# edit .env — fill in all required values
 ```
-
-Edit `.env` and fill in all required values (see [Environment Variables](#environment-variables)).
 
 ### 2. Start the stack
 
@@ -82,12 +108,12 @@ Edit `.env` and fill in all required values (see [Environment Variables](#enviro
 docker compose up --build
 ```
 
-Alembic migrations run automatically on startup. The first run also seeds the superuser defined by `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD`.
+Alembic migrations run automatically. The first start also seeds the superuser defined by `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD`.
 
 ### 3. Verify
 
-```
-GET http://localhost:8000/user/docs
+```http
+GET http://localhost:9000/user/health/
 ```
 
 ---
@@ -100,8 +126,6 @@ Set `SELECTED_DB` in `.env`:
 | ----- | ------------- | -------------- | ------------ |
 | `Mysql` (default) | `pymysql` | — | 3306 |
 | `Postgres` | `psycopg2` | `asyncpg` | 5432 |
-
-Update `DB_HOST`, `DB_PORT`, and `DB_DATABASE` accordingly. Both drivers ship in the container image.
 
 ---
 
@@ -129,24 +153,28 @@ Update `DB_HOST`, `DB_PORT`, and `DB_DATABASE` accordingly. Both drivers ship in
 | `REFRESH_TOKEN_ALGORITHM` | no | `HS256` | Signing algorithm for refresh tokens |
 | `ACCESS_SECRET_KEY` | HS256 only | — | Symmetric signing key for access tokens (omit for RS256/ES256) |
 | `REFRESH_SECRET_KEY` | yes | — | Signing key for refresh tokens |
-| `ACCESS_PRIVATE_KEY` | RS256/ES256 only | — | PEM private key used by the auth service to sign access tokens |
-| `ACCESS_PUBLIC_KEY` | RS256/ES256 only | — | PEM public key distributed to all consuming services for verification |
+| `ACCESS_PRIVATE_KEY` | RS256/ES256 only | — | PEM private key for signing access tokens (auth service only) |
+| `ACCESS_PUBLIC_KEY` | RS256/ES256 only | — | PEM public key distributed to all consumer services |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | no | `30` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRE_MINUTES` | no | `120` | Refresh token lifetime |
 | `REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS` | no | `3600` | Refresh cookie max-age |
-| `TOKENS_ENCRYPTION_KEY` | yes | — | Token payload encryption key |
-| `TOKEN_ISSUER` | no | — | When set, embeds `iss` in issued tokens and requires a match on validation |
-| `TOKEN_AUDIENCE` | no | — | When set, embeds `aud` in issued tokens and requires a match on validation |
-| `ACCESS_KEY_ID` | no | — | Explicit `kid` embedded in JWT headers and JWKS; auto-derived from key fingerprint when unset |
+| `TOKENS_ENCRYPTION_KEY` | yes | — | Key for `SessionMiddleware` cookie signing |
+| `TOKEN_ISSUER` | no | — | When set, embeds `iss` in tokens and requires a match on validation |
+| `TOKEN_AUDIENCE` | no | — | When set, embeds `aud` in tokens and requires a match on validation |
+| `ACCESS_KEY_ID` | no | — | Explicit `kid` in JWT headers and JWKS; auto-derived from key fingerprint when unset |
+| `JWKS_URI` | no | — | Consumer services: JWKS endpoint URL; enables automatic `JwksKeyResolver` wiring |
+| `JWKS_CACHE_TTL_SECONDS` | no | `300` | JWKS key cache TTL in seconds |
 
-**HS256 (default)** — set `ACCESS_SECRET_KEY` and `REFRESH_SECRET_KEY`; leave `ACCESS_PRIVATE_KEY` / `ACCESS_PUBLIC_KEY` blank.
+**HS256 (default)** — set `ACCESS_SECRET_KEY` and `REFRESH_SECRET_KEY`; leave asymmetric key vars blank.
 
-**RS256 / ES256** — leave `ACCESS_SECRET_KEY` blank; set `ACCESS_TOKEN_ALGORITHM`, `ACCESS_PRIVATE_KEY`, and `ACCESS_PUBLIC_KEY`.  Generate a key pair with:
+**RS256 / ES256** — leave `ACCESS_SECRET_KEY` blank; set `ACCESS_TOKEN_ALGORITHM`, `ACCESS_PRIVATE_KEY`, `ACCESS_PUBLIC_KEY`. Generate a key pair:
 
 ```bash
 openssl genrsa -out private.pem 2048
 openssl rsa -in private.pem -pubout -out public.pem
 ```
+
+Or use `examples/docker_compose/RS256_m8/keys/generate_keys.sh`.
 
 ### Database
 
@@ -157,9 +185,7 @@ openssl rsa -in private.pem -pubout -out public.pem
 | `DB_PORT` | yes | — | Database port |
 | `DB_DATABASE` | yes | — | Database name |
 | `DB_USER` | yes | — | Database user |
-| `DB_PASSWORD` | yes | — | Database password (strong password required) |
-| `DB_ENGINE` | no | `InnoDB` | MySQL storage engine (ignored for Postgres) |
-| `DB_CHARSET` | no | `utf8mb4` | MySQL charset (ignored for Postgres) |
+| `DB_PASSWORD` | yes | — | Database password |
 
 ### Redis
 
@@ -176,9 +202,23 @@ openssl rsa -in private.pem -pubout -out public.pem
 | -------- | -------- | ----------- |
 | `FIRST_SUPERUSER` | yes | Email of the bootstrap superuser |
 | `FIRST_SUPERUSER_PASSWORD` | yes | Password of the bootstrap superuser |
-| `GOOGLE_CLIENT_ID` | no | Google OAuth2 client ID (required only if using Google login) |
-| `GOOGLE_CLIENT_SECRET` | no | Google OAuth2 client secret (required only if using Google login) |
-| `PRIVATE_API_SECRET` | yes | Shared secret for private inter-service endpoints (`X-Internal-Token` header) |
+| `GOOGLE_CLIENT_ID` | no | Google OAuth2 client ID |
+| `GOOGLE_CLIENT_SECRET` | no | Google OAuth2 client secret |
+| `PRIVATE_API_SECRET` | yes | Shared secret for `X-Internal-Token` header |
+
+### Observability
+
+| Variable | Required | Default | Description |
+| -------- | -------- | ------- | ----------- |
+| `METRICS_ENABLED` | no | `false` | Expose `GET /metrics` Prometheus endpoint |
+| `METRICS_GROUPS` | no | all | Comma-separated metric groups to enable |
+
+### Deployment
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `API_BIND_IP` | `127.0.0.1` | Host IP Traefik binds port 9000 to. Set to `0.0.0.0` for LAN/public exposure |
+| `TRUSTED_PROXY_IPS` | `172.16.0.0/12` | CIDR(s) Uvicorn trusts as reverse-proxy source for `X-Forwarded-For` |
 
 ### Static / Templates
 
@@ -191,7 +231,7 @@ openssl rsa -in private.pem -pubout -out public.pem
 
 ## Infrastructure Resilience
 
-The service is designed to degrade gracefully when Redis or the database is temporarily unavailable rather than crashing with opaque 500 errors.
+The service degrades gracefully when Redis or the database is temporarily unavailable.
 
 ### Redis unavailable
 
@@ -201,19 +241,17 @@ The service is designed to degrade gracefully when Redis or the database is temp
 | `hybrid` | ✅ works, rate limiting skipped | ✅ works, JTI check skipped | ✅ works | ❌ 503 |
 | `stateful` | ✅ works, rate limiting skipped | ✅ works, JTI allowlist check skipped | ✅ works | ❌ 503 |
 
-> In `stateful`/`hybrid` mode with Redis down, login still succeeds but token revocation is unavailable.  The `/health/` endpoint reflects this with `effective_mode: stateless_degraded`.  A `CRITICAL` log line is emitted at startup when this condition is detected.
+In `stateful`/`hybrid` mode with Redis down, the `/health/` endpoint reflects `effective_mode: stateless_degraded` and a `CRITICAL` log is emitted at startup.
 
 ### Database unavailable
 
-All routes that touch the database return `503 Service Unavailable` with a clear message.  A `CRITICAL` log line is emitted at startup.
+All routes that touch the database return `503 Service Unavailable` with a clear message.
 
 ### Health endpoint
 
 ```http
 GET {API_PREFIX}/health/
 ```
-
-Example response when fully operational:
 
 ```json
 {
@@ -228,95 +266,38 @@ Example response when fully operational:
 }
 ```
 
-Example response with Redis down in stateful mode:
+`degraded_since` is the UTC timestamp when Redis first became unreachable in the current process lifetime, or `null` when healthy.
 
-```json
-{
-  "status": "degraded",
-  "token_mode": "stateful",
-  "effective_mode": "stateless_degraded",
-  "redis": "unavailable",
-  "database": "ok",
-  "revocation_available": false,
-  "rate_limiting_available": false,
-  "degraded_since": "2026-05-10T12:34:56.789123+00:00"
-}
-```
+---
 
-`degraded_since` is the UTC timestamp when Redis first became unreachable in the current process lifetime, or `null` when Redis is healthy.  Use it in alerting to detect silent degradation that persists beyond an acceptable window.
+## Deployment Modes
 
-### Deployment modes
-
-The stack supports three security postures depending on the target environment.  Configure the appropriate one before going live.
-
-| Mode | `API_BIND_IP` | TLS | HSTS | Secure cookies | Use when |
-| ---- | ------------- | --- | ---- | -------------- | -------- |
-| **Development** | `0.0.0.0` *(or omit)* | self-signed OK | off | off (`ENVIRONMENT=local`) | local machine only, Docker dev loop |
-| **Private LAN / homelab** | `0.0.0.0` or `127.0.0.1` | self-signed / local CA recommended | off | on | Raspberry Pi, NAS, private LAN, edge devices |
-| **Public / production** | `127.0.0.1` | valid cert required | on (opt-in, see below) | on | VPS, cloud, any internet-facing host |
-
-> Self-signed certificates with a local CA (e.g. [mkcert](https://github.com/FiloSottile/mkcert)) are a good fit for private LAN deployments.  Modern LANs are not uniformly trusted — IoT devices, guest Wi-Fi, and ARP spoofing are real risks even on a home network.
+| Mode | `API_BIND_IP` | TLS | HSTS | Use when |
+| ---- | ------------- | --- | ---- | -------- |
+| **Development** | `0.0.0.0` | self-signed OK | off | local machine, Docker dev loop |
+| **Private LAN / homelab** | `0.0.0.0` or `127.0.0.1` | local CA recommended | off | Raspberry Pi, NAS, private LAN |
+| **Public / production** | `127.0.0.1` | valid cert required | on (opt-in) | VPS, cloud, internet-facing |
 
 ### Running behind a reverse proxy (real client IP)
 
-Audit logs, rate-limit keys, and reuse-detection events all record the client IP.  When the service runs behind Traefik (or any reverse proxy) this requires a coordinated three-layer setup — failing to configure any one layer either breaks IP attribution or opens a spoofing path.
+Requires a coordinated three-layer setup:
 
-**1. Traefik** — add `forwardedHeaders.trustedIPs` to each entrypoint in `traefik.yml`:
-
-```yaml
-entryPoints:
-  api:
-    address: ":9000"
-    forwardedHeaders:
-      trustedIPs:
-        - "127.0.0.1/32"
-        - "172.16.0.0/12"   # Docker bridge networks
-        - "::1/128"
-```
-
-This instructs Traefik to strip any `X-Forwarded-For` sent by a client and replace it with the real peer address.  Without this, clients can forge their IP.
-
-**2. Uvicorn** — the startup script (`docker_start.sh`) reads `TRUSTED_PROXY_IPS` (defaults to `172.16.0.0/12`) and passes it to uvicorn:
-
-```text
---proxy-headers --forwarded-allow-ips=<TRUSTED_PROXY_IPS>
-```
-
-Set `TRUSTED_PROXY_IPS` in the container environment to match your actual Docker network CIDR.  Never use `*` — that would let any client spoof their IP.
-
-| Variable | Default | Description |
-| -------- | ------- | ----------- |
-| `API_BIND_IP` | `127.0.0.1` | Host IP Traefik binds port 9000 to. Set to `0.0.0.0` for LAN/public exposure |
-| `TRUSTED_PROXY_IPS` | `172.16.0.0/12` | CIDR(s) uvicorn trusts as a reverse proxy source for `X-Forwarded-For` |
-
-**3. Application** — `_client_ip()` reads the leftmost IP from `X-Forwarded-For`, which is the real client address only because the proxy chain above has been sanitized.  Without layers 1 and 2 this value is untrustworthy.
+1. **Traefik** — add `forwardedHeaders.trustedIPs` to each entrypoint in `traefik.yml` (strips client-supplied `X-Forwarded-For`, prevents IP spoofing).
+2. **Uvicorn** — the startup script reads `TRUSTED_PROXY_IPS` (default `172.16.0.0/12`) and passes it via `--proxy-headers --forwarded-allow-ips`. Never use `*`.
+3. **Application** — `_client_ip()` reads the leftmost `X-Forwarded-For` value, which is trustworthy only because layers 1 and 2 have been configured.
 
 ### HSTS (opt-in, public deployments only)
 
-`Strict-Transport-Security` is **not enabled by default** because in self-hosted and LAN environments it can cause serious breakage: once a browser receives the header it will refuse all HTTP connections to that hostname for the configured period — even if you later disable HSTS or rotate to a new certificate.
-
-To enable HSTS, uncomment the relevant block in `traefik/dynamic_conf.yml`:
-
-```yaml
-# stsSeconds: 31536000       # 1 year
-# stsIncludeSubdomains: true
-# stsPreload: false
-```
-
-Only do this when:
-
-- TLS is correctly configured with a stable, trusted certificate
-- The hostname will remain HTTPS-only for the full `stsSeconds` period
-- You understand that `stsPreload: true` permanently adds the domain to browser preload lists
+`Strict-Transport-Security` is commented out in all `traefik/dynamic_conf.yml` files. Uncomment after confirming TLS is stable and the hostname will remain HTTPS-only for the full `stsSeconds` period.
 
 ---
 
 ## Private API
 
-Endpoints under `/user/private/` are intended for inter-service calls only:
+Endpoints under `/user/private/` are for inter-service calls only:
 
-- They **must not** be exposed to the public internet — enforce this at the reverse proxy / Docker network level.
-- Every request must include the header `X-Internal-Token: <PRIVATE_API_SECRET>`.
+- Must not be exposed to the public internet — enforce at the reverse proxy / Docker network level.
+- Every request must include `X-Internal-Token: <PRIVATE_API_SECRET>`.
 
 ---
 
@@ -332,24 +313,21 @@ from auth_sdk_m8.security import build_access_validator, ValidationHooks
 _validator = build_access_validator(settings, hooks=_hooks)
 ```
 
-`build_access_validator` reads `ACCESS_TOKEN_ALGORITHM`, `ACCESS_SECRET_KEY` / `ACCESS_PUBLIC_KEY`, `TOKEN_ISSUER`, `TOKEN_AUDIENCE`, and `JWKS_URI` directly from a `CommonSettings` instance.  No boilerplate needed.
+`build_access_validator` reads `ACCESS_TOKEN_ALGORITHM`, `ACCESS_SECRET_KEY` / `ACCESS_PUBLIC_KEY`, `TOKEN_ISSUER`, `TOKEN_AUDIENCE`, and `JWKS_URI` directly from a `CommonSettings` instance.
 
 ### JWKS-based key validation (RS256/ES256)
 
-When `JWKS_URI` is set in the consumer's settings, `build_access_validator` automatically wires up `JwksKeyResolver` instead of a static public key.  The resolver fetches `/.well-known/jwks.json` from the auth service, caches keys by `kid`, and refreshes on cache miss — supporting zero-downtime key rotation.
+When `JWKS_URI` is set, `build_access_validator` wires up `JwksKeyResolver` automatically. The resolver fetches `/.well-known/jwks.json`, caches keys by `kid`, and refreshes on cache miss — supporting zero-downtime key rotation.
 
 ```ini
-# consumer .env
 ACCESS_TOKEN_ALGORITHM=RS256
 JWKS_URI=http://auth-service/user/.well-known/jwks.json
-JWKS_CACHE_TTL_SECONDS=300   # optional, default 300
+JWKS_CACHE_TTL_SECONDS=300
 ```
-
-The auth service serves the JWKS endpoint at `{API_PREFIX}/.well-known/jwks.json`.  HS256 configurations return `{"keys": []}` — the shared secret is never published.
 
 ### Revocation check (stateful mode)
 
-Consumer services must share the same Redis instance as `auth_user_service` and set `TOKEN_MODE="stateful"`.  The `AccessTokenBlacklist` class checks whether a JTI has been blacklisted by the auth service:
+Consumer services must share the same Redis instance and set `TOKEN_MODE="stateful"`.
 
 ```python
 from auth_sdk_m8.security import AccessTokenBlacklist
@@ -361,7 +339,7 @@ if settings.TOKEN_MODE == "stateful" and redis is not None:
 
 ### Issuer / audience enforcement (opt-in)
 
-Set `TOKEN_ISSUER` and `TOKEN_AUDIENCE` to the **same values** in both `auth_user_service` and every consumer service.  When set, the auth service embeds `iss`/`aud` claims in issued tokens and all validators require an exact match — preventing token reuse across services or issuers.  Leaving them unset (default) skips enforcement for backward compatibility.
+Set `TOKEN_ISSUER` and `TOKEN_AUDIENCE` to the **same values** in both the auth service and every consumer. When set, the auth service embeds `iss`/`aud` claims in issued tokens and all validators require an exact match.
 
 ---
 
@@ -371,20 +349,19 @@ Set `TOKEN_ISSUER` and `TOKEN_AUDIENCE` to the **same values** in both `auth_use
 
 ```bash
 cd auth_user_service
-pip install -r requirements-fastapi.txt
+pip install -r requirements_base.txt -r requirements_dev.txt
 uvicorn auth_user_service.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### VS Code remote debugging
 
-Set `VSCODE_DEBUG=true` in the container environment. The startup script will launch `debugpy` on port `5678` and wait for the debugger to attach before starting Uvicorn.
+Set `VSCODE_DEBUG=true` in the container environment. The startup script launches `debugpy` on port `5678` and waits for the debugger to attach before starting Uvicorn.
 
 ### Database migrations
 
-Migrations are generated and applied automatically on container start. To run them manually:
+Migrations are applied automatically on container start. To run manually:
 
 ```bash
-# Inside the container or with the project on PYTHONPATH
 alembic -c auth_user_service/alembic.ini revision --autogenerate -m "description"
 alembic -c auth_user_service/alembic.ini upgrade head
 ```
@@ -400,8 +377,14 @@ ruff check . --fix
 ### Tests
 
 ```bash
+# Unit + integration tests
 pytest
+
+# Live red-team tests (requires the RS256_m8 stack running)
+pytest -m live
 ```
+
+The `tests/security/` suite covers JWT security, Redis resilience, refresh lifecycle, input sanitisation, JWKS endpoint, OAuth adversarial, iss/aud validation, session-chain invalidation, exception handling, and client IP attribution.
 
 ---
 
@@ -409,8 +392,8 @@ pytest
 
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [SQLModel](https://sqlmodel.tiangolo.com/) + [Alembic](https://alembic.sqlalchemy.org/)
-- [auth-sdk-m8](https://github.com/mano8/auth-sdk-m8) — shared schemas, JWT validation, refresh token rotation, base controllers
-- [Redis](https://redis.io/) — session revocation and rate limiting
+- [auth-sdk-m8](https://github.com/mano8/auth-sdk-m8) — shared schemas, JWT validation, refresh token rotation, JWKS resolver, base controllers
+- [Redis](https://redis.io/) — session revocation, refresh token allowlist, and rate limiting
 - [PyJWT](https://pyjwt.readthedocs.io/) + [passlib](https://passlib.readthedocs.io/) + [cryptography](https://cryptography.io/)
 - [google-auth](https://google-auth.readthedocs.io/) — Google OAuth2
 
