@@ -1,17 +1,17 @@
 -r requirements_base.txt
 
 # Testing
-pytest>=8.3.4
-pytest-cov>=6.0.0
-coverage>=7.6.9
+pytest>=9.0.3
+pytest-cov>=7.1.0
+coverage>=7.14.0
 
 # Debugging
-debugpy>=1.8.14
+debugpy>=1.8.20
 
 # Linting
-flake8>=7.2.0
+flake8>=7.3.0
 
 # Build tools (optional but OK in dev)
-setuptools>=75.8.0
-wheel>=0.45.1
-build>=1.2.2.post1
+setuptools>=82.0.1
+wheel>=0.47.0
+build>=1.5.0
