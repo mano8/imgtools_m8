@@ -5,7 +5,6 @@ from sqlalchemy import UniqueConstraint
 from sqlmodel import CHAR, Column, Field, SQLModel
 from slugify import slugify
 
-from auth_sdk_m8.schemas.base import CategoryType
 from auth_sdk_m8.models.shared import TimestampMixin
 from fastapi_service.core.db_models import prefixed_tables
 from fastapi_service.core.config import settings
@@ -32,10 +31,6 @@ class CategoryBase(SQLModel):
         min_length=1,
         max_length=50,
         description="URL-friendly identifier",
-    )
-    type: CategoryType = Field(
-        sa_column_kwargs={"nullable": False},
-        description="Category type",
     )
 
 
