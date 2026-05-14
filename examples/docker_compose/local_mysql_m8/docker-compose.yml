@@ -21,9 +21,9 @@ services:
   m8_db:
     image: mariadb:12-ubi
     volumes:
-      - ./mysql_db:/bitnami/mariadb
+      - ./mysql_db:/var/lib/mysql
     environment:
-      - ALLOW_EMPTY_PASSWORD=no
+      - MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=0
       - MARIADB_PORT_NUMBER=${DB_PORT}
       - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
       - MARIADB_USER=${DB_USER}
