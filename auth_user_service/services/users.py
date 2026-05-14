@@ -94,7 +94,7 @@ class UserController:
         Returns:
             User | None: The user object if found, otherwise None.
         """
-        statement = select(User).where(User.id == str(user_id))
+        statement = select(User).where(User.id == user_id)
         session_user = session.exec(statement).first()
         return session_user
 

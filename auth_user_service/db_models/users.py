@@ -290,7 +290,7 @@ class User(UserBase, table=True):
         sa_column=Column(
             "id",
             Uuid(as_uuid=True),
-            default=lambda: str(uuid.uuid4()),
+            default=uuid.uuid4,
             primary_key=True,
             index=True,
         ),
