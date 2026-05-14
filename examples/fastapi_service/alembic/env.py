@@ -1,91 +1,81 @@
 """
 Alembic environment configuration module.
 
-This module provides the configuration for Alembic to run database
-migrations in both offline and online modes. It sets up the logging,
-database engine, and migration context.
+Handles database migrations in offline and online modes.
 """
+# pylint: disable=invalid-name,too-many-arguments,too-few-public-methods
+# pylint: disable=unused-import,consider-using-f-string,no-member
+# pylint: disable=redefined-builtin,unused-argument
 
-# pylint: disable=no-member
-from logging.config import fileConfig
-import sys
+from __future__ import annotations
+
 import os
+import sys
+from logging.config import fileConfig
 
-# add your project to PYTHONPATH if needed
-sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))
-
-import fastapi_service.db_models
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from sqlmodel import SQLModel
 from alembic import context
+from sqlalchemy import engine_from_config, pool
+from sqlmodel import SQLModel
 
 from fastapi_service.core.config import settings
+import fastapi_service.db_models  # noqa: F401
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# ---------------------------------------------------------------------
+# PYTHONPATH (Docker / monorepo safe)
+# ---------------------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+
+# ---------------------------------------------------------------------
+# ALEMBIC CONFIG
+# ---------------------------------------------------------------------
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-if config.config_file_name is not None:
+if config.config_file_name:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-# from fastapi_service.schemas.users import SQLModel  # noqa
-# noqa
-
 target_metadata = SQLModel.metadata
+
 VERSION_TABLE = config.get_main_option("version_table")
 VERSION_LOCATIONS = [config.get_main_option("version_locations")]
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
 
 
-def get_url():
-    """
-    Retrieve the database URL.
-
-    Returns:
-        str: The SQLAlchemy database URI from the settings.
-    """
+# ---------------------------------------------------------------------
+# DATABASE URL
+# ---------------------------------------------------------------------
+def get_url() -> str:
+    """Return database URL from settings."""
     return str(settings.SQLALCHEMY_DATABASE_URI)
 
 
-def include_object(object, name, type_, reflected, compare_to):
+# ---------------------------------------------------------------------
+# INCLUDE OBJECT FILTER
+# ---------------------------------------------------------------------
+def include_object(
+    object,  # noqa: A002
+    name: str,
+    type_: str,
+    reflected: bool,
+    compare_to: object,
+) -> bool:
     """
-    Only include tables (and other objects) that start with 'prefix_' or are the version table.
+    Filter database objects included in migrations.
     """
-    # Always include the version table
     if type_ == "table":
         if name == VERSION_TABLE:
             return True
+        return not reflected
 
-        if not reflected:
-            # This is a model-defined table → include it
-            return True
-        else:
-            # This is an existing DB table not in metadata → exclude
-            return False
     return True
 
 
-def run_migrations_offline():
-    """
-    Run migrations in 'offline' mode.
-
-    This configures the migration context with a URL rather than an Engine.
-    This mode allows running migrations without a DBAPI. Calls to
-    context.execute() emit the given string to the script output.
-    """
-    url = get_url()
+# ---------------------------------------------------------------------
+# OFFLINE MIGRATIONS
+# ---------------------------------------------------------------------
+def run_migrations_offline() -> None:
+    """Run migrations in offline mode."""
     context.configure(
-        url=url,
+        url=get_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
@@ -98,15 +88,14 @@ def run_migrations_offline():
         context.run_migrations()
 
 
-def run_migrations_online():
-    """
-    Run migrations in 'online' mode.
-
-    This mode creates an Engine and associates a connection with the
-    migration context. It then runs the migrations within a transaction.
-    """
+# ---------------------------------------------------------------------
+# ONLINE MIGRATIONS
+# ---------------------------------------------------------------------
+def run_migrations_online() -> None:
+    """Run migrations in online mode."""
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = get_url()
+
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
@@ -127,6 +116,9 @@ def run_migrations_online():
             context.run_migrations()
 
 
+# ---------------------------------------------------------------------
+# ENTRYPOINT
+# ---------------------------------------------------------------------
 if context.is_offline_mode():
     run_migrations_offline()
 else:
