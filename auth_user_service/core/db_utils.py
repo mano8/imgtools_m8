@@ -1,6 +1,7 @@
 """
 dm_model's helpers
 """
+
 from typing import Dict, Any
 
 from sqlmodel import SQLModel

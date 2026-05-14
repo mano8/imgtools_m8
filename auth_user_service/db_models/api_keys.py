@@ -2,6 +2,7 @@
 Api key and rate limit models for the database.
 These models are used to manage API keys and their associated rate limits.
 """
+
 import uuid
 from sqlalchemy import Column, Uuid
 from datetime import datetime

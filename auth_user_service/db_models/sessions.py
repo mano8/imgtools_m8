@@ -2,6 +2,7 @@
 Client session models for managing user sessions and tokens.
 This module defines the database models and schemas for client sessions,
 """
+
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
