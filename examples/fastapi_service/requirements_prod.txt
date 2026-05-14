@@ -1,4 +1,4 @@
 -r requirements_base.txt
 
 # Production server (optional but recommended)
-gunicorn>=21.2.0
+gunicorn>=26.0.0

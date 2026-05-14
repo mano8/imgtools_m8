@@ -1,8 +1,8 @@
 """Initial m8 migration
 
-Revision ID: 32577939f753
+Revision ID: 7c9355e42d04
 Revises:
-Create Date: 2026-05-07 18:52:08.201005
+Create Date: 2026-05-11 12:27:18.394868
 
 """
 
@@ -14,7 +14,7 @@ import sqlmodel
 
 
 # revision identifiers, used by Alembic.
-revision: str = "32577939f753"
+revision: str = "7c9355e42d04"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,11 +26,6 @@ def upgrade() -> None:
         "dcnt_category",
         sa.Column("name", sqlmodel.sql.sqltypes.AutoString(length=50), nullable=False),
         sa.Column("slug", sqlmodel.sql.sqltypes.AutoString(length=50), nullable=False),
-        sa.Column(
-            "type",
-            sa.Enum("PROMPT_BLOCK", "PROMPT_TEMPLATE", name="categorytype"),
-            nullable=False,
-        ),
         sa.Column(
             "created_at",
             sa.DateTime(),

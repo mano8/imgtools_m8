@@ -1,6 +1,5 @@
 """Unit tests for services.dashboard.DashboardController."""
 
-import uuid
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -71,7 +70,7 @@ class TestGetActivityCountByModel:
     def test_superuser_gets_all_data(self, db_session, sample_user):
         current_user = MagicMock()
         current_user.is_superuser = True
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         result = DashboardController.get_activity_count_by_model(
             session=db_session,
@@ -87,7 +86,7 @@ class TestGetActivityCountByModel:
     def test_non_superuser_filters_by_user_id(self, db_session, sample_user):
         current_user = MagicMock()
         current_user.is_superuser = False
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         result = DashboardController.get_activity_count_by_model(
             session=db_session,
@@ -100,7 +99,7 @@ class TestGetActivityCountByModel:
     def test_is_current_flag(self, db_session, sample_user):
         current_user = MagicMock()
         current_user.is_superuser = True
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         result = DashboardController.get_activity_count_by_model(
             session=db_session,
@@ -114,7 +113,7 @@ class TestGetActivityCountByModel:
     def test_activity_entry_has_expected_keys(self, db_session, sample_user):
         current_user = MagicMock()
         current_user.is_superuser = True
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         result = DashboardController.get_activity_count_by_model(
             session=db_session,
@@ -144,7 +143,7 @@ class TestGetUpdateCountByModel:
     def test_non_superuser_filters_by_user(self, db_session, sample_user):
         current_user = MagicMock()
         current_user.is_superuser = False
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         result = DashboardController.get_updates_count_by_model(
             session=db_session,
@@ -159,7 +158,7 @@ class TestGetDashUsersStats:
     def test_superuser_includes_user_count(self, db_session, sample_user):
         current_user = MagicMock()
         current_user.is_superuser = True
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         result = DashboardController.get_dash_users_stats(
             session=db_session,
@@ -173,7 +172,7 @@ class TestGetDashUsersStats:
     def test_non_superuser_nb_users_is_zero(self, db_session, sample_user):
         current_user = MagicMock()
         current_user.is_superuser = False
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         result = DashboardController.get_dash_users_stats(
             session=db_session,
@@ -187,7 +186,7 @@ class TestGetDashUsersStats:
     def test_is_current_flag(self, db_session, sample_user):
         current_user = MagicMock()
         current_user.is_superuser = True
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         result = DashboardController.get_dash_users_stats(
             session=db_session,

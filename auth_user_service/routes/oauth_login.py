@@ -25,7 +25,7 @@ router = APIRouter(prefix="/google-api", tags=["google-api"])
 async def google_auth_login(
     request: Request, templates: Jinja2Templates = Depends(get_templates)
 ) -> dict:
-    """Retrieve category list."""
+    """Render the Google login page with the appropriate login URL."""
     google_login_url = AuthController.get_google_login_url(
         redirect_uri=str(request.url_for("google_auth_callback")),
     )
@@ -46,7 +46,7 @@ async def google_auth_success_login(
     access_token: str = Depends(SecurityHelper.get_access_token_from_cookie),
     templates: Jinja2Templates = Depends(get_templates),
 ) -> dict:
-    """Retrieve category list."""
+    """Render the Google login success page."""
     try:
         token_data = SecurityHelper.decode_access_token(
             token_data=TokenDecodeProps(

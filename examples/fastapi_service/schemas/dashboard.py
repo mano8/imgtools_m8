@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 class RangeActivityType(str, Enum):
     """
-    Category type Enum
+    Range Activity Type Enum
     """
 
     HOUR = "hour"

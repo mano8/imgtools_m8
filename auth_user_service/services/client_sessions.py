@@ -6,6 +6,7 @@ Redis for revocation and SQLModel for persistence.
 """
 
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -153,7 +154,9 @@ class SessionController:
         return deleted
 
     @staticmethod
-    def get_user_active_sessions(session: Session, user_id: str) -> list[ClientSession]:
+    def get_user_active_sessions(
+        session: Session, user_id: uuid.UUID
+    ) -> list[ClientSession]:
         """
         Retrieve all non-revoked, non-expired sessions for a user.
 
@@ -174,7 +177,7 @@ class SessionController:
 
     @staticmethod
     def revoke_all_user_sessions(
-        session: Session, user_id: str, redis: Optional[Redis]
+        session: Session, user_id: uuid.UUID, redis: Optional[Redis]
     ) -> int:
         """Revoke every active session for *user_id* — reuse-attack response.
 

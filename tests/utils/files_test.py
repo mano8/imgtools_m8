@@ -3,7 +3,6 @@
 import os
 import tempfile
 
-import pytest
 
 from auth_user_service.utils.files import FilesHelper
 

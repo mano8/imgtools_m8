@@ -32,6 +32,9 @@ def _startup_checks() -> None:
     from auth_user_service.core.deps import get_redis_client
     from auth_user_service.core.engine_sync import engine
     from sqlmodel import text
+    from auth_sdk_m8.core.config import check_config_health
+
+    check_config_health(settings, _logger)
 
     if settings.TOKEN_MODE != "stateless":
         redis = get_redis_client()

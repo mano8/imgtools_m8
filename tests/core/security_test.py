@@ -266,7 +266,6 @@ class TestSecurityHelper:
 
     def test_decrypt_with_wrong_key_raises(self):
         """Decrypting with a different key should raise an exception."""
-        from cryptography.fernet import InvalidToken
 
         key1 = "a_strong_32byte_encryption_key!!"
         key2 = "different_32byte_encryption_key!"

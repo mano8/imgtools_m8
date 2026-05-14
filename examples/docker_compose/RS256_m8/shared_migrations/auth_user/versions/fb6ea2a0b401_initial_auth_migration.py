@@ -1,8 +1,8 @@
 """Initial auth migration
 
-Revision ID: 6af5d0feecf2
+Revision ID: fb6ea2a0b401
 Revises:
-Create Date: 2026-05-07 15:34:49.446446
+Create Date: 2026-05-11 16:07:16.764482
 
 """
 
@@ -14,7 +14,7 @@ import sqlmodel
 
 
 # revision identifiers, used by Alembic.
-revision: str = "6af5d0feecf2"
+revision: str = "fb6ea2a0b401"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -58,7 +58,7 @@ def upgrade() -> None:
             sa.Enum("SUPERADMIN", "ADMIN", "WRITER", "READER", "USER", name="roletype"),
             nullable=False,
         ),
-        sa.Column("id", sa.CHAR(length=36), nullable=False),
+        sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column(
             "hashed_password",
             sqlmodel.sql.sqltypes.AutoString(length=255),
@@ -73,6 +73,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("oauth_user_id"),
         sa.UniqueConstraint("telegram_id"),
+        mysql_charset="utf8mb4",
+        mysql_engine="InnoDB",
     )
     op.create_index(op.f("ix_auth_user_email"), "auth_user", ["email"], unique=True)
     op.create_index(op.f("ix_auth_user_id"), "auth_user", ["id"], unique=False)
@@ -97,11 +99,13 @@ def upgrade() -> None:
         sa.Column(
             "key_hash", sqlmodel.sql.sqltypes.AutoString(length=128), nullable=False
         ),
-        sa.Column("user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column("last_used_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["auth_user.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("key_hash"),
+        mysql_charset="utf8mb4",
+        mysql_engine="InnoDB",
     )
     op.create_index(op.f("ix_auth_api_key_id"), "auth_api_key", ["id"], unique=False)
     op.create_index(
@@ -149,9 +153,11 @@ def upgrade() -> None:
         ),
         sa.Column("external_token_expires_at", sa.DateTime(), nullable=True),
         sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["auth_user.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
+        mysql_charset="utf8mb4",
+        mysql_engine="InnoDB",
     )
     op.create_index(
         op.f("ix_auth_client_session_id"), "auth_client_session", ["id"], unique=False
@@ -165,13 +171,15 @@ def upgrade() -> None:
     op.create_table(
         "auth_rate_limit",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("user_id", sa.CHAR(length=36), nullable=False),
+        sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column(
             "period", sa.Enum("MINUTE", "HOUR", "DAY", name="period"), nullable=False
         ),
         sa.Column("limit", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["auth_user.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
+        mysql_charset="utf8mb4",
+        mysql_engine="InnoDB",
     )
     op.create_index(
         op.f("ix_auth_rate_limit_user_id"), "auth_rate_limit", ["user_id"], unique=False

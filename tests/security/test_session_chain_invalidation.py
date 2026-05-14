@@ -11,9 +11,8 @@ Verifies that:
 """
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from auth_user_service.services.client_sessions import SessionController
 
@@ -22,7 +21,9 @@ def _make_db_session(jti: str, expires_in_seconds: int = 3600) -> MagicMock:
     """Return a fake ClientSession with controllable fields."""
     s = MagicMock()
     s.jwt_jti = jti
-    s.jwt_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds)
+    s.jwt_expires_at = datetime.now(timezone.utc) + timedelta(
+        seconds=expires_in_seconds
+    )
     return s
 
 
@@ -35,19 +36,29 @@ class TestRevokeAllUserSessionsRedis:
             "get_user_active_sessions",
             return_value=sessions,
         ):
-            with patch("auth_user_service.services.client_sessions.RedisSessionManager") as mgr_cls, \
-                 patch("auth_user_service.services.client_sessions.RedisRefreshStore") as store_cls, \
-                 patch("auth_user_service.services.client_sessions.delete"), \
-                 patch("auth_user_service.services.client_sessions.Session"):
+            with (
+                patch(
+                    "auth_user_service.services.client_sessions.RedisSessionManager"
+                ) as mgr_cls,
+                patch(
+                    "auth_user_service.services.client_sessions.RedisRefreshStore"
+                ) as store_cls,
+                patch("auth_user_service.services.client_sessions.delete"),
+                patch("auth_user_service.services.client_sessions.Session"),
+            ):
                 mock_mgr = MagicMock()
                 mock_store = MagicMock()
                 mgr_cls.return_value = mock_mgr
                 store_cls.return_value = mock_store
                 mock_session = MagicMock()
                 mock_session.exec.return_value.rowcount = len(sessions)
-                return SessionController.revoke_all_user_sessions(
-                    mock_session, "user-123", redis
-                ), mock_mgr, mock_store
+                return (
+                    SessionController.revoke_all_user_sessions(
+                        mock_session, "user-123", redis
+                    ),
+                    mock_mgr,
+                    mock_store,
+                )
 
     def test_access_jtis_are_blacklisted(self):
         redis = MagicMock()
@@ -73,10 +84,17 @@ class TestRevokeAllUserSessionsRedis:
     def test_redis_none_skips_redis_operations(self):
         """When Redis is unavailable, DB cleanup still runs without crashing."""
         sessions = [_make_db_session("jti-A")]
-        with patch.object(
-            SessionController, "get_user_active_sessions", return_value=sessions
-        ), patch("auth_user_service.services.client_sessions.RedisSessionManager") as mgr_cls, \
-           patch("auth_user_service.services.client_sessions.RedisRefreshStore") as store_cls:
+        with (
+            patch.object(
+                SessionController, "get_user_active_sessions", return_value=sessions
+            ),
+            patch(
+                "auth_user_service.services.client_sessions.RedisSessionManager"
+            ) as mgr_cls,
+            patch(
+                "auth_user_service.services.client_sessions.RedisRefreshStore"
+            ) as store_cls,
+        ):
             mock_session = MagicMock()
             mock_session.exec.return_value.rowcount = 1
             SessionController.revoke_all_user_sessions(mock_session, "user-123", None)
@@ -115,7 +133,7 @@ class TestRevokeAllUserSessionsDatabase:
         )
 
         count = SessionController.revoke_all_user_sessions(
-            db_session, str(sample_user.id), redis=None
+            db_session, sample_user.id, redis=None
         )
         assert count >= 1
 

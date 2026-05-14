@@ -4,7 +4,6 @@ import uuid
 from datetime import timedelta
 from unittest.mock import MagicMock
 
-import pytest
 
 from auth_user_service.core.client import (
     LoginRateLimiter,

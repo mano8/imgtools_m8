@@ -110,7 +110,9 @@ class TestJWTAbuse:
             with pytest.raises(HTTPException) as exc_info:
                 get_current_user(token=token)
         assert exc_info.value.status_code == 403
-        assert "Inactive" in exc_info.value.detail or "inactive" in exc_info.value.detail
+        assert (
+            "Inactive" in exc_info.value.detail or "inactive" in exc_info.value.detail
+        )
 
 
 class TestJWTRevocation:
@@ -152,9 +154,7 @@ class TestJWTRevocation:
         token = _make_token()
         with (
             patch("auth_user_service.core.deps.settings") as mock_cfg,
-            patch(
-                "auth_user_service.core.deps.get_redis_client"
-            ) as mock_get_redis,
+            patch("auth_user_service.core.deps.get_redis_client") as mock_get_redis,
         ):
             mock_cfg.TOKEN_MODE = "hybrid"
             get_current_user(token=token)
@@ -164,9 +164,7 @@ class TestJWTRevocation:
         token = _make_token()
         with (
             patch("auth_user_service.core.deps.settings") as mock_cfg,
-            patch(
-                "auth_user_service.core.deps.get_redis_client"
-            ) as mock_get_redis,
+            patch("auth_user_service.core.deps.get_redis_client") as mock_get_redis,
         ):
             mock_cfg.TOKEN_MODE = "stateless"
             get_current_user(token=token)
@@ -181,9 +179,7 @@ class TestRedisDownFailOpen:
         token = _make_token()
         with (
             patch("auth_user_service.core.deps.settings") as mock_cfg,
-            patch(
-                "auth_user_service.core.deps.get_redis_client", return_value=None
-            ),
+            patch("auth_user_service.core.deps.get_redis_client", return_value=None),
         ):
             mock_cfg.TOKEN_MODE = "stateful"
             result = get_current_user(token=token)
@@ -194,9 +190,7 @@ class TestRedisDownFailOpen:
         token = _make_token()
         with (
             patch("auth_user_service.core.deps.settings") as mock_cfg,
-            patch(
-                "auth_user_service.core.deps.get_redis_client", return_value=None
-            ),
+            patch("auth_user_service.core.deps.get_redis_client", return_value=None),
         ):
             mock_cfg.TOKEN_MODE = "stateful"
             try:

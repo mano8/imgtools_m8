@@ -55,7 +55,7 @@ def mock_redis():
 @pytest.fixture
 def sample_user(db_session):
     user = User(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         email=f"user_{uuid.uuid4().hex[:8]}@example.com",
         full_name="Test User",
         hashed_password=SecurityHelper.get_password_hash(TEST_PASSWORD),
@@ -74,7 +74,7 @@ def sample_user(db_session):
 @pytest.fixture
 def inactive_user(db_session):
     user = User(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         email=f"inactive_{uuid.uuid4().hex[:8]}@example.com",
         full_name="Inactive User",
         hashed_password=SecurityHelper.get_password_hash(TEST_PASSWORD),
@@ -93,7 +93,7 @@ def inactive_user(db_session):
 @pytest.fixture
 def superuser(db_session):
     user = User(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         email=f"superuser_{uuid.uuid4().hex[:8]}@example.com",
         full_name="Super User",
         hashed_password=SecurityHelper.get_password_hash(TEST_PASSWORD),
@@ -112,7 +112,7 @@ def superuser(db_session):
 @pytest.fixture
 def google_user(db_session):
     user = User(
-        id=str(uuid.uuid4()),
+        id=uuid.uuid4(),
         email=f"google_{uuid.uuid4().hex[:8]}@example.com",
         full_name="Google User",
         oauth_user_id=f"google_{uuid.uuid4().hex}",
@@ -133,7 +133,7 @@ def sample_client_session(db_session, sample_user):
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     client_session = ClientSession(
         id=str(uuid.uuid4()),
-        user_id=str(sample_user.id),
+        user_id=sample_user.id,
         provider=AuthProviderType.PASSWORD,
         jwt_jti=str(uuid.uuid4()),
         refresh_token_hash="a" * 64,
@@ -152,7 +152,7 @@ def expired_client_session(db_session, sample_user):
     past = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=10)
     client_session = ClientSession(
         id=str(uuid.uuid4()),
-        user_id=str(sample_user.id),
+        user_id=sample_user.id,
         provider=AuthProviderType.PASSWORD,
         jwt_jti=str(uuid.uuid4()),
         refresh_token_hash="b" * 64,
@@ -164,3 +164,12 @@ def expired_client_session(db_session, sample_user):
     db_session.commit()
     db_session.refresh(client_session)
     return client_session
+
+
+_UNIT_DIRS = {"core", "services", "schemas", "db_models", "utils"}
+
+
+def pytest_collection_modifyitems(config, items: list) -> None:
+    for item in items:
+        if item.fspath.dirpath().basename in _UNIT_DIRS:
+            item.add_marker(pytest.mark.unit)
