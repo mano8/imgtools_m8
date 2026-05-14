@@ -2,11 +2,10 @@
 
 import uuid
 
-import pytest
 
 from auth_user_service.db_models.users import UserCreate, UserUpdate
 from auth_user_service.services.users import UserController
-from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
+from auth_sdk_m8.schemas.base import AuthProviderType
 
 
 class TestCreateUser:

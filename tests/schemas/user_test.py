@@ -1,7 +1,6 @@
 """Tests for schemas.user and schemas.google."""
 
 import uuid
-import pytest
 
 from auth_user_service.schemas.user import (
     OAuthGoogleToken,

@@ -3,7 +3,6 @@
 import uuid
 
 import pytest
-from pydantic import ValidationError
 
 from auth_user_service.db_models.users import (
     UpdatePassword,

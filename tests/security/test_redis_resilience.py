@@ -110,9 +110,7 @@ class TestGoogleOAuthRedisRequirement:
                 "auth_user_service.services.auth.get_redis_client",
                 return_value=mock_redis,
             ),
-            patch(
-                "auth_user_service.services.auth.PKCEStore", return_value=mock_pkce
-            ),
+            patch("auth_user_service.services.auth.PKCEStore", return_value=mock_pkce),
         ):
             url = AuthController.get_google_login_url("http://localhost/callback")
         assert url.startswith("https://accounts.google.com")

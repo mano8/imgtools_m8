@@ -24,7 +24,9 @@ from auth_sdk_m8.security import TokenValidationConfig, TokenValidator
 from auth_user_service.core.security import SecurityHelper
 
 
-_SECRET = TokenSecret(secret_key=SecretStr("Aa1-secret-key-for-test-32-chars-long"), algorithm="HS256")
+_SECRET = TokenSecret(
+    secret_key=SecretStr("Aa1-secret-key-for-test-32-chars-long"), algorithm="HS256"
+)
 _USER_DATA = TokenAccessData(
     sub=str(uuid.uuid4()),
     role="user",
@@ -46,9 +48,7 @@ def _make_token(issuer: str = None, audience: str = None) -> str:
     return token
 
 
-def _make_validator(
-    issuer: str = None, audience: str = None
-) -> TokenValidator:
+def _make_validator(issuer: str = None, audience: str = None) -> TokenValidator:
     return TokenValidator(
         secrets=_SECRET,
         config=TokenValidationConfig(

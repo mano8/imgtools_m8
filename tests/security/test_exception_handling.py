@@ -70,7 +70,9 @@ class TestDatabaseUnavailable:
         ex = OperationalError("connection refused", None, None)
         with pytest.raises(HTTPException) as exc_info:
             handle_route_exception(ex)
-        assert "Database" in exc_info.value.detail or "database" in exc_info.value.detail
+        assert (
+            "Database" in exc_info.value.detail or "database" in exc_info.value.detail
+        )
 
     def test_session_rolled_back_on_operational_error(self):
         ex = OperationalError("connection refused", None, None)

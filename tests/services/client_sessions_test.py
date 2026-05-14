@@ -4,11 +4,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-import pytest
 
-from auth_user_service.db_models.sessions import ClientSession, ClientSessionCreate
+from auth_user_service.db_models.sessions import ClientSessionCreate
 from auth_user_service.services.client_sessions import SessionController
-from auth_sdk_m8.schemas.base import AuthProviderType
 
 
 def _make_session_create(jti: str = None) -> ClientSessionCreate:
@@ -177,7 +175,7 @@ class TestPurgeExpiredSessions:
         self, db_session, sample_user, expired_client_session
     ):
         current_user = MagicMock()
-        current_user.id = str(sample_user.id)
+        current_user.id = sample_user.id
 
         deleted = SessionController.purge_expired_sessions(
             session=db_session, current_user=current_user
@@ -187,7 +185,7 @@ class TestPurgeExpiredSessions:
 
     def test_returns_zero_when_nothing_expired(self, db_session, sample_user):
         current_user = MagicMock()
-        current_user.id = str(uuid.uuid4())  # user with no sessions
+        current_user.id = uuid.uuid4()  # user with no sessions
 
         deleted = SessionController.purge_expired_sessions(
             session=db_session, current_user=current_user
@@ -201,14 +199,14 @@ class TestGetUserActiveSessions:
         self, db_session, sample_user, sample_client_session
     ):
         sessions = SessionController.get_user_active_sessions(
-            session=db_session, user_id=str(sample_user.id)
+            session=db_session, user_id=sample_user.id
         )
 
         assert isinstance(sessions, list)
 
     def test_returns_empty_for_unknown_user(self, db_session):
         sessions = SessionController.get_user_active_sessions(
-            session=db_session, user_id=str(uuid.uuid4())
+            session=db_session, user_id=uuid.uuid4()
         )
 
         assert sessions == []

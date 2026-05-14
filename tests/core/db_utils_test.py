@@ -2,7 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
 
 from auth_user_service.core.db_utils import (
     PrefixedBase,
