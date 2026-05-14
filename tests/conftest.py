@@ -164,3 +164,12 @@ def expired_client_session(db_session, sample_user):
     db_session.commit()
     db_session.refresh(client_session)
     return client_session
+
+
+_UNIT_DIRS = {"core", "services", "schemas", "db_models", "utils"}
+
+
+def pytest_collection_modifyitems(config, items: list) -> None:
+    for item in items:
+        if item.fspath.dirpath().basename in _UNIT_DIRS:
+            item.add_marker(pytest.mark.unit)
