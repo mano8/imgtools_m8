@@ -5,7 +5,6 @@ from typing import Any
 from os.path import join as PathJoin
 from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from pydantic import ValidationError
 
 from auth_user_service.core.config import settings
 from auth_user_service.services.users import UserController
@@ -41,21 +40,29 @@ def update_avatar(
     """
     try:
         if file.content_type not in FilesHelper.ALLOWED_IMG_MIME_TYPES:
-            raise ValidationError(
-                "Invalid file mime type. Allowed types are: "
-                f"{', '.join(FilesHelper.ALLOWED_IMG_MIME_TYPES)}"
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid file MIME type. Allowed types: "
+                    f"{', '.join(FilesHelper.ALLOWED_IMG_MIME_TYPES)}"
+                ),
             )
         ext = FilesHelper.get_file_extension(file.filename)
         if ext not in FilesHelper.ALLOWED_IMG_EXTENSIONS:
-            raise ValidationError(
-                "Invalid file extension. Allowed extensions are: "
-                f"{', '.join(FilesHelper.ALLOWED_IMG_EXTENSIONS)}"
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Invalid file extension. Allowed extensions: "
+                    f"{', '.join(FilesHelper.ALLOWED_IMG_EXTENSIONS)}"
+                ),
             )
         contents = file.file.read(FilesHelper.MAX_IMG_FILE_SIZE + 1)
         if len(contents) > FilesHelper.MAX_IMG_FILE_SIZE:
-            raise ValidationError(
-                "File too large. Maximum allowed size is "
-                f"{FilesHelper.MAX_IMG_FILE_SIZE} bytes"
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"File too large. Maximum size: {FilesHelper.MAX_IMG_FILE_SIZE} bytes"
+                ),
             )
         file.file.seek(0)
         unique_filename = f"{uuid.uuid4().hex}{ext}"
