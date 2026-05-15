@@ -16,6 +16,12 @@ cp api.env.example api.env
 Edit `.env` to select your database engine (`SELECTED_DB=Mysql` or `Postgres`),
 token mode, and algorithm, then fill in all secrets.
 
+Run `bash init.sh` to generate RSA/EC keys (if using RS256/ES*) and TLS certificates.
+DB provisioning runs automatically on first `docker compose up -d` via `init-db.sh`.
+
+To reset the database later: `bash init.sh --reset-db` (prompts for confirmation).
+To rotate keys without reinitializing: `bash init.sh --rotate-keys`.
+
 Refer to the other stacks in `examples/docker_compose/` for complete working examples:
 
 | Stack | Key difference |

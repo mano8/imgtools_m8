@@ -44,23 +44,7 @@ automatically via the **JWKS endpoint** — no manual key distribution required.
 
 ## Setup
 
-### 1. Generate RSA key pair
-
-The auth service needs a private key to sign tokens. The consumer verifies using the
-public key fetched from the JWKS endpoint — you do **not** need to copy the public key
-anywhere manually.
-
-```sh
-# Run from this directory (RS256_m8/)
-mkdir -p keys
-openssl genrsa -out keys/private.pem 2048
-openssl rsa -in keys/private.pem -pubout -out keys/public.pem
-```
-
-The `keys/` directory is mounted read-only into the auth container at `/opt/keys/`.
-Keep `keys/private.pem` out of version control (it is already in `.gitignore`).
-
-### 2. Copy and edit the env files
+### 1. Copy and edit the env files
 
 ```sh
 cp .env.example .env
@@ -68,36 +52,32 @@ cp auth.env.example auth.env
 cp api.env.example api.env
 ```
 
-Open `.env` and replace every `changethis`:
+Open `.env` and replace every `changethis` (DB credentials, Redis password).
+
+Open `auth.env` and replace every `changethis`:
 
 ```ini
-FIRST_SUPERUSER="admin@example.com"
-FIRST_SUPERUSER_PASSWORD="a-strong-password"
-
-# No ACCESS_SECRET_KEY for RS256 — leave it absent
-ACCESS_KEY_ID="my-key-v1"          # stable identifier embedded as "kid" in every JWT
-REFRESH_SECRET_KEY="<generate>"    # refresh tokens remain HS256 symmetric
-
-DB_USER="myuser"
-DB_PASSWORD="<generate>"
-DB_ROOT_PASSWORD="<generate>"
-
-REDIS_PASSWORD="<generate>"
-```
-
-`ACCESS_KEY_ID` is a stable string you choose (e.g. `"prod-2025-01"`). It is embedded
-as the `kid` header in every JWT. When you rotate keys, update this value and consumers
-will automatically re-fetch the new public key from JWKS.
-
-Open `auth.env` and replace:
-
-```ini
+REFRESH_SECRET_KEY="<generate>"     # refresh tokens remain HS256 symmetric
 PRIVATE_API_SECRET="<generate>"     # for internal service-to-service calls
 TOKENS_ENCRYPTION_KEY="<generate>"  # encrypts refresh token payloads at rest
 ```
 
+Leave `ACCESS_KEY_ID=changethis_hex_kid` as-is — `init.sh` derives it automatically
+from the generated key fingerprint and writes the correct value into `auth.env`.
+
 `api.env` requires no changes. The `JWKS_URI` already points to the auth service's
 JWKS endpoint over the internal Docker network.
+
+### 2. Generate RSA key pair + TLS certificates
+
+```sh
+bash init.sh
+```
+
+This generates `keys/private.pem` and `keys/public.pem`, derives a stable `kid` from
+the DER fingerprint, writes `ACCESS_KEY_ID` into `auth.env`, and generates the
+self-signed TLS certificate for Traefik. Keep `keys/private.pem` out of version
+control (it is already in `.gitignore`).
 
 ### 3. Start
 
@@ -112,7 +92,7 @@ if it does not exist.
 
 ## How JWKS works in this stack
 
-```
+```text
 Consumer receives JWT with header: {"alg": "RS256", "kid": "my-key-v1"}
          │
          ▼
@@ -127,16 +107,16 @@ Is "my-key-v1" in local cache?
 
 This means:
 
-- **Key rotation**: generate a new key pair, update `ACCESS_KEY_ID` in `.env`, restart
-  auth. Old tokens (with the old `kid`) keep working until they expire. New tokens use
-  the new key. Consumers fetch the new public key automatically on the first request with
+- **Key rotation**: run `bash init.sh --rotate-keys` to regenerate the key pair and
+  update `ACCESS_KEY_ID` in `auth.env`, then restart auth. Old tokens keep working until
+  they expire. Consumers fetch the new public key automatically on the first request with
   an unknown `kid`.
 - **No manual key sync**: consumers never need the private key or a pre-shared copy of
   the public key.
 
 The JWKS endpoint is public (no auth required) at:
 
-```
+```text
 http://localhost:9000/user/.well-known/jwks.json
 ```
 
@@ -239,18 +219,28 @@ Scrapes `/user/metrics` from the auth service (`METRICS_ENABLED=true` in `auth.e
 
 ## Key rotation procedure
 
-1. Generate a new key pair in `keys/`:
-   ```sh
-   openssl genrsa -out keys/private.pem 2048
-   openssl rsa -in keys/private.pem -pubout -out keys/public.pem
-   ```
-2. Update `ACCESS_KEY_ID` in `.env` to a new value (e.g. `"my-key-v2"`).
-3. Restart the auth service:
-   ```sh
-   docker compose up -d --build auth_user_service
-   ```
-4. Consumer services pick up the new public key automatically on the first request
-   carrying the new `kid`. No consumer restart needed.
+**1. Regenerate the key pair and update `ACCESS_KEY_ID`:**
+
+```sh
+bash init.sh --rotate-keys
+```
+
+This overwrites `keys/private.pem` and `keys/public.pem` with a fresh RSA pair and
+derives a new `kid` from the DER fingerprint, writing it to `ACCESS_KEY_ID` in
+`auth.env`.
+
+**2. Restart the auth service:**
+
+```sh
+docker compose up -d --build auth_user_service
+```
+
+**3. Consumers self-update** — no restart needed. On the first request carrying the
+new `kid`, each consumer fetches the updated JWKS endpoint automatically.
+
+Tokens issued with the old `kid` remain valid until they expire. After
+`JWKS_CACHE_TTL_SECONDS` the cache refreshes; since the old `kid` no longer appears
+in the JWKS response, those tokens will then fail verification.
 
 Tokens issued with the old `kid` remain valid until they expire and are verified using
 the old cached public key. After their TTL (`JWKS_CACHE_TTL_SECONDS`) the cache is
@@ -264,7 +254,7 @@ will then fail verification.
 | Path | Purpose |
 | --- | --- |
 | `./keys` | RSA key pair (mounted read-only into auth container) |
-| `./mysql_db` | Persistent MariaDB data |
+| `./db_data` | Persistent MariaDB data |
 | `./redis/redis_data` | Persistent Redis snapshots |
 | `./prometheus/data` | Prometheus TSDB |
 | `./grafana/data` | Grafana dashboards and state |
@@ -288,8 +278,10 @@ curl http://localhost:9000/user/.well-known/jwks.json | python -m json.tool
 # Stop (keeps volumes and data)
 docker compose stop
 
-# Full reset — removes all stored data
-docker compose down -v
+# Full reset — stops containers and wipes the database (prompts for confirmation)
+# Note: Prometheus and Grafana data in ./prometheus/data and ./grafana/data persist.
+# Delete those directories manually if you also want to reset observability state.
+bash init.sh --reset-db
 ```
 
 ---

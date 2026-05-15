@@ -54,7 +54,15 @@ TOKENS_ENCRYPTION_KEY="<generate>"  # encrypts refresh token payloads at rest
 
 `api.env` requires no changes for local development.
 
-### 2. Start
+### 2. Run init
+
+```sh
+bash init.sh
+```
+
+Generates TLS certificates for Traefik. No keys needed for HS256.
+
+### 3. Start
 
 ```sh
 docker compose up --build
@@ -168,7 +176,7 @@ so OAuth works out of the box once credentials are set.
 
 | Path | Purpose |
 | --- | --- |
-| `./mysql_db` | Persistent MariaDB data |
+| `./db_data` | Persistent MariaDB data |
 | `./redis/redis_data` | Persistent Redis snapshots |
 | `./shared_migrations` | Alembic migration files (auto-created, shared between services) |
 | `../../../auth_user_service` | Live source mount — Python changes apply without rebuild |
@@ -193,8 +201,8 @@ docker compose stop
 # Stop and remove containers (keeps data volumes)
 docker compose down
 
-# Full reset — removes all stored data
-docker compose down -v
+# Full reset — stops containers and wipes the database (prompts for confirmation)
+bash init.sh --reset-db
 
 # Rebuild one service after dependency changes
 docker compose up -d --build auth_user_service

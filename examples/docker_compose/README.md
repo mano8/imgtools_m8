@@ -18,6 +18,26 @@ or when building toward a production setup.
 
 ---
 
+## Quick start
+
+Every stack follows the same three steps:
+
+```sh
+# 1. copy env files and fill in secrets
+cp .env.example .env && cp auth.env.example auth.env && cp api.env.example api.env
+
+# 2. generate keys (RS256/ES* stacks) and TLS certificates
+bash init.sh
+
+# 3. bring up the stack — DB is provisioned automatically on first boot
+docker compose up -d --build
+```
+
+To reset the database: `bash init.sh --reset-db` (prompts for confirmation; use `--yes` for CI).
+To rotate cryptographic keys: `bash init.sh --rotate-keys`.
+
+---
+
 ## Common architecture
 
 All stacks share the same service layout:

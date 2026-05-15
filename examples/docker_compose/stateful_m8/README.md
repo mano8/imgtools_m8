@@ -57,7 +57,15 @@ TOKENS_ENCRYPTION_KEY="<generate>"  # encrypts refresh token payloads at rest
 
 `api.env` requires no changes for local development.
 
-### 2. Start
+### 2. Run init
+
+```sh
+bash init.sh
+```
+
+Generates TLS certificates for Traefik. No keys needed for HS256.
+
+### 3. Start
 
 ```sh
 docker compose up --build
@@ -197,7 +205,7 @@ histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
 
 | Path | Purpose |
 | --- | --- |
-| `./mysql_db` | Persistent MariaDB data |
+| `./db_data` | Persistent MariaDB data |
 | `./redis/redis_data` | Persistent Redis snapshots |
 | `./prometheus/data` | Prometheus TSDB |
 | `./grafana/data` | Grafana dashboards and state |
@@ -227,8 +235,10 @@ docker compose stop
 # Stop and remove containers (keeps data volumes)
 docker compose down
 
-# Full reset — removes all stored data including Prometheus and Grafana state
-docker compose down -v
+# Full reset — stops containers and wipes the database (prompts for confirmation)
+# Note: Prometheus and Grafana data in ./prometheus/data and ./grafana/data persist.
+# Delete those directories manually if you also want to reset observability state.
+bash init.sh --reset-db
 ```
 
 ---
