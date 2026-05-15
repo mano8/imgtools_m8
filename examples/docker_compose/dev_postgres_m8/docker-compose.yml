@@ -18,16 +18,22 @@ services:
   m8_db:
     image: postgres:16-alpine
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - ./db_data:/var/lib/postgresql/data
+      - ../shared/db_init:/docker-entrypoint-initdb.d:ro
     environment:
-      - POSTGRES_DB=${DB_DATABASE}
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - PGPORT=${DB_PORT}
+      - AUTH_DB_USER=${AUTH_DB_USER}
+      - AUTH_DB_PASSWORD=${AUTH_DB_PASSWORD}
+      - AUTH_DB_NAME=${AUTH_DB_NAME}
+      - API_DB_USER=${API_DB_USER}
+      - API_DB_PASSWORD=${API_DB_PASSWORD}
+      - API_DB_NAME=${API_DB_NAME}
     ports:
       - "127.0.0.1:${DB_PORT}:${DB_PORT}"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5

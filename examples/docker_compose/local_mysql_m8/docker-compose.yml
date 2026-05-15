@@ -21,18 +21,22 @@ services:
   m8_db:
     image: mariadb:12-ubi
     volumes:
-      - ./mysql_db:/var/lib/mysql
+      - ./db_data:/var/lib/mysql
+      - ../shared/db_init:/docker-entrypoint-initdb.d:ro
     environment:
       - MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=0
       - MARIADB_PORT_NUMBER=${DB_PORT}
       - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
-      - MARIADB_USER=${DB_USER}
-      - MARIADB_PASSWORD=${DB_PASSWORD}
-      - MARIADB_DATABASE=${DB_DATABASE}
+      - AUTH_DB_USER=${AUTH_DB_USER}
+      - AUTH_DB_PASSWORD=${AUTH_DB_PASSWORD}
+      - AUTH_DB_NAME=${AUTH_DB_NAME}
+      - API_DB_USER=${API_DB_USER}
+      - API_DB_PASSWORD=${API_DB_PASSWORD}
+      - API_DB_NAME=${API_DB_NAME}
     ports:
       - "127.0.0.1:3306:3306"
     healthcheck:
-      test: ["CMD-SHELL", "MYSQL_PWD=$$MARIADB_PASSWORD mariadb -u $$MARIADB_USER -e 'SELECT 1' $$MARIADB_DATABASE"]
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MARIADB_ROOT_PASSWORD mariadb -u root -e 'SELECT 1'"]
       interval: 10s
       timeout: 5s
       retries: 10
