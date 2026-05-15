@@ -18,7 +18,7 @@ services:
   m8_db:
     image: mariadb:12-ubi
     volumes:
-      - ./mysql_db://var/lib/mysql
+      - ./mysql_db:/var/lib/mysql
     environment:
       - MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=0
       - MARIADB_PORT_NUMBER=${DB_PORT}
@@ -29,16 +29,15 @@ services:
     ports:
       - "127.0.0.1:3306:3306"
     healthcheck:
-      test: ["CMD-SHELL", "MYSQL_PWD=$$MARIADB_ROOT_PASSWORD mariadb-admin ping -h localhost -u root"]
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MARIADB_PASSWORD mariadb -u $$MARIADB_USER -e 'SELECT 1' $$MARIADB_DATABASE"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     networks:
       - m8_app_network
 
-  
   redis_cache:
     image: redis:7.4-alpine
     volumes:
@@ -63,81 +62,45 @@ services:
     restart: unless-stopped
     networks:
       - m8_app_network
-  
-  
+
   prometheus:
     image: ubuntu/prometheus:3.11-24.04_stable
-
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/data:/prometheus
-
     ports:
       - "127.0.0.1:9090:9090"
-
     networks:
       - m8_app_network
-
     restart: unless-stopped
-  
+
   grafana:
     image: grafana/grafana:13.1.0-25530058790
-
     depends_on:
       - prometheus
-
     env_file:
       - ./grafana/config.monitoring
-
     volumes:
       - ./grafana/data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
-
     ports:
       - "127.0.0.1:3000:3000"
-
     networks:
       - m8_app_network
-
     restart: unless-stopped
-  
+
   auth_user_service:
     build:
       context: ../../../
       dockerfile: ./auth_user_service/Dockerfile
     env_file:
       - ./auth.env
-    environment:
-      ENVIRONMENT: ${ENVIRONMENT}
-      API_PREFIX: ${API_PREFIX}
-      SET_OPEN_API: ${SET_OPEN_API}
-      SET_DOCS: ${SET_DOCS}
-      SET_REDOC: ${SET_REDOC}
-      BACKEND_HOST: ${BACKEND_HOST}
-      FRONTEND_HOST: ${FRONTEND_HOST}
-      SELECTED_DB: ${SELECTED_DB}
-      DB_HOST: ${DB_HOST}
-      DB_DATABASE: ${DB_DATABASE}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_USER: ${DB_USER}
-      REDIS_USER: ${REDIS_USER}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      FIRST_SUPERUSER: ${FIRST_SUPERUSER}
-      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
-      ACCESS_SECRET_KEY: ${ACCESS_SECRET_KEY:-}
-      ACCESS_PRIVATE_KEY: ${ACCESS_PRIVATE_KEY:-}
-      ACCESS_PUBLIC_KEY: ${ACCESS_PUBLIC_KEY:-}
-      REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY}
-      ACCESS_TOKEN_ALGORITHM: ${ACCESS_TOKEN_ALGORITHM:-HS256}
-      REFRESH_TOKEN_ALGORITHM: ${REFRESH_TOKEN_ALGORITHM:-HS256}
-      TOKEN_MODE: ${TOKEN_MODE:-stateful}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
       - ../../../auth_user_service:/opt/auth_user_service
       - ./auth.env:/opt/auth_user_service/.env:ro
       - ./shared_migrations:/opt/shared_migrations
       - ./auth_user/static:/opt/auth_user_service/app/static
+      - ./keys:/opt/keys:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.auth-router.entrypoints=api,websecure"
@@ -153,34 +116,9 @@ services:
   fastapi_service:
     build:
       context: ../../
-      dockerfile: .\fastapi_service\Dockerfile
+      dockerfile: ./fastapi_service/Dockerfile
     env_file:
       - ./api.env
-    environment:
-      ENVIRONMENT: ${ENVIRONMENT}
-      API_PREFIX: ${API_PREFIX}
-      SET_OPEN_API: ${SET_OPEN_API}
-      SET_DOCS: ${SET_DOCS}
-      SET_REDOC: ${SET_REDOC}
-      BACKEND_HOST: ${BACKEND_HOST}
-      FRONTEND_HOST: ${FRONTEND_HOST}
-      SELECTED_DB: ${SELECTED_DB}
-      DB_HOST: ${DB_HOST}
-      DB_DATABASE: ${DB_DATABASE}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_USER: ${DB_USER}
-      REDIS_USER: ${REDIS_USER}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-      FIRST_SUPERUSER: ${FIRST_SUPERUSER}
-      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
-      ACCESS_SECRET_KEY: ${ACCESS_SECRET_KEY:-}
-      ACCESS_PUBLIC_KEY: ${ACCESS_PUBLIC_KEY:-}
-      REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY}
-      ACCESS_TOKEN_ALGORITHM: ${ACCESS_TOKEN_ALGORITHM:-HS256}
-      TOKEN_MODE: ${TOKEN_MODE:-stateful}
-      AUTH_PREFIX: ${AUTH_PREFIX}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
       - ../../fastapi_service:/opt/fastapi_service
       - ./api.env:/opt/fastapi_service/.env:ro
@@ -199,31 +137,6 @@ services:
         condition: service_started
     networks:
       - m8_app_network
-  # ── Consumer service (optional) ───────────────────────────────────────────
-  # Uncomment and configure for your own FastAPI application.
-  # Set TOKEN_MODE=stateless and provide ACCESS_SECRET_KEY (HS256) or
-  # ACCESS_PUBLIC_KEY (RS256/ES256) matching the auth service.
-  #
-  # fastapi_service:
-  #   build:
-  #     context: <path-to-your-service>
-  #     dockerfile: ./Dockerfile
-  #   env_file:
-  #     - ./api.env
-  #   environment:
-  #     TOKEN_MODE: stateless
-  #     ACCESS_SECRET_KEY: ${ACCESS_SECRET_KEY:-}
-  #     REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY}
-  #     ACCESS_TOKEN_ALGORITHM: ${ACCESS_TOKEN_ALGORITHM:-HS256}
-  #     AUTH_PREFIX: /user
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.fastapi-service.entrypoints=api,websecure"
-  #     - "traefik.http.services.fastapi-service.loadbalancer.server.port=8000"
-  #   depends_on:
-  #     - auth_user_service
-  #   networks:
-  #     - m8_app_network
 
 networks:
   m8_app_network:
