@@ -6,7 +6,7 @@ database engines, token modes, and observability options.
 ## Which stack should I use?
 
 | Stack | Database | Token mode | Monitoring | Best for |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | [local_mysql_m8](local_mysql_m8/) | MariaDB | hybrid | — | Fastest start, everyday dev |
 | [dev_postgres_m8](dev_postgres_m8/) | PostgreSQL 16 | stateful | — | PostgreSQL projects |
 | [stateful_m8](stateful_m8/) | MariaDB | stateful | Prometheus + Grafana | Testing metrics & dashboards |
@@ -70,7 +70,7 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
 Set `TOKEN_MODE` in `.env` to control how access tokens are validated:
 
 | Mode | How it works | Redis required | Use case |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `stateless` | Verify JWT signature only — no server state | No | Maximum scalability |
 | `hybrid` | JWT access token + Redis-stored refresh token | Yes | Good balance |
 | `stateful` | Every request checks Redis blacklist | Yes | Instant logout guarantee |
@@ -101,7 +101,7 @@ a volume.
 ## Ports (same for all stacks)
 
 | Port | Bound to | What |
-|---|---|---|
+| --- | --- | --- |
 | `8000` | `0.0.0.0` | Traefik HTTP — public |
 | `4430` | `0.0.0.0` | Traefik HTTPS — public |
 | `9000` | `127.0.0.1` | API services entry (override with `API_BIND_IP`) |
