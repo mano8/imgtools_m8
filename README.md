@@ -1,5 +1,6 @@
 # fa-auth-m8
 
+![CI/CD](https://github.com/mano8/fa-auth-m8/actions/workflows/CI.yaml/badge.svg?branch=main)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/edab51cc8805468fb3884e1d9e57ccdc)](https://app.codacy.com/gh/mano8/fa-auth-m8/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![codecov](https://codecov.io/gh/mano8/fa-auth-m8/graph/badge.svg?token=LH7GTT2JZY)](https://codecov.io/gh/mano8/fa-auth-m8)
 
@@ -111,7 +112,7 @@ cp example.env.txt .env
 docker compose up --build
 ```
 
-Alembic migrations run automatically. The first start also seeds the superuser defined by `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD`.
+Alembic migrations run automatically. The first start seeds the superuser from `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD`. On all subsequent starts those values are ignored — the seed is skipped if any superuser already exists in the database.
 
 ### 3. Verify
 
@@ -203,8 +204,8 @@ Or use `examples/docker_compose/RS256_m8/keys/generate_keys.sh`.
 
 | Variable | Required | Description |
 | -------- | -------- | ----------- |
-| `FIRST_SUPERUSER` | yes | Email of the bootstrap superuser |
-| `FIRST_SUPERUSER_PASSWORD` | yes | Password of the bootstrap superuser |
+| `FIRST_SUPERUSER` | yes | Email of the bootstrap superuser — used only on first run; ignored once any superuser exists in the database |
+| `FIRST_SUPERUSER_PASSWORD` | yes | Password of the bootstrap superuser — used only on first run; ignored on subsequent starts |
 | `GOOGLE_CLIENT_ID` | no | Google OAuth2 client ID |
 | `GOOGLE_CLIENT_SECRET` | no | Google OAuth2 client secret |
 | `PRIVATE_API_SECRET` | yes | Shared secret for `X-Internal-Token` header |

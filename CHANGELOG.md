@@ -4,6 +4,14 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.6.1] - 2026-05-16
+
+### Fixed
+
+- **Idempotent superuser seed**: `initial_user_db` now guards on the presence of any superuser in the database instead of looking up the specific bootstrap email. On subsequent `compose up` runs the seed is skipped entirely and a log line confirms it — `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD` remain required by config but are never applied again after the first run.
+
+---
+
 ## [0.6.0] - 2026-05-14
 
 ### Security
