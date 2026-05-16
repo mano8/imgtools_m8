@@ -174,4 +174,4 @@ async def redis_unavailable_handler(
 
 
 if __name__ == "__main__":
-    uvicorn.run("auth_user_service.main:app", host="0.0.0.0", port=5378, reload=True)
+    uvicorn.run("auth_user_service.main:app", host="0.0.0.0", port=5378, reload=True)  # nosec B104
