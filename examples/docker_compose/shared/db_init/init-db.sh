@@ -38,13 +38,13 @@ check_identifier() {
 # ── DB provisioning ───────────────────────────────────────────────────────────
 
 create_user_and_db() {
-    local user="$1" password="$2" dbname="$3" prefix="$4"
+    local user="$1" db_pass="$2" dbname="$3" prefix="$4"
     echo "==> provisioning [${prefix}] ${dbname} (${user})"
     case "$ENGINE" in
         mariadb)
             mariadb -u root -p"${MARIADB_ROOT_PASSWORD}" <<SQL
 CREATE DATABASE IF NOT EXISTS \`${dbname}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${user}'@'%' IDENTIFIED BY '${password}';
+CREATE USER IF NOT EXISTS '${user}'@'%' IDENTIFIED BY '${db_pass}';
 GRANT ALL PRIVILEGES ON \`${dbname}\`.* TO '${user}'@'%';
 FLUSH PRIVILEGES;
 SQL
@@ -54,7 +54,7 @@ SQL
 DO \$\$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${user}') THEN
-        EXECUTE format('CREATE USER %I WITH PASSWORD %L', '${user}', '${password}');
+        EXECUTE format('CREATE USER %I WITH PASSWORD %L', '${user}', '${db_pass}');
     END IF;
 END
 \$\$;

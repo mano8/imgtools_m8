@@ -31,7 +31,7 @@ import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterator
+
 
 import jwt
 import pytest

@@ -1,0 +1,8 @@
+line-length = 88
+
+exclude = [
+    ".git",
+    "__pycache__",
+    "examples/docker_compose",   # infrastructure templates, auto-generated migrations
+    "**/alembic/versions",       # auto-generated Alembic migration files
+]
