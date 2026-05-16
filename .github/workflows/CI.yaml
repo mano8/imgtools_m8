@@ -69,6 +69,37 @@ jobs:
       - name: Install dependencies
         run: pip install -r auth_user_service/requirements_dev.txt
 
+      - name: Create test .env
+        run: |
+          cat > auth_user_service/.env << 'ENVEOF'
+          DOMAIN=localhost
+          ENVIRONMENT=local
+          PROJECT_NAME=fa-auth-m8
+          STACK_NAME=fa-auth-m8
+          API_PREFIX=/user
+          STATIC_BASE_PATH=/static
+          TEMPLATES_BASE_PATH=/templates
+          BACKEND_HOST=http://localhost:8000
+          FRONTEND_HOST=http://localhost:5173
+          BACKEND_CORS_ORIGINS=http://localhost:8000,http://localhost:5173
+          SELECTED_DB=Mysql
+          DB_HOST=localhost
+          DB_PORT=3306
+          DB_DATABASE=test_db
+          DB_USER=test_user
+          DB_PASSWORD=CiTestDb_Passw0rd
+          REDIS_HOST=localhost
+          REDIS_PORT=6379
+          REDIS_USER=appuser
+          REDIS_PASSWORD=CiTestRed_Passw0rd
+          ACCESS_SECRET_KEY=CiTest-AccessKey-fa-auth2024-AbCdE
+          REFRESH_SECRET_KEY=CiTest-RefreshKey-fa-auth2024-AbCd
+          FIRST_SUPERUSER=ci-admin@example.com
+          FIRST_SUPERUSER_PASSWORD=CiTestSup_Pass0rd
+          PRIVATE_API_SECRET=CiTest-PrivateApi-fa-auth2024-AbCd
+          TOKENS_ENCRYPTION_KEY=CiTest-TokensEnc-fa-auth2024-AbCd
+          ENVEOF
+
       - name: Run tests
         run: pytest --cov-report=xml
 
