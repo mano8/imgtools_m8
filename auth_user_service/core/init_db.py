@@ -7,11 +7,16 @@ default superuser if one does not already exist. It is expected that
 database tables are created via Alembic migrations.
 """
 
+import logging
+
 from sqlmodel import Session, select
-from auth_user_service.services.users import UserController
+
+from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
 from auth_user_service.core.config import settings
 from auth_user_service.db_models.users import User, UserCreate
-from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
+from auth_user_service.services.users import UserController
+
+logger = logging.getLogger(__name__)
 # make sure all SQLModel models are imported (app.models)
 # before initializing DB otherwise, SQLModel might fail
 # to initialize relationships properly
@@ -21,36 +26,30 @@ from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
 
 def initial_user_db(session: Session) -> None:
     """
-    Initialize the database with initial data.
+    Initialize the database with the first superuser on first run only.
 
-    This function checks if a superuser exists in the database using
-    the default email provided in the settings. If the superuser is not
-    found, it creates one using the provided credentials. Tables should
-    be created via Alembic migrations prior to calling this function.
+    On the first run (no superuser in the DB), creates one from
+    FIRST_SUPERUSER / FIRST_SUPERUSER_PASSWORD. On all subsequent starts,
+    returns immediately — the env vars are always required by config but
+    are only acted upon once.
 
     Parameters:
         session (Session):
             The SQLModel database session used for executing queries.
     """
-    # Tables should be created with Alembic migrations
-    # But if you don't want to use migrations, create
-    # the tables un-commenting the next lines
-    # from sqlmodel import SQLModel
-
-    # This works because the models are already imported
-    # and registered from app.models
-    # SQLModel.metadata.create_all(engine)
-    # ✅ Ensure all tables are created
-    user = session.exec(
-        select(User).where(User.email == settings.FIRST_SUPERUSER)
+    existing = session.exec(
+        select(User).where(User.is_superuser)
     ).first()
-    if not user:
-        user_in = UserCreate(
-            provider=AuthProviderType.PASSWORD,
-            provider_user_id=None,
-            email=settings.FIRST_SUPERUSER,
-            password=settings.FIRST_SUPERUSER_PASSWORD.get_secret_value(),
-            is_superuser=True,
-            role=RoleType.SUPERADMIN,
-        )
-        user = UserController.create_user(session=session, user_create=user_in)
+    if existing:
+        logger.info("Superuser already exists — skipping initial seed.")
+        return
+
+    user_in = UserCreate(
+        provider=AuthProviderType.PASSWORD,
+        provider_user_id=None,
+        email=settings.FIRST_SUPERUSER,
+        password=settings.FIRST_SUPERUSER_PASSWORD.get_secret_value(),
+        is_superuser=True,
+        role=RoleType.SUPERADMIN,
+    )
+    UserController.create_user(session=session, user_create=user_in)
