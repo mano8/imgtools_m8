@@ -64,6 +64,51 @@ are not directly reachable from the host.
 
 ---
 
+## Database isolation
+
+`init-db.sh` runs inside the DB container on first volume creation and provisions
+databases automatically. Choose one model in `.env`:
+
+**Scenario 1 — single shared DB** (simplest):
+
+```ini
+DB_USER=myuser
+DB_PASSWORD=a-strong-password
+DB_NAME=myapp
+```
+
+All services share one database and one user.
+
+**Scenario 2 — per-service isolation** (default in all stacks):
+
+```ini
+AUTH_DB_USER=auth_user   AUTH_DB_PASSWORD=...  AUTH_DB_NAME=auth_db
+API_DB_USER=api_user     API_DB_PASSWORD=...   API_DB_NAME=api_db
+```
+
+Each service gets its own database and credentials. `init-db.sh` creates them automatically.
+
+**Scenario 3 — N-service isolation** (extend Scenario 2 freely):
+
+```ini
+WORKER_DB_USER=worker_user  WORKER_DB_PASSWORD=...  WORKER_DB_NAME=worker_db
+SEARCH_DB_USER=search_user  SEARCH_DB_PASSWORD=...  SEARCH_DB_NAME=search_db
+```
+
+Add any `PREFIX_DB_{USER,PASSWORD,NAME}` triplet. Prefixes must be `UPPERCASE`,
+start with a letter, and use only `[A-Z0-9_]`. No compose edits needed — the DB
+container sees all `.env` vars via `env_file:` and discovers triplets automatically.
+
+**Validation**: `init-db.sh` detects and rejects: missing/empty fields, duplicate
+`DB_NAME` or `DB_USER` across prefixes (silent isolation collapse), invalid identifier
+characters, and mixed bare+prefixed configuration. Weak or reused passwords produce
+warnings without blocking startup.
+
+**Stale volume**: Database provisioning runs **once** on first volume creation.
+If `.env` DB config changes after the volume exists, reset with `bash init.sh --reset-db`.
+
+---
+
 ## Environment file system
 
 Each stack uses **three env files**. Copy the `.example` files and fill in your values:

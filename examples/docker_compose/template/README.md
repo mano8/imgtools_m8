@@ -22,6 +22,10 @@ DB provisioning runs automatically on first `docker compose up -d` via `init-db.
 To reset the database later: `bash init.sh --reset-db` (prompts for confirmation).
 To rotate keys without reinitializing: `bash init.sh --rotate-keys`.
 
+For the DB isolation model, see `.env.example` — choose Scenario 1 (single shared DB),
+Scenario 2 (per-service, default), or Scenario 3 (N arbitrary services). See the
+[database isolation guide](../README.md#database-isolation) for full documentation.
+
 Refer to the other stacks in `examples/docker_compose/` for complete working examples:
 
 | Stack | Key difference |

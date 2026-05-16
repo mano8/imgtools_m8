@@ -20,16 +20,12 @@ services:
     volumes:
       - ./db_data:/var/lib/postgresql/data
       - ../shared/db_init:/docker-entrypoint-initdb.d:ro
+    env_file:
+      - ./.env                          # exposes all .env vars so init-db.sh can discover DB triplets
     environment:
-      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_USER=${DB_USER}        # engine bootstrap — required by the official postgres image
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - PGPORT=${DB_PORT}
-      - AUTH_DB_USER=${AUTH_DB_USER}
-      - AUTH_DB_PASSWORD=${AUTH_DB_PASSWORD}
-      - AUTH_DB_NAME=${AUTH_DB_NAME}
-      - API_DB_USER=${API_DB_USER}
-      - API_DB_PASSWORD=${API_DB_PASSWORD}
-      - API_DB_NAME=${API_DB_NAME}
     ports:
       - "127.0.0.1:${DB_PORT}:${DB_PORT}"
     healthcheck:

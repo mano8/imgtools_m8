@@ -214,6 +214,18 @@ histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
 
 ---
 
+## Database isolation
+
+This stack defaults to **Scenario 2** (per-service isolation): `auth_db` and `api_db`
+are created as separate databases with separate users on first volume init. To switch
+to a single shared DB or add more services, see the scenario blocks in `.env.example`
+and the [database isolation guide](../README.md#database-isolation).
+
+Database provisioning runs **once** on first volume creation. If `.env` DB config
+changes after the volume exists, reset with `bash init.sh --reset-db`.
+
+---
+
 ## Common operations
 
 ```sh
