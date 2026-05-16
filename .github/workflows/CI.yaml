@@ -98,6 +98,8 @@ jobs:
           FIRST_SUPERUSER_PASSWORD=CiTestSup_Pass0rd
           PRIVATE_API_SECRET=CiTest-PrivateApi-fa-auth2024-AbCd
           TOKENS_ENCRYPTION_KEY=CiTest-TokensEnc-fa-auth2024-AbCd
+          GOOGLE_CLIENT_ID=fake-ci-client.apps.googleusercontent.com
+          GOOGLE_CLIENT_SECRET=CiTest-GoogleSecret-fa-auth2024-AbCd
           ENVEOF
 
       - name: Run tests
