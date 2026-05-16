@@ -19,7 +19,7 @@ def health_check() -> dict[str, Any]:
     Useful for monitoring and for diagnosing silent degradation when TOKEN_MODE
     is ``stateful`` or ``hybrid`` but Redis is unavailable.
     """
-    redis_required = settings.TOKEN_MODE != "stateless"
+    redis_required = settings.requires_redis
 
     redis_ok = False
     if redis_required:

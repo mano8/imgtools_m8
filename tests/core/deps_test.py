@@ -98,6 +98,7 @@ class TestGetCurrentUser:
             patch("auth_user_service.core.deps.get_redis_client") as mock_get_redis,
         ):
             mock_cfg.TOKEN_MODE = "hybrid"
+            mock_cfg.is_stateful = False
             result = get_current_user(token=token)
 
         mock_get_redis.assert_not_called()

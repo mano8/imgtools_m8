@@ -317,6 +317,7 @@ async def test_successful_oauth_registers_refresh_jti_in_allowlist():
         patch("auth_user_service.routes.google_auth.settings") as mock_settings,
     ):
         mock_settings.TOKEN_MODE = "stateful"
+        mock_settings.is_stateless = False
         mock_settings.ENVIRONMENT = "local"
         mock_settings.REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS = 604800
         mock_settings.ACCESS_TOKEN_EXPIRE_MINUTES = 30

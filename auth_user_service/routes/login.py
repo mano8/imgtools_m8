@@ -81,7 +81,7 @@ def login_access_token(
 
     _m = _get_metrics()
 
-    if redis is not None and settings.TOKEN_MODE != "stateless":
+    if redis is not None and not settings.is_stateless:
         rate_limiter = LoginRateLimiter(redis)
         if not rate_limiter.is_allowed(email):
             if _m and _m.login_attempts_total:
@@ -110,7 +110,7 @@ def login_access_token(
             detail="Invalid credentials or inactive user",
         )
 
-    if redis is not None and settings.TOKEN_MODE != "stateless":
+    if redis is not None and not settings.is_stateless:
         LoginRateLimiter(redis).reset(email)
 
     if _m and _m.login_attempts_total:
@@ -122,7 +122,7 @@ def login_access_token(
 
     access_token, refresh_token, jti = AuthController.create_auth_tokens(user=user)
 
-    if settings.TOKEN_MODE != "stateless":
+    if not settings.is_stateless:
         AuthController.create_auth_session(
             session=session,
             user=user,
@@ -173,7 +173,7 @@ def login_refresh_token(
         raise HTTPException(status_code=401, detail=str(err)) from err
 
     # Allowlist check: stateful/hybrid modes require the JTI to be registered.
-    if settings.TOKEN_MODE != "stateless" and redis is not None:
+    if not settings.is_stateless and redis is not None:
         if not RedisRefreshStore(redis).is_valid(old_jti):
             if _m and _m.token_refresh_total:
                 _m.token_refresh_total.labels(result="revoked").inc()
@@ -188,7 +188,7 @@ def login_refresh_token(
         user=user
     )
 
-    if settings.TOKEN_MODE != "stateless":
+    if not settings.is_stateless:
         # Rotate first: if the Lua script finds old_jti already gone, a concurrent
         # request won the race or this is a reuse attack — reject before any DB write.
         if redis is not None:
@@ -246,7 +246,7 @@ def logout(
     jti: str | None = None
 
     # Blacklist the access token JTI so it cannot be reused until natural expiry.
-    if settings.TOKEN_MODE == "stateful":
+    if settings.is_stateful:
         try:
             payload = _access_validator.validate_access_token(token)
             jti = payload.jti
@@ -261,7 +261,7 @@ def logout(
             logger.warning("Could not blacklist access token JTI on logout.")
 
     # Revoke the refresh JTI from the Redis allowlist.
-    if redis is not None and settings.TOKEN_MODE != "stateless":
+    if redis is not None and not settings.is_stateless:
         try:
             _, refresh_jti = SecurityHelper.decode_refresh_token(
                 refresh_token,
@@ -275,7 +275,7 @@ def logout(
             logger.warning("Could not revoke refresh JTI on logout.")
 
     # Remove the DB session record.
-    if settings.TOKEN_MODE != "stateless" and jti is not None:
+    if not settings.is_stateless and jti is not None:
         try:
             SessionController.delete_session_by_jti(session=session, jti=jti)
         except Exception:  # noqa: BLE001

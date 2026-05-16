@@ -36,7 +36,7 @@ def _startup_checks() -> None:
 
     check_config_health(settings, _logger)
 
-    if settings.TOKEN_MODE != "stateless":
+    if settings.requires_redis:
         redis = get_redis_client()
         if redis is None:
             _logger.critical(
@@ -49,10 +49,7 @@ def _startup_checks() -> None:
                 "STARTUP: Redis connected OK (TOKEN_MODE=%s)", settings.TOKEN_MODE
             )
 
-    if not (
-        settings.AUTH_SERVICE_ROLE == "consumer"
-        and settings.TOKEN_MODE == "stateless"
-    ):
+    if not (settings.AUTH_SERVICE_ROLE == "consumer" and settings.is_stateless):
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
@@ -177,4 +174,4 @@ async def redis_unavailable_handler(
 
 
 if __name__ == "__main__":
-    uvicorn.run("auth_user_service.main:app", host="0.0.0.0", port=5378, reload=True)
+    uvicorn.run("auth_user_service.main:app", host="0.0.0.0", port=5378, reload=True)  # nosec B104

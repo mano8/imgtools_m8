@@ -75,9 +75,7 @@ class TestRevokeSessionJti:
         mock_manager = MagicMock()
 
         with (
-            patch(
-                "auth_user_service.services.client_sessions.get_redis_client"
-            ) as mock_get_redis,
+            patch("auth_user_service.services.client_sessions.get_redis_client"),
             patch(
                 "auth_user_service.services.client_sessions.RedisSessionManager"
             ) as mock_cls,

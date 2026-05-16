@@ -1,7 +1,10 @@
 
-mysql_db/*
-db/*
+db_data/*
 postgres_data/*
+db/*
 redis/*
+traefik/certs/*.pem
+traefik/certs/*.crt
+traefik/certs/*.key
 *.pem
 *README_DEV*

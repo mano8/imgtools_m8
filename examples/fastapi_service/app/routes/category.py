@@ -72,7 +72,6 @@ def read_item(session: SessionDep, current_user: CurrentUser, item_id: int) -> A
             raise HTTPException(status_code=401, detail="Not enough permissions")
         return ResponseModelBase(success=True, data=dict(item))
     except HTTPException as ex:
-        a = 1
         raise ex
     except Exception as ex:
         return BaseController.handle_exception(ex=ex, session=session)

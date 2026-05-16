@@ -57,7 +57,7 @@ _redis_pool: Optional[ConnectionPool] = (
         password=settings.REDIS_PASSWORD.get_secret_value() or None,
         decode_responses=True,
     )
-    if settings.TOKEN_MODE != "stateless"
+    if settings.requires_redis
     else None
 )
 
@@ -104,7 +104,7 @@ def get_current_user(token: TokenDep, redis: RedisDep) -> UserModel:
         ) from ex
 
     # In stateful mode, verify the JTI has not been blacklisted by auth service.
-    if settings.TOKEN_MODE == "stateful" and redis is not None:
+    if settings.is_stateful and redis is not None:
         if AccessTokenBlacklist(redis).is_revoked(payload.jti):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

@@ -4,7 +4,7 @@ These models are used to manage API keys and their associated rate limits.
 """
 
 import uuid
-from sqlalchemy import Column, Uuid
+from sqlalchemy import Uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 from sqlmodel import Column, Field, ForeignKey, Relationship, SQLModel

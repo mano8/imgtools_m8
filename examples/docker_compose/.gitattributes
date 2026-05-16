@@ -1,0 +1,2 @@
+# Normalize shell scripts to LF on checkout — prevents CRLF breaking shebang and pipefail
+*.sh text eol=lf

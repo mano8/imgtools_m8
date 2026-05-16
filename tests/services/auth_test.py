@@ -80,7 +80,7 @@ class TestCreateState:
 class TestGetGoogleLoginUrl:
     def test_returns_google_oauth_url(self):
         with (
-            patch("auth_user_service.services.auth.get_redis_client") as mock_get_redis,
+            patch("auth_user_service.services.auth.get_redis_client"),
             patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls,
         ):
             mock_pkce = MagicMock()

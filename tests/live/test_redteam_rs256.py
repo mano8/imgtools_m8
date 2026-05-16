@@ -31,7 +31,7 @@ import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterator
+
 
 import jwt
 import pytest
@@ -64,6 +64,7 @@ TIMEOUT = 10  # seconds
 
 
 # ── Token-crafting helpers ─────────────────────────────────────────────────────
+
 
 def _b64url_nopad(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
@@ -136,6 +137,7 @@ def _auth(bearer: str) -> dict:
 
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="session")
 def private_key_pem() -> str:
@@ -219,32 +221,47 @@ def regular_user(admin_headers) -> dict:
 # A  AUTHENTICATION ATTACKS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestA_AuthenticationAttacks:
     """Category A — Login endpoint abuse."""
 
     _URL = f"{AUTH_BASE}/login/access-token"
 
     def test_a01_valid_login_succeeds(self):
-        r = requests.post(self._URL, data={"username": _ADMIN_EMAIL, "password": _ADMIN_PASSWORD}, timeout=TIMEOUT)
+        r = requests.post(
+            self._URL,
+            data={"username": _ADMIN_EMAIL, "password": _ADMIN_PASSWORD},
+            timeout=TIMEOUT,
+        )
         assert r.status_code == 200
         assert "access_token" in r.json()
 
     def test_a02_wrong_password_returns_400(self):
-        r = requests.post(self._URL, data={"username": _ADMIN_EMAIL, "password": "WRONG!"}, timeout=TIMEOUT)
+        r = requests.post(
+            self._URL,
+            data={"username": _ADMIN_EMAIL, "password": "WRONG!"},
+            timeout=TIMEOUT,
+        )
         assert r.status_code == 400
         detail = r.json().get("detail", "").lower()
         assert "invalid" in detail or "incorrect" in detail
 
     def test_a03_unknown_user_returns_400_not_404(self):
         """User enumeration: 404 would confirm whether an email exists."""
-        r = requests.post(self._URL, data={"username": "ghost@nowhere.invalid", "password": "x"}, timeout=TIMEOUT)
+        r = requests.post(
+            self._URL,
+            data={"username": "ghost@nowhere.invalid", "password": "x"},
+            timeout=TIMEOUT,
+        )
         assert r.status_code == 400, (
             f"[FINDING-A03] Status {r.status_code} reveals user-existence: "
             "400 expected for all bad credentials regardless of existence"
         )
 
     def test_a04_empty_credentials_returns_422(self):
-        r = requests.post(self._URL, data={"username": "", "password": ""}, timeout=TIMEOUT)
+        r = requests.post(
+            self._URL, data={"username": "", "password": ""}, timeout=TIMEOUT
+        )
         assert r.status_code == 422
 
     def test_a05_missing_body_returns_422(self):
@@ -252,7 +269,11 @@ class TestA_AuthenticationAttacks:
         assert r.status_code == 422
 
     def test_a06_sql_injection_in_email_does_not_crash(self):
-        r = requests.post(self._URL, data={"username": "' OR '1'='1", "password": "x"}, timeout=TIMEOUT)
+        r = requests.post(
+            self._URL,
+            data={"username": "' OR '1'='1", "password": "x"},
+            timeout=TIMEOUT,
+        )
         assert r.status_code in (400, 422), (
             f"[FINDING-A06] SQL injection caused unexpected {r.status_code}: {r.text[:200]}"
         )
@@ -260,7 +281,9 @@ class TestA_AuthenticationAttacks:
 
     def test_a07_xss_in_email_not_reflected_unescaped(self):
         xss = "<script>alert(1)</script>@evil.com"
-        r = requests.post(self._URL, data={"username": xss, "password": "x"}, timeout=TIMEOUT)
+        r = requests.post(
+            self._URL, data={"username": xss, "password": "x"}, timeout=TIMEOUT
+        )
         assert r.status_code in (400, 422)
         assert r.status_code != 500
         assert "<script>" not in r.text, "[FINDING-A07] XSS payload reflected unescaped"
@@ -272,11 +295,17 @@ class TestA_AuthenticationAttacks:
             data={"username": _ADMIN_EMAIL, "password": "A" * 10_000},
             timeout=TIMEOUT,
         )
-        assert r.status_code != 500, "[FINDING-A08] Server crashed on oversized password (bcrypt DoS)"
+        assert r.status_code != 500, (
+            "[FINDING-A08] Server crashed on oversized password (bcrypt DoS)"
+        )
         assert r.status_code in (400, 413, 422)
 
     def test_a09_null_bytes_in_credentials_rejected(self):
-        r = requests.post(self._URL, data={"username": "user\x00@test.com", "password": "x\x00"}, timeout=TIMEOUT)
+        r = requests.post(
+            self._URL,
+            data={"username": "user\x00@test.com", "password": "x\x00"},
+            timeout=TIMEOUT,
+        )
         assert r.status_code in (400, 422)
         assert r.status_code != 500
 
@@ -294,6 +323,7 @@ class TestA_AuthenticationAttacks:
 # ═══════════════════════════════════════════════════════════════════════════════
 # B  JWT ATTACKS
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestB_JWTAttacks:
     """Category B — Token forgery, algorithm confusion, and replay."""
@@ -375,8 +405,12 @@ class TestB_JWTAttacks:
     def test_b09_expired_token_rejected(self, private_key_pem):
         """Token that expired an hour ago must be refused."""
         payload = _access_payload()
-        payload["exp"] = int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp())
-        token = jwt.encode(payload, private_key_pem, algorithm="RS256", headers={"kid": _ACCESS_KEY_ID})
+        payload["exp"] = int(
+            (datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()
+        )
+        token = jwt.encode(
+            payload, private_key_pem, algorithm="RS256", headers={"kid": _ACCESS_KEY_ID}
+        )
         r = requests.get(self._ME, headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 403
 
@@ -391,20 +425,33 @@ class TestB_JWTAttacks:
         token = _forge_rs256(private_key_pem, is_superuser=False)
         payload = jwt.decode(token, options={"verify_signature": False})
         payload["is_active"] = False
-        bad_token = jwt.encode(payload, private_key_pem, algorithm="RS256", headers={"kid": _ACCESS_KEY_ID})
+        bad_token = jwt.encode(
+            payload, private_key_pem, algorithm="RS256", headers={"kid": _ACCESS_KEY_ID}
+        )
         r = requests.get(self._ME, headers=_auth(bad_token), timeout=TIMEOUT)
         assert r.status_code == 403
 
     def test_b12_path_traversal_kid_does_not_crash(self, private_key_pem):
         """Injecting a path-traversal kid must not cause 500 or load arbitrary keys."""
         payload = _access_payload(is_superuser=True)
-        token = jwt.encode(payload, private_key_pem, algorithm="RS256", headers={"kid": "../../etc/passwd"})
+        token = jwt.encode(
+            payload,
+            private_key_pem,
+            algorithm="RS256",
+            headers={"kid": "../../etc/passwd"},
+        )
         r = requests.get(self._ME, headers=_auth(token), timeout=TIMEOUT)
-        assert r.status_code != 500, "[FINDING-B12] Path-traversal kid caused server error"
+        assert r.status_code != 500, (
+            "[FINDING-B12] Path-traversal kid caused server error"
+        )
 
     def test_b13_bearer_scheme_case_insensitive_handled(self, admin_token):
         """Some clients send 'bearer' in lowercase — verify correct parsing."""
-        r = requests.get(self._ME, headers={"Authorization": f"bearer {admin_token}"}, timeout=TIMEOUT)
+        r = requests.get(
+            self._ME,
+            headers={"Authorization": f"bearer {admin_token}"},
+            timeout=TIMEOUT,
+        )
         # FastAPI's OAuth2PasswordBearer is case-insensitive for the scheme
         assert r.status_code in (200, 403)  # Either accepted or consistently rejected
 
@@ -413,11 +460,14 @@ class TestB_JWTAttacks:
 # C  AUTHORIZATION / IDOR
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestC_Authorization:
     """Category C — Privilege escalation and insecure direct object references."""
 
     def test_c01_users_list_requires_superuser(self, regular_user):
-        r = requests.get(f"{AUTH_BASE}/users/", headers=regular_user["headers"], timeout=TIMEOUT)
+        r = requests.get(
+            f"{AUTH_BASE}/users/", headers=regular_user["headers"], timeout=TIMEOUT
+        )
         assert r.status_code == 403
 
     def test_c02_create_user_requires_superuser(self, regular_user):
@@ -430,8 +480,12 @@ class TestC_Authorization:
         assert r.status_code == 403
 
     def test_c03_regular_user_cannot_read_other_user(self, regular_user, admin_headers):
-        users = requests.get(f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT).json()["data"]
-        other_id = next((u["id"] for u in users if u["email"] != regular_user["email"]), None)
+        users = requests.get(
+            f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT
+        ).json()["data"]
+        other_id = next(
+            (u["id"] for u in users if u["email"] != regular_user["email"]), None
+        )
         if not other_id:
             pytest.skip("No other user available for IDOR test")
         r = requests.get(
@@ -443,9 +497,15 @@ class TestC_Authorization:
             f"[FINDING-C03] IDOR: regular user accessed user/{other_id}/"
         )
 
-    def test_c04_regular_user_cannot_delete_other_user(self, regular_user, admin_headers):
-        users = requests.get(f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT).json()["data"]
-        other_id = next((u["id"] for u in users if u["email"] != regular_user["email"]), None)
+    def test_c04_regular_user_cannot_delete_other_user(
+        self, regular_user, admin_headers
+    ):
+        users = requests.get(
+            f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT
+        ).json()["data"]
+        other_id = next(
+            (u["id"] for u in users if u["email"] != regular_user["email"]), None
+        )
         if not other_id:
             pytest.skip("No other user available")
         r = requests.delete(
@@ -456,13 +516,21 @@ class TestC_Authorization:
         assert r.status_code == 403
 
     def test_c05_regular_user_cannot_list_sessions(self, regular_user):
-        r = requests.get(f"{AUTH_BASE}/sessions/", headers=regular_user["headers"], timeout=TIMEOUT)
+        r = requests.get(
+            f"{AUTH_BASE}/sessions/", headers=regular_user["headers"], timeout=TIMEOUT
+        )
         assert r.status_code == 403
 
-    def test_c06_regular_user_cannot_get_another_users_session(self, regular_user, admin_headers):
+    def test_c06_regular_user_cannot_get_another_users_session(
+        self, regular_user, admin_headers
+    ):
         """IDOR: sessions/get-by-user/{user_id}/ requires superuser."""
-        users = requests.get(f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT).json()["data"]
-        other_id = next((u["id"] for u in users if u["email"] != regular_user["email"]), None)
+        users = requests.get(
+            f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT
+        ).json()["data"]
+        other_id = next(
+            (u["id"] for u in users if u["email"] != regular_user["email"]), None
+        )
         if not other_id:
             pytest.skip("No other user available")
         r = requests.get(
@@ -484,12 +552,20 @@ class TestC_Authorization:
         assert r.status_code != 500
 
     def test_c08_superuser_cannot_delete_self(self, admin_headers):
-        r = requests.delete(f"{AUTH_BASE}/profile/delete/me/", headers=admin_headers, timeout=TIMEOUT)
+        r = requests.delete(
+            f"{AUTH_BASE}/profile/delete/me/", headers=admin_headers, timeout=TIMEOUT
+        )
         assert r.status_code == 403
 
-    def test_c09_update_another_user_requires_superuser(self, regular_user, admin_headers):
-        users = requests.get(f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT).json()["data"]
-        other_id = next((u["id"] for u in users if u["email"] != regular_user["email"]), None)
+    def test_c09_update_another_user_requires_superuser(
+        self, regular_user, admin_headers
+    ):
+        users = requests.get(
+            f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT
+        ).json()["data"]
+        other_id = next(
+            (u["id"] for u in users if u["email"] != regular_user["email"]), None
+        )
         if not other_id:
             pytest.skip("No other user available")
         r = requests.patch(
@@ -509,6 +585,7 @@ class TestC_Authorization:
 # D  RATE LIMITING
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestD_RateLimiting:
     """Category D — Brute-force protection and bypass attempts."""
 
@@ -519,7 +596,9 @@ class TestD_RateLimiting:
         """5-attempt window: 6th request must be rate-limited."""
         target = f"bforce_{uuid.uuid4().hex[:8]}@redteam-test.com"
         statuses = [
-            requests.post(self._URL, data={"username": target, "password": "x"}, timeout=TIMEOUT).status_code
+            requests.post(
+                self._URL, data={"username": target, "password": "x"}, timeout=TIMEOUT
+            ).status_code
             for _ in range(6)
         ]
         assert 429 in statuses, (
@@ -530,14 +609,16 @@ class TestD_RateLimiting:
     def test_d02_rate_limit_response_is_informative(self):
         target = f"rl_{uuid.uuid4().hex[:8]}@redteam-test.com"
         for _ in range(6):
-            r = requests.post(self._URL, data={"username": target, "password": "x"}, timeout=TIMEOUT)
+            r = requests.post(
+                self._URL, data={"username": target, "password": "x"}, timeout=TIMEOUT
+            )
             if r.status_code == 429:
                 body = r.json()
                 assert "detail" in body
                 detail = body["detail"].lower()
-                assert any(kw in detail for kw in ("too many", "try again", "minutes")), (
-                    f"[FINDING-D02] 429 detail not informative: {body['detail']}"
-                )
+                assert any(
+                    kw in detail for kw in ("too many", "try again", "minutes")
+                ), f"[FINDING-D02] 429 detail not informative: {body['detail']}"
                 return
         pytest.skip("Rate limit not hit — Redis may have been flushed")
 
@@ -566,7 +647,9 @@ class TestD_RateLimiting:
         results = []
         for _ in range(3):
             target = f"cs_{uuid.uuid4().hex[:8]}@redteam-test.com"
-            r = requests.post(self._URL, data={"username": target, "password": "x"}, timeout=TIMEOUT)
+            r = requests.post(
+                self._URL, data={"username": target, "password": "x"}, timeout=TIMEOUT
+            )
             results.append(r.status_code)
         # Each fresh email gets a clean bucket — all should be 400 not 429
         assert all(s == 400 for s in results), (
@@ -586,6 +669,7 @@ class TestD_RateLimiting:
 # ═══════════════════════════════════════════════════════════════════════════════
 # E  CORS
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestE_CORS:
     """Category E — Cross-origin request policy."""
@@ -614,7 +698,9 @@ class TestE_CORS:
     def test_e02_unknown_origin_not_reflected(self):
         r = self._preflight("http://evil-attacker.com")
         acao = r.headers.get("access-control-allow-origin", "")
-        assert acao != "*", "[FINDING-E02] Wildcard CORS — any origin can make credentialed requests"
+        assert acao != "*", (
+            "[FINDING-E02] Wildcard CORS — any origin can make credentialed requests"
+        )
         assert "evil-attacker.com" not in acao, (
             f"[FINDING-E02] Arbitrary origin reflected in ACAO: '{acao}'"
         )
@@ -642,6 +728,7 @@ class TestE_CORS:
 # F  PRIVATE API EXPOSURE
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestF_PrivateAPI:
     """Category F — Inter-service private endpoint security.
 
@@ -651,7 +738,12 @@ class TestF_PrivateAPI:
     """
 
     _URL = f"{AUTH_BASE}/private/users/"
-    _BODY = {"email": "pvt@redteam-test.com", "password": "Test!123", "full_name": "T", "is_verified": False}
+    _BODY = {
+        "email": "pvt@redteam-test.com",
+        "password": "Test!123",
+        "full_name": "T",
+        "is_verified": False,
+    }
 
     def test_f01_private_route_blocked_by_traefik(self):
         """GOOD: Traefik returns 404 — /private/ not reachable from the internet."""
@@ -664,7 +756,8 @@ class TestF_PrivateAPI:
     def test_f02_private_route_blocked_with_wrong_token(self):
         """Traefik blocks before any X-Internal-Token check can occur."""
         r = requests.post(
-            self._URL, json=self._BODY,
+            self._URL,
+            json=self._BODY,
             headers={"X-Internal-Token": "wrong_totally"},
             timeout=TIMEOUT,
         )
@@ -672,7 +765,10 @@ class TestF_PrivateAPI:
 
     def test_f03_private_route_blocked_with_admin_jwt(self, admin_headers):
         """Admin JWT does not open the private route through Traefik."""
-        body = {**self._BODY, "email": f"pvt_jwt_{uuid.uuid4().hex[:6]}@redteam-test.com"}
+        body = {
+            **self._BODY,
+            "email": f"pvt_jwt_{uuid.uuid4().hex[:6]}@redteam-test.com",
+        }
         r = requests.post(self._URL, json=body, headers=admin_headers, timeout=TIMEOUT)
         assert r.status_code == 404
 
@@ -691,9 +787,13 @@ class TestF_PrivateAPI:
           3. Never commit secrets; enforce with gitleaks / truffleHog in CI.
           4. Add an explicit Traefik deny rule for /private/ as defence-in-depth.
         """
-        body = {**self._BODY, "email": f"pvt_known_{uuid.uuid4().hex[:6]}@redteam-test.com"}
+        body = {
+            **self._BODY,
+            "email": f"pvt_known_{uuid.uuid4().hex[:6]}@redteam-test.com",
+        }
         r = requests.post(
-            self._URL, json=body,
+            self._URL,
+            json=body,
             headers={"X-Internal-Token": _PRIVATE_API_SECRET},
             timeout=TIMEOUT,
         )
@@ -718,19 +818,24 @@ class TestF_PrivateAPI:
 # G  FILE UPLOAD SECURITY
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestG_FileUpload:
     """Category G — Avatar upload endpoint abuse."""
 
     _URL = f"{AUTH_BASE}/profile/upload_avatar/"
 
     def test_g01_upload_requires_auth(self):
-        r = requests.post(self._URL, files={"file": ("x.jpg", b"x", "image/jpeg")}, timeout=TIMEOUT)
+        r = requests.post(
+            self._URL, files={"file": ("x.jpg", b"x", "image/jpeg")}, timeout=TIMEOUT
+        )
         assert r.status_code in (401, 403)
 
     def test_g02_php_file_rejected_by_mime(self, regular_user):
         r = requests.post(
             self._URL,
-            files={"file": ("shell.php", b"<?php system($_GET['c']); ?>", "text/plain")},
+            files={
+                "file": ("shell.php", b"<?php system($_GET['c']); ?>", "text/plain")
+            },
             headers=regular_user["headers"],
             timeout=TIMEOUT,
         )
@@ -762,7 +867,9 @@ class TestG_FileUpload:
         if r.status_code == 200:
             # Verify no script tag survives
             body_str = json.dumps(r.json())
-            assert "<script>" not in body_str, "[FINDING-G04] SVG with XSS accepted without sanitization"
+            assert "<script>" not in body_str, (
+                "[FINDING-G04] SVG with XSS accepted without sanitization"
+            )
 
     def test_g05_path_traversal_in_filename_sanitised(self, regular_user):
         """../../etc/passwd as filename must not escape the avatar directory."""
@@ -806,6 +913,7 @@ class TestG_FileUpload:
 # ═══════════════════════════════════════════════════════════════════════════════
 # H  INFORMATION DISCLOSURE
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestH_InformationDisclosure:
     """Category H — Sensitive data leakage via errors, docs, and metadata."""
@@ -901,6 +1009,7 @@ class TestH_InformationDisclosure:
 # I  CROSS-SERVICE TOKEN PROPAGATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestI_CrossServiceTokens:
     """Category I — RS256 token accepted/rejected by downstream fastapi service."""
 
@@ -921,7 +1030,9 @@ class TestI_CrossServiceTokens:
         )
 
     def test_i03_alg_none_rejected_by_fastapi_service(self):
-        r = requests.get(self._SVC_LIST, headers=_auth(_forge_alg_none()), timeout=TIMEOUT)
+        r = requests.get(
+            self._SVC_LIST, headers=_auth(_forge_alg_none()), timeout=TIMEOUT
+        )
         assert r.status_code == 403, (
             "[CRITICAL-I03] alg=none accepted by downstream fastapi service"
         )
@@ -980,6 +1091,7 @@ class TestI_CrossServiceTokens:
 # J  REFRESH TOKEN LIFECYCLE
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestJ_RefreshTokenLifecycle:
     """Category J — Token rotation, replay detection, and revocation."""
 
@@ -996,7 +1108,9 @@ class TestJ_RefreshTokenLifecycle:
 
     def test_j01_refresh_rotates_access_token(self):
         sess = self._fresh_login()
-        refresh = requests.post(self._REFRESH_URL, cookies=sess["cookies"], timeout=TIMEOUT)
+        refresh = requests.post(
+            self._REFRESH_URL, cookies=sess["cookies"], timeout=TIMEOUT
+        )
         assert refresh.status_code == 200
         assert refresh.json()["access_token"] != sess["token"]
 
@@ -1010,11 +1124,15 @@ class TestJ_RefreshTokenLifecycle:
         original_cookies = sess["cookies"]
 
         # Rotate once — old JTI is consumed
-        first = requests.post(self._REFRESH_URL, cookies=original_cookies, timeout=TIMEOUT)
+        first = requests.post(
+            self._REFRESH_URL, cookies=original_cookies, timeout=TIMEOUT
+        )
         assert first.status_code == 200
 
         # Replay the original (consumed) JTI — must be caught
-        replay = requests.post(self._REFRESH_URL, cookies=original_cookies, timeout=TIMEOUT)
+        replay = requests.post(
+            self._REFRESH_URL, cookies=original_cookies, timeout=TIMEOUT
+        )
         assert replay.status_code == 401, (
             f"[FINDING-J02] Refresh token replay not detected: {replay.status_code}"
         )
@@ -1042,7 +1160,9 @@ class TestJ_RefreshTokenLifecycle:
         except Exception:
             pytest.skip("Could not decode refresh token payload")
 
-        r = requests.post(self._REFRESH_URL, cookies={"refresh_token": tampered}, timeout=TIMEOUT)
+        r = requests.post(
+            self._REFRESH_URL, cookies={"refresh_token": tampered}, timeout=TIMEOUT
+        )
         assert r.status_code == 401
 
     def test_j04_forged_hs256_refresh_with_committed_key(self):
@@ -1068,7 +1188,9 @@ class TestJ_RefreshTokenLifecycle:
             "type": "refresh",
         }
         forged = jwt.encode(payload, _REFRESH_SECRET_KEY, algorithm="HS256")
-        r = requests.post(self._REFRESH_URL, cookies={"refresh_token": forged}, timeout=TIMEOUT)
+        r = requests.post(
+            self._REFRESH_URL, cookies={"refresh_token": forged}, timeout=TIMEOUT
+        )
         # Should fail: JTI not in Redis allowlist and/or user not found
         print(
             f"\n[FINDING-J04] Forged HS256 refresh token (valid sig, unknown sub): "
@@ -1104,6 +1226,7 @@ class TestJ_RefreshTokenLifecycle:
 # ═══════════════════════════════════════════════════════════════════════════════
 # K  HTTP SECURITY HEADERS
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestK_SecurityHeaders:
     """Category K — Response header hardening."""
@@ -1144,12 +1267,15 @@ class TestK_SecurityHeaders:
     def test_k06_referrer_policy_set(self, resp_headers):
         rp = resp_headers.get("referrer-policy", "")
         if not rp:
-            print("\n[FINDING-K06] Referrer-Policy header absent — may leak URL parameters")
+            print(
+                "\n[FINDING-K06] Referrer-Policy header absent — may leak URL parameters"
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # L  COOKIE SECURITY
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestL_CookieSecurity:
     """Category L — refresh_token cookie attribute validation."""
@@ -1199,7 +1325,9 @@ class TestL_CookieSecurity:
         )
 
     def test_l06_hashed_password_not_in_any_response(self, admin_headers):
-        r = requests.get(f"{AUTH_BASE}/profile/get/me/", headers=admin_headers, timeout=TIMEOUT)
+        r = requests.get(
+            f"{AUTH_BASE}/profile/get/me/", headers=admin_headers, timeout=TIMEOUT
+        )
         assert r.status_code == 200
         body = r.json()
         assert "hashed_password" not in body, (

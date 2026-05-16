@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install lint tools
+        run: pip install ruff
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Lint
+        run: ruff check .
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Install bandit
+        run: pip install bandit
+
+      - name: Run bandit (grade A — no MEDIUM/HIGH issues)
+        run: bandit -r auth_user_service examples/fastapi_service --severity-level medium -f json -o bandit-report.json
+
+      - name: Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: auth_user_service/requirements_dev.txt
+
+      - name: Install dependencies
+        run: pip install -r auth_user_service/requirements_dev.txt
+
+      - name: Create test .env
+        run: |
+          cat > auth_user_service/.env << 'ENVEOF'
+          DOMAIN=localhost
+          ENVIRONMENT=local
+          PROJECT_NAME=fa-auth-m8
+          STACK_NAME=fa-auth-m8
+          API_PREFIX=/user
+          STATIC_BASE_PATH=/static
+          TEMPLATES_BASE_PATH=/templates
+          BACKEND_HOST=http://localhost:8000
+          FRONTEND_HOST=http://localhost:5173
+          BACKEND_CORS_ORIGINS=http://localhost:8000,http://localhost:5173
+          SELECTED_DB=Mysql
+          DB_HOST=localhost
+          DB_PORT=3306
+          DB_DATABASE=test_db
+          DB_USER=test_user
+          DB_PASSWORD=CiTestDb_Passw0rd
+          REDIS_HOST=localhost
+          REDIS_PORT=6379
+          REDIS_USER=appuser
+          REDIS_PASSWORD=CiTestRed_Passw0rd
+          ACCESS_SECRET_KEY=CiTest-AccessKey-fa-auth2024-AbCdE
+          REFRESH_SECRET_KEY=CiTest-RefreshKey-fa-auth2024-AbCd
+          FIRST_SUPERUSER=ci-admin@example.com
+          FIRST_SUPERUSER_PASSWORD=CiTestSup_Pass0rd
+          PRIVATE_API_SECRET=CiTest-PrivateApi-fa-auth2024-AbCd
+          TOKENS_ENCRYPTION_KEY=CiTest-TokensEnc-fa-auth2024-AbCd
+          GOOGLE_CLIENT_ID=fake-ci-client.apps.googleusercontent.com
+          GOOGLE_CLIENT_SECRET=CiTest-GoogleSecret-fa-auth2024-AbCd
+          ENVEOF
+
+      - name: Run tests
+        run: pytest --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          verbose: true
+
+      - name: Upload coverage to Codacy
+        if: matrix.python-version == '3.11'
+        uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699 # v1
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          coverage-reports: coverage.xml

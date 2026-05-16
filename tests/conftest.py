@@ -16,11 +16,11 @@ from sqlmodel import Session, SQLModel, create_engine
 sqlite3.register_adapter(uuid.UUID, str)
 sqlite3.register_converter("CHAR", lambda b: b.decode("utf-8"))
 
-from auth_user_service.core.security import SecurityHelper
-from auth_user_service.db_models.api_keys import ApiKey, RateLimit  # noqa: F401 – registers metadata
-from auth_user_service.db_models.sessions import ClientSession
-from auth_user_service.db_models.users import User
-from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
+from auth_user_service.core.security import SecurityHelper  # noqa: E402
+from auth_user_service.db_models.api_keys import ApiKey, RateLimit  # noqa: E402, F401
+from auth_user_service.db_models.sessions import ClientSession  # noqa: E402
+from auth_user_service.db_models.users import User  # noqa: E402
+from auth_sdk_m8.schemas.base import AuthProviderType, RoleType  # noqa: E402
 
 TEST_PASSWORD = "testpassword123"
 
