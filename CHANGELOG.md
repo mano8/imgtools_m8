@@ -4,6 +4,29 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-05-17
+
+### Fixed
+
+- **`get_user` by ID**: `users.get_user()` was looking up by email when called with an ID argument; query corrected to use `user_id`. User count query simplified.
+
+### Added
+
+- **Modular live test suite** — monolithic `test_redteam_rs256.py` replaced by six focused modules, each gated by a pytest mark so only relevant tests run against a given stack:
+  - `test_security_universal.py` — 13 attack categories (A–M) that apply to any algorithm and token mode.
+  - `test_asymmetric.py` — asymmetric-only attacks (alg=none confusion, JWKS exposure, attacker-generated key); auto-skipped when the stack uses HS256.
+  - `test_hs256.py` — HS256-specific attacks; auto-skipped on asymmetric stacks.
+  - `test_stateful.py` — token-revocation and session-chain guarantees for `TOKEN_MODE=stateful`.
+  - `test_hybrid.py` — degraded-mode and partial-Redis behaviour for `TOKEN_MODE=hybrid`.
+  - `test_stateless.py` — no-Redis guarantees for `TOKEN_MODE=stateless`.
+  - `tests/live/suites/` — shared helpers (`auth_flows.py`, `token_forge.py`) that de-duplicate login flows and JWT forgery fixtures across all modules.
+  - `conftest.py` auto-detects the running stack's algorithm and token mode; `require_algorithm` / `require_token_mode` marks trigger automatic skip.
+- **New `pytest.ini` markers**: `live_security`, `live_asymmetric`, `live_hs256`, `live_stateful`, `live_hybrid`, `live_stateless`, `require_algorithm`, `require_token_mode`, `destructive`.
+- **Session deletion and revocation tests** (`tests/services/client_sessions_test.py`) — covers `delete_session`, `revoke_session`, and Redis JTI cleanup paths.
+- **100% branch coverage** across `core/client.py`, `core/deps.py`, and `services/api_keys.py`.
+
+---
+
 ## [0.7.0] - 2026-05-16
 
 ### Added
@@ -17,9 +40,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   - Degraded-mode support: when Redis is unavailable and `API_KEY_STRICT_RATE_LIMIT=false` (default), requests are allowed through; strict mode returns 503.
 - **`get_current_api_key` FastAPI dependency** (`core/deps.py`): validates `X-API-Key` header, enforces rate limits, and queues a write-behind `last_used_at` update to Redis.
 - **Write-behind `last_used_at` flush** (`main.py` lifespan): hardened asyncio background task — exception-shielded loop, final flush on graceful shutdown (5 s timeout), Prometheus histogram for flush latency.
-- **API key CRUD endpoints** under `GET|POST|DELETE /user/profile/api-keys`:
+- **API key endpoints** under `/user/profile/api-keys/`:
+  - `GET /verify` — validate `X-API-Key` header, enforce rate limits, return key metadata (used by consumer services).
   - `POST /` — create key, enforce `API_KEY_MAX_PER_USER` cap, return plaintext once.
-  - `GET /` — list all keys for the current user.
+  - `GET /` — list all keys for the current user (metadata only; hash never exposed).
   - `GET /{key_id}` — retrieve metadata for a single key.
   - `DELETE /{key_id}` — revoke a key; emits `api_key_lifecycle_total{action="revoked"}`.
 - **`Period.MONTH`** added to `auth_sdk_m8.schemas.base.Period` enum.
