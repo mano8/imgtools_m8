@@ -121,6 +121,20 @@ class TestGetActiveKey:
         db_session.commit()
         assert ApiKeyService.get_active_key(db_session, plaintext) is None
 
+    def test_returns_key_when_no_expiry(self, db_session, sample_user):
+        plaintext, key_hash = ApiKeyService.generate_key()
+        api_key = ApiKey(
+            name="no-expiry",
+            key_hash=key_hash,
+            user_id=sample_user.id,
+            expires_at=None,
+            revoked=False,
+        )
+        db_session.add(api_key)
+        db_session.commit()
+        found = ApiKeyService.get_active_key(db_session, plaintext)
+        assert found is not None
+
 
 # ---------------------------------------------------------------------------
 # ApiKeyService.get_limits
@@ -246,3 +260,42 @@ class TestRateLimitEnforcer:
 
         assert (Period.MINUTE, 0) not in defaults
         assert any(p == Period.HOUR for p, _ in defaults)
+
+    def test_metrics_allowed_incremented(self, mock_settings):
+        from unittest.mock import patch, MagicMock as MM
+
+        redis = MagicMock()
+        self._make_pipe(redis, 1)
+        api_key = self._make_api_key()
+        enforcer = self._make_enforcer(redis, mock_settings)
+
+        mock_metrics = MM()
+        mock_counter = MM()
+        mock_metrics.api_key_rate_limit_checks_total = mock_counter
+        mock_metrics.api_key_rate_limit_hits_total = None
+
+        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_metrics):
+            result = enforcer.enforce(api_key, [(Period.MINUTE, 10)])
+
+        assert result.allowed is True
+        assert mock_counter.labels.call_count >= 2  # "checked" + "allowed"
+
+    def test_metrics_blocked_incremented(self, mock_settings):
+        from unittest.mock import patch, MagicMock as MM
+
+        redis = MagicMock()
+        self._make_pipe(redis, 100)
+        api_key = self._make_api_key()
+        enforcer = self._make_enforcer(redis, mock_settings)
+
+        mock_metrics = MM()
+        mock_counter = MM()
+        mock_hits = MM()
+        mock_metrics.api_key_rate_limit_checks_total = mock_counter
+        mock_metrics.api_key_rate_limit_hits_total = mock_hits
+
+        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_metrics):
+            result = enforcer.enforce(api_key, [(Period.MINUTE, 10)])
+
+        assert result.allowed is False
+        mock_hits.labels.assert_called_once_with(period=Period.MINUTE.value)

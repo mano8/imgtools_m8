@@ -208,3 +208,74 @@ class TestGetUserActiveSessions:
         )
 
         assert sessions == []
+
+
+class TestDeleteSessionByJti:
+    def test_removes_session_from_db(self, db_session, sample_user, sample_client_session):
+        jti = sample_client_session.jwt_jti
+
+        SessionController.delete_session_by_jti(session=db_session, jti=jti)
+
+        remaining = SessionController.get_user_active_sessions(
+            session=db_session, user_id=sample_user.id
+        )
+        assert all(s.jwt_jti != jti for s in remaining)
+
+    def test_noop_for_unknown_jti(self, db_session):
+        # Should not raise even when the JTI doesn't exist
+        SessionController.delete_session_by_jti(session=db_session, jti="nonexistent-jti")
+
+
+class TestRevokeAllUserSessions:
+    def test_revokes_active_sessions_and_returns_count(
+        self, db_session, sample_user, sample_client_session
+    ):
+        mock_redis = MagicMock()
+
+        count = SessionController.revoke_all_user_sessions(
+            session=db_session, user_id=sample_user.id, redis=mock_redis
+        )
+
+        assert count >= 1
+        remaining = SessionController.get_user_active_sessions(
+            session=db_session, user_id=sample_user.id
+        )
+        assert remaining == []
+
+    def test_blacklists_jtis_in_redis(
+        self, db_session, sample_user, sample_client_session
+    ):
+        mock_redis = MagicMock()
+        access_mgr = MagicMock()
+        refresh_store = MagicMock()
+
+        with (
+            patch(
+                "auth_user_service.services.client_sessions.RedisSessionManager",
+                return_value=access_mgr,
+            ),
+            patch(
+                "auth_user_service.services.client_sessions.RedisRefreshStore",
+                return_value=refresh_store,
+            ),
+        ):
+            SessionController.revoke_all_user_sessions(
+                session=db_session, user_id=sample_user.id, redis=mock_redis
+            )
+
+        access_mgr.blacklist_jti.assert_called()
+        refresh_store.revoke.assert_called()
+
+    def test_returns_zero_when_no_sessions(self, db_session):
+        count = SessionController.revoke_all_user_sessions(
+            session=db_session, user_id=uuid.uuid4(), redis=MagicMock()
+        )
+
+        assert count == 0
+
+    def test_skips_redis_when_none(self, db_session, sample_user, sample_client_session):
+        count = SessionController.revoke_all_user_sessions(
+            session=db_session, user_id=sample_user.id, redis=None
+        )
+
+        assert count >= 1
