@@ -1,0 +1,69 @@
+groups:
+  - name: api_key_rate_limits
+    rules:
+      # Block ratio above 10% — potential abuse or misconfigured limits.
+      # sum() is mandatory: any single-instance rate() would miss traffic
+      # handled by other replicas and give a false low ratio.
+      - alert: ApiKeyBlockRatioHigh
+        expr: |
+          sum(rate(user_auth_api_key_rate_limit_hits_total[5m]))
+          /
+          sum(rate(user_auth_api_key_rate_limit_checks_total{result="checked"}[5m]))
+          > 0.10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API key rate limit block ratio above 10%"
+          description: >
+            {{ printf "%.1f" (mul 100 $value) }}% of API key requests are being rate
+            limited. Investigate for abuse or review default limits.
+
+      # Instrumentation invariant: hits can never exceed checks.
+      # A 10% tolerance absorbs sub-second scrape-interval skew; anything
+      # beyond that signals a counter increment bug.
+      - alert: ApiKeyRateLimitInvariantViolation
+        expr: |
+          sum(rate(user_auth_api_key_rate_limit_hits_total[5m]))
+          >
+          sum(rate(user_auth_api_key_rate_limit_checks_total{result="checked"}[5m])) * 1.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API key rate limit instrumentation invariant violated"
+          description: >
+            hits_total > checks_total * 1.1 — a counter is being incremented
+            without the corresponding check. Instrumentation bug.
+
+  - name: api_key_health
+    rules:
+      # Flush p99 latency above 500 ms indicates Redis or DB degradation.
+      - alert: ApiKeyFlushLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(user_auth_api_key_flush_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API key last_used_at flush p99 latency above 500ms"
+          description: >
+            The write-behind flush of last_used_at to the database is slow
+            (p99 = {{ printf "%.2f" $value }}s). Check Redis and database health.
+
+      # High rate of invalid key presentations — credential stuffing or misconfigured clients.
+      - alert: ApiKeyHighInvalidRate
+        expr: |
+          sum(rate(user_auth_api_key_validations_total{result=~"invalid|revoked|expired"}[5m]))
+          > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate of invalid API key presentations"
+          description: >
+            More than 1 invalid/revoked/expired API key presentation per second
+            over the last 5 minutes. May indicate credential stuffing or broken clients.

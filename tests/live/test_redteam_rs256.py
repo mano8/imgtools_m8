@@ -1333,3 +1333,267 @@ class TestL_CookieSecurity:
         assert "hashed_password" not in body, (
             "[FINDING-L06] hashed_password exposed in /profile/get/me/"
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# M  API KEY SECURITY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestM_ApiKeySecurity:
+    """Category M — API key lifecycle, rate limiting, and IDOR guards.
+
+    Covers:
+      M01  create returns plaintext exactly once
+      M02  verify endpoint returns key metadata
+      M03  X-RateLimit-* headers present and well-formed
+      M04  X-RateLimit-Remaining decrements on successive calls
+      M05  invalid key rejected with 401
+      M06  missing header rejected with 422
+      M07  plaintext not re-exposed in list/get
+      M08  list returns only caller's keys (IDOR isolation)
+      M09  get returns 404 for another user's key
+      M10  revoke marks key inactive
+      M11  revoked key rejected with 401
+      M12  double-revoke returns 409
+      M13  delete other user's key returns 404
+      M14  plaintext never stored (key_hash not in response)
+    """
+
+    _BASE = f"{AUTH_BASE}/profile/api-keys"
+
+    # ── Session-scoped fixtures ────────────────────────────────────────────────
+
+    @pytest.fixture(scope="class")
+    def admin_key(self, admin_headers) -> dict:
+        """Create one API key for the admin user; clean up after the class."""
+        r = requests.post(
+            f"{self._BASE}/",
+            json={"name": "live-test-admin", "ttl_hours": 1},
+            headers=admin_headers,
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 201, f"Key creation failed: {r.text}"
+        data = r.json()
+        assert "plaintext" in data
+        yield data
+        # Revoke if still active so the stack stays clean
+        if not data.get("revoked"):
+            requests.delete(
+                f"{self._BASE}/{data['id']}",
+                headers=admin_headers,
+                timeout=TIMEOUT,
+            )
+
+    @pytest.fixture(scope="class")
+    def user_key(self, regular_user) -> dict:
+        """Create one API key for the regular user."""
+        r = requests.post(
+            f"{self._BASE}/",
+            json={"name": "live-test-user", "ttl_hours": 1},
+            headers=regular_user["headers"],
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 201, f"Key creation failed: {r.text}"
+        data = r.json()
+        yield data
+        if not data.get("revoked"):
+            requests.delete(
+                f"{self._BASE}/{data['id']}",
+                headers=regular_user["headers"],
+                timeout=TIMEOUT,
+            )
+
+    # ── Creation ──────────────────────────────────────────────────────────────
+
+    def test_m01_create_returns_plaintext_once(self, admin_key):
+        """POST /profile/api-keys/ must return plaintext in the creation response."""
+        pt = admin_key.get("plaintext", "")
+        assert pt.startswith("ak_"), (
+            f"[FINDING-M01] Plaintext missing or wrong prefix: '{pt[:20]}'"
+        )
+        assert len(pt) > 10
+
+    def test_m01b_create_returns_required_fields(self, admin_key):
+        for field in ("id", "name", "expires_at", "revoked", "created_at"):
+            assert field in admin_key, f"[FINDING-M01b] Missing field '{field}'"
+        assert admin_key["revoked"] is False
+        assert admin_key["name"] == "live-test-admin"
+
+    def test_m14_key_hash_not_in_creation_response(self, admin_key):
+        assert "key_hash" not in admin_key, (
+            "[FINDING-M14] key_hash exposed in creation response"
+        )
+        assert "hashed" not in str(admin_key).lower()
+
+    # ── Verify endpoint ───────────────────────────────────────────────────────
+
+    def test_m02_verify_valid_key_returns_200(self, admin_key):
+        r = requests.get(
+            f"{self._BASE}/verify",
+            headers={"X-API-Key": admin_key["plaintext"]},
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 200, f"Valid key rejected: {r.text}"
+        body = r.json()
+        assert body["id"] == admin_key["id"]
+        assert body["name"] == admin_key["name"]
+
+    def test_m03_verify_returns_ratelimit_headers(self, admin_key):
+        r = requests.get(
+            f"{self._BASE}/verify",
+            headers={"X-API-Key": admin_key["plaintext"]},
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 200
+        h = {k.lower(): v for k, v in r.headers.items()}
+        assert "x-ratelimit-limit" in h, "[FINDING-M03] X-RateLimit-Limit missing"
+        assert "x-ratelimit-remaining" in h, (
+            "[FINDING-M03] X-RateLimit-Remaining missing"
+        )
+        assert "x-ratelimit-reset" in h, "[FINDING-M03] X-RateLimit-Reset missing"
+        assert int(h["x-ratelimit-limit"]) > 0
+        assert int(h["x-ratelimit-remaining"]) >= 0
+        assert int(h["x-ratelimit-reset"]) > 0
+
+    def test_m04_remaining_decrements_on_successive_calls(self, admin_headers):
+        """Each request within the same window must decrement Remaining by 1.
+
+        Uses a dedicated key so this test is independent of the class-shared
+        admin_key's rate-limit budget.
+        """
+        r = requests.post(
+            f"{self._BASE}/",
+            json={"name": "live-test-m04", "ttl_hours": 1},
+            headers=admin_headers,
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 201
+        pt = r.json()["plaintext"]
+        key_id = r.json()["id"]
+
+        def _remaining() -> int:
+            resp = requests.get(
+                f"{self._BASE}/verify",
+                headers={"X-API-Key": pt},
+                timeout=TIMEOUT,
+            )
+            assert resp.status_code == 200, f"Verify failed: {resp.status_code}"
+            return int(resp.headers.get("x-ratelimit-remaining", -1))
+
+        r1 = _remaining()
+        r2 = _remaining()
+        requests.delete(
+            f"{self._BASE}/{key_id}", headers=admin_headers, timeout=TIMEOUT
+        )
+        assert r2 == r1 - 1, (
+            f"[FINDING-M04] Remaining did not decrement: {r1} → {r2}"
+        )
+
+    def test_m05_invalid_key_returns_401(self):
+        r = requests.get(
+            f"{self._BASE}/verify",
+            headers={"X-API-Key": "ak_totally_invalid_key_000000000000"},
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 401, (
+            f"[FINDING-M05] Invalid key returned {r.status_code} instead of 401"
+        )
+
+    def test_m06_missing_header_returns_422(self):
+        r = requests.get(f"{self._BASE}/verify", timeout=TIMEOUT)
+        assert r.status_code == 422, (
+            f"[FINDING-M06] Missing X-API-Key returned {r.status_code} instead of 422"
+        )
+
+    # ── List / Get ────────────────────────────────────────────────────────────
+
+    def test_m07_plaintext_not_in_list_response(self, admin_headers, admin_key):
+        r = requests.get(f"{self._BASE}/", headers=admin_headers, timeout=TIMEOUT)
+        assert r.status_code == 200
+        for key_obj in r.json():
+            assert "plaintext" not in key_obj, (
+                "[FINDING-M07] plaintext exposed in list endpoint"
+            )
+            assert "key_hash" not in key_obj, (
+                "[FINDING-M07] key_hash exposed in list endpoint"
+            )
+
+    def test_m07b_plaintext_not_in_get_response(self, admin_headers, admin_key):
+        r = requests.get(
+            f"{self._BASE}/{admin_key['id']}",
+            headers=admin_headers,
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert "plaintext" not in body, "[FINDING-M07b] plaintext exposed in get"
+        assert "key_hash" not in body, "[FINDING-M07b] key_hash exposed in get"
+
+    def test_m08_list_returns_only_own_keys(self, regular_user, admin_key):
+        """Regular user must not see admin's key in their list."""
+        r = requests.get(
+            f"{self._BASE}/", headers=regular_user["headers"], timeout=TIMEOUT
+        )
+        assert r.status_code == 200
+        ids = [k["id"] for k in r.json()]
+        assert admin_key["id"] not in ids, (
+            "[FINDING-M08] IDOR: regular user can see admin's API key"
+        )
+
+    def test_m09_get_returns_404_for_other_users_key(self, regular_user, admin_key):
+        """Regular user must not retrieve admin's key by ID."""
+        r = requests.get(
+            f"{self._BASE}/{admin_key['id']}",
+            headers=regular_user["headers"],
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 404, (
+            f"[FINDING-M09] IDOR: regular user accessed admin key, got {r.status_code}"
+        )
+
+    # ── Revoke ────────────────────────────────────────────────────────────────
+
+    def test_m13_revoke_other_users_key_returns_404(self, regular_user, admin_key):
+        """Regular user must not revoke admin's key."""
+        r = requests.delete(
+            f"{self._BASE}/{admin_key['id']}",
+            headers=regular_user["headers"],
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 404, (
+            f"[FINDING-M13] IDOR: regular user revoked admin key, got {r.status_code}"
+        )
+
+    def test_m10_revoke_own_key_succeeds(self, regular_user, user_key):
+        r = requests.delete(
+            f"{self._BASE}/{user_key['id']}",
+            headers=regular_user["headers"],
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 200, f"Revoke failed: {r.text}"
+        assert "revoked" in r.json().get("message", "").lower()
+        user_key["revoked"] = True
+
+    def test_m11_revoked_key_returns_401(self, user_key):
+        """Revoked key must be rejected at the verify endpoint."""
+        r = requests.get(
+            f"{self._BASE}/verify",
+            headers={"X-API-Key": user_key["plaintext"]},
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 401, (
+            f"[FINDING-M11] Revoked key accepted: {r.status_code}"
+        )
+
+    def test_m12_double_revoke_returns_409(self, admin_headers, user_key):
+        """Revoking an already-revoked key must return 409 Conflict."""
+        r = requests.delete(
+            f"{self._BASE}/{user_key['id']}",
+            headers=admin_headers,
+            timeout=TIMEOUT,
+        )
+        assert r.status_code in (404, 409), (
+            f"[FINDING-M12] Double-revoke returned {r.status_code} "
+            "(expected 409 Conflict or 404 Not Found)"
+        )

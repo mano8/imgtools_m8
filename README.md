@@ -17,12 +17,13 @@ A self-contained FastAPI authentication microservice designed to run as a Docker
 - Opt-in `iss`/`aud` JWT claim enforcement to prevent cross-service token reuse
 - Session tracking and JTI revocation via Redis
 - Login rate limiting per email (Redis-backed, namespace-hardened)
+- **API key authentication** with per-key fixed-window rate limiting (MINUTE / HOUR / DAY / MONTH), `X-RateLimit-*` response headers, and write-behind `last_used_at` tracking
 - Role-based access control (`user`, `admin`, `superuser`)
 - User management CRUD (superuser only)
 - Dashboard activity endpoints
 - Private inter-service API (protected by shared secret + Docker network isolation)
 - MySQL **or** PostgreSQL — switchable via a single env var
-- Prometheus metrics (`METRICS_ENABLED=true`)
+- Prometheus metrics (`METRICS_ENABLED=true`) with API key–specific counters and alert rules
 - Alembic migrations auto-applied on first start
 - VS Code remote debugger support
 

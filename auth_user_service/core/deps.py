@@ -10,7 +10,7 @@ import secrets
 from datetime import datetime, timezone
 from typing import Annotated, Optional
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.templating import Jinja2Templates
 from redis import ConnectionPool, Redis
@@ -26,6 +26,11 @@ from auth_user_service.core.client import RedisSessionManager
 from auth_user_service.core.config import settings
 from auth_sdk_m8.observability.metrics import get as _get_metrics
 from auth_user_service.core.engine_sync import SessionDep  # noqa: F401 (re-exported)
+from auth_user_service.db_models.api_keys import ApiKey
+from auth_user_service.services.api_keys import ApiKeyService, RateLimitEnforcer
+
+# Redis hash key for write-behind last_used_at updates: field=key_id, value=ISO timestamp
+LAST_USED_AT_HASH = "api_key:luat"
 
 _logger = logging.getLogger(__name__)
 
@@ -196,3 +201,75 @@ def verify_private_api_secret(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
         )
+
+
+def get_current_api_key(
+    session: SessionDep,
+    redis: RedisDep,
+    response: Response,
+    x_api_key: Annotated[str, Header(alias="X-API-Key")],
+) -> ApiKey:
+    """Validate an API key and enforce rate limits.
+
+    Reads the ``X-API-Key`` header, validates the key, runs rate limit checks
+    when Redis is available, and queues a write-behind ``last_used_at`` update.
+    Sets ``X-RateLimit-*`` response headers when limits are enforced.
+
+    Raises:
+        HTTPException 401: Key missing, invalid, expired, or revoked.
+        HTTPException 429: Rate limit exceeded (includes ``Retry-After`` header).
+        HTTPException 503: Strict mode and Redis unavailable.
+    """
+    api_key = ApiKeyService.get_active_key(session, x_api_key)
+    if api_key is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired API key",
+        )
+
+    if redis is not None:
+        limits = ApiKeyService.get_limits(session, api_key.id, api_key.user_id)
+        result = RateLimitEnforcer(redis, settings).enforce(api_key, limits)
+
+        if not result.allowed:
+            retry_after = 60
+            if result.reset_at is not None:
+                retry_after = max(
+                    1,
+                    int((result.reset_at - datetime.now(timezone.utc)).total_seconds())
+                    + 1,
+                )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded for period: {result.exceeded_period}",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        if result.limit is not None:
+            response.headers["X-RateLimit-Limit"] = str(result.limit)
+        if result.remaining is not None:
+            response.headers["X-RateLimit-Remaining"] = str(result.remaining)
+        if result.reset_at is not None:
+            response.headers["X-RateLimit-Reset"] = str(
+                int(result.reset_at.timestamp())
+            )
+
+        try:
+            redis.hset(
+                LAST_USED_AT_HASH,
+                str(api_key.id),
+                datetime.now(timezone.utc).isoformat(),
+            )
+        except Exception:
+            _logger.warning("api_key.luat.queue_failed key_id=%s", api_key.id)
+
+    elif settings.API_KEY_STRICT_RATE_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Rate limiting service unavailable",
+        )
+
+    return api_key
+
+
+CurrentApiKey = Annotated[ApiKey, Depends(get_current_api_key)]

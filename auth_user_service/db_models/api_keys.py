@@ -4,9 +4,11 @@ These models are used to manage API keys and their associated rate limits.
 """
 
 import uuid
-from sqlalchemy import Uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
+
+import sqlalchemy as sa
+from sqlalchemy import Uuid
 from sqlmodel import Column, Field, ForeignKey, Relationship, SQLModel
 
 from auth_sdk_m8.schemas.base import Period
@@ -25,9 +27,7 @@ if TYPE_CHECKING:
 # ---------------------- API KEY MODELS ------------------------
 # ---------------------------------------------------------------
 class ApiKeyBase(TimestampMixin, SQLModel):
-    """
-    Shared fields for API key schemas.
-    """
+    """Shared fields for API key schemas."""
 
     name: str = Field(
         default=None,
@@ -47,9 +47,7 @@ class ApiKeyBase(TimestampMixin, SQLModel):
 
 
 class ApiKeyCreate(SQLModel):
-    """
-    Schema for creating a new API key.
-    """
+    """Schema for creating a new API key."""
 
     name: Optional[str] = Field(
         default=None,
@@ -65,16 +63,19 @@ class ApiKeyCreate(SQLModel):
 
 
 class ApiKey(ApiKeyBase, SQLModel, table=True):
-    """
-    Database model for storing API keys.
-    """
+    """Database model for storing API keys."""
 
     __tablename__ = prefixed_tables("api_key")
     __table_args__ = (get_table_args(),)
-    id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()),
-        primary_key=True,
-        index=True,
+
+    id: uuid.UUID = Field(
+        sa_column=Column(
+            "id",
+            Uuid(as_uuid=True),
+            default=uuid.uuid4,
+            primary_key=True,
+            index=True,
+        ),
         description="Unique API key ID",
     )
     key_hash: str = Field(
@@ -98,19 +99,14 @@ class ApiKey(ApiKeyBase, SQLModel, table=True):
         description="Last time the key was used (UTC)",
     )
 
-    user: "User" = Relationship(
-        back_populates="api_keys",
-    )
+    user: "User" = Relationship(back_populates="api_keys")
+    rate_limits: List["RateLimit"] = Relationship(back_populates="api_key")
 
 
 class ApiKeyPublic(ApiKeyBase, SQLModel):
-    """
-    Public representation of an API key (no key hash).
-    """
+    """Public representation of an API key (no key hash)."""
 
-    id: uuid.UUID = Field(
-        description="Unique API key ID",
-    )
+    id: uuid.UUID = Field(description="Unique API key ID")
     last_used_at: Optional[datetime] = Field(
         default=None,
         description="Last time the key was used (UTC)",
@@ -122,25 +118,53 @@ class ApiKeyPublic(ApiKeyBase, SQLModel):
 # ---------------------------------------------------------------
 class RateLimit(SQLModel, table=True):
     """
-    Database model for storing rate limit configurations per user.
+    Rate limit configuration.
+
+    Enforcement priority: api_key_id row > user_id row > settings defaults.
+    Invariant: at least one of api_key_id or user_id must be set (DB CHECK).
     """
 
     __tablename__ = prefixed_tables("rate_limit")
-    __table_args__ = (get_table_args(),)
+    __table_args__ = (
+        sa.CheckConstraint(
+            "api_key_id IS NOT NULL OR user_id IS NOT NULL",
+            name="ck_ratelimit_has_owner",
+        ),
+        sa.UniqueConstraint(
+            "api_key_id", "period", name="uq_ratelimit_api_key_period"
+        ),
+        sa.UniqueConstraint(
+            "user_id", "period", name="uq_ratelimit_user_period"
+        ),
+        get_table_args(),
+    )
+
     id: Optional[int] = Field(
         default=None,
         primary_key=True,
         description="Rate limit record ID",
     )
-    user_id: uuid.UUID = Field(
+    api_key_id: Optional[uuid.UUID] = Field(
+        default=None,
+        sa_column=Column(
+            "api_key_id",
+            Uuid(as_uuid=True),
+            ForeignKey(prefixed_fk("api_key", "id"), ondelete="CASCADE"),
+            nullable=True,
+            index=True,
+        ),
+        description="API key this limit applies to (primary enforcement axis)",
+    )
+    user_id: Optional[uuid.UUID] = Field(
+        default=None,
         sa_column=Column(
             "user_id",
             Uuid(as_uuid=True),
             ForeignKey(prefixed_fk("user", "id"), ondelete="CASCADE"),
-            nullable=False,
+            nullable=True,
             index=True,
         ),
-        description="User to whom the limit applies",
+        description="User default limit (fallback when no per-key override exists)",
     )
     period: Period = Field(
         sa_column_kwargs={"nullable": False},
@@ -152,6 +176,5 @@ class RateLimit(SQLModel, table=True):
         description="Maximum requests allowed in the interval",
     )
 
-    user: "User" = Relationship(
-        back_populates="rate_limits",
-    )
+    api_key: Optional["ApiKey"] = Relationship(back_populates="rate_limits")
+    user: Optional["User"] = Relationship(back_populates="rate_limits")

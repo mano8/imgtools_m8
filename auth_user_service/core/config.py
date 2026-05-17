@@ -46,6 +46,14 @@ class Settings(ObservabilitySettingsMixin, CommonSettings):
     ]
     TABLES_PREFIX: str = "auth"
 
+    # API key rate limiting defaults (0 = disabled for that period)
+    API_KEY_STRICT_RATE_LIMIT: bool = False
+    API_KEY_DEFAULT_LIMIT_MINUTE: int = 60
+    API_KEY_DEFAULT_LIMIT_HOUR: int = 1_000
+    API_KEY_DEFAULT_LIMIT_DAY: int = 10_000
+    API_KEY_DEFAULT_LIMIT_MONTH: int = 200_000
+    API_KEY_MAX_PER_USER: int = 10
+
     # Declare only service-specific fields
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: SecretStr

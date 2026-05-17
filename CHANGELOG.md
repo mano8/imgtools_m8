@@ -4,6 +4,53 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-05-16
+
+### Added
+
+- **API key rate limiting** — full fixed-window enforcement across MINUTE, HOUR, DAY, and MONTH periods.
+  - Redis `INCR + EXPIRE` in a pipeline (atomic) per window; correct per-period bucket format prevents HOUR/DAY/MONTH counters from resetting every minute.
+  - Priority chain: per-key `RateLimit` rows → per-user defaults → `API_KEY_DEFAULT_LIMIT_*` settings.
+  - `RateLimitResult` dataclass carries `allowed`, `exceeded_period`, `limit`, `remaining`, `reset_at`.
+  - `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` response headers populated from the tightest (MINUTE) window.
+  - `Retry-After` header on 429 responses.
+  - Degraded-mode support: when Redis is unavailable and `API_KEY_STRICT_RATE_LIMIT=false` (default), requests are allowed through; strict mode returns 503.
+- **`get_current_api_key` FastAPI dependency** (`core/deps.py`): validates `X-API-Key` header, enforces rate limits, and queues a write-behind `last_used_at` update to Redis.
+- **Write-behind `last_used_at` flush** (`main.py` lifespan): hardened asyncio background task — exception-shielded loop, final flush on graceful shutdown (5 s timeout), Prometheus histogram for flush latency.
+- **API key CRUD endpoints** under `GET|POST|DELETE /user/profile/api-keys`:
+  - `POST /` — create key, enforce `API_KEY_MAX_PER_USER` cap, return plaintext once.
+  - `GET /` — list all keys for the current user.
+  - `GET /{key_id}` — retrieve metadata for a single key.
+  - `DELETE /{key_id}` — revoke a key; emits `api_key_lifecycle_total{action="revoked"}`.
+- **`Period.MONTH`** added to `auth_sdk_m8.schemas.base.Period` enum.
+- **5 new Prometheus metrics** in `auth_sdk_m8.observability.metrics` (auth group):
+  - `auth_api_key_validations_total` — result: success | invalid | revoked | expired.
+  - `auth_api_key_rate_limit_checks_total` — result: checked | allowed | blocked.
+  - `auth_api_key_rate_limit_hits_total` — period: minute | hour | day | month.
+  - `auth_api_key_lifecycle_total` — action: created | revoked.
+  - `auth_api_key_flush_duration_seconds` — histogram for write-behind flush latency.
+- **`RateLimit` DB model redesigned**: `api_key_id` (nullable FK → `auth_api_key.id`, CASCADE) added as primary enforcement axis; `user_id` made nullable (fallback default); `period` enum extended with MONTH; two UNIQUE constraints (`uq_ratelimit_api_key_period`, `uq_ratelimit_user_period`) and a CHECK constraint (`ck_ratelimit_has_owner`) added.
+- **`ApiKey.id`** migrated from VARCHAR to `Uuid` for type consistency with `user.id`.
+- **Alembic migration** `99540139637b_api_key_rate_limit_redesign` for all five compose examples.
+- **`API_KEY_*` settings** in `auth_user_service/core/config.py`:
+  - `API_KEY_STRICT_RATE_LIMIT` (default `false`), `API_KEY_DEFAULT_LIMIT_MINUTE/HOUR/DAY/MONTH`, `API_KEY_MAX_PER_USER`.
+- **Prometheus alert rules** (`prometheus/alerts.yml`) for all three Prometheus-enabled compose stacks:
+  - `ApiKeyBlockRatioHigh` — hits/checks > 10% over 5 min.
+  - `ApiKeyRateLimitInvariantViolation` — hits > checks × 1.1 (instrumentation sanity guard).
+  - `ApiKeyFlushLatencyHigh` — p99 flush > 500 ms.
+  - `ApiKeyHighInvalidRate` — > 1 invalid/revoked/expired key/s over 5 min.
+
+### Fixed
+
+- **`RedisRateLimiter` bucket format bug**: HOUR, DAY, and MONTH periods were using the same `%Y%m%d%H%M` format as MINUTE, creating a new Redis key every minute instead of accumulating in a single window. Each period now has a distinct bucket format.
+- **INCR + EXPIRE race condition**: the two Redis calls are now issued in a single pipeline, preventing a key with no TTL if the service crashes between them.
+
+### Changed
+
+- `RedisRateLimiter` public API: `increment()` replaced by `check_and_increment()` (returns `RateLimitResult`) and `check_all_limits()`. Internal `_increment()` handles the pipelined atomic counter.
+
+---
+
 ## [0.6.1] - 2026-05-16
 
 ### Fixed
