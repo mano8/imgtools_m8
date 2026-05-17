@@ -80,6 +80,22 @@ def forge_rs256(
     )
 
 
+def forge_es256(
+    private_key_pem: str,
+    *,
+    is_superuser: bool = True,
+    token_type: str = "access",
+    kid: str = _ACCESS_KEY_ID,
+) -> str:
+    """Forge a cryptographically valid ES256 token using the given EC private key."""
+    return jwt.encode(
+        access_payload(is_superuser=is_superuser, token_type=token_type),
+        private_key_pem,
+        algorithm="ES256",
+        headers={"kid": kid},
+    )
+
+
 def forge_hs256(secret: str, *, sub: str | None = None) -> str:
     """Forge an HS256 refresh token signed with the given secret."""
     payload = {

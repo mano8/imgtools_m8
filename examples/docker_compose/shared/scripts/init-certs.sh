@@ -24,7 +24,9 @@ if [[ -f "$CERT" ]] && [[ "$ROTATE" != "true" ]]; then
 fi
 
 echo "==> Generating self-signed TLS certificate"
-openssl req -x509 -newkey rsa:2048 -keyout "$KEY" -out "$CERT" \
+# MSYS_NO_PATHCONV=1 prevents Git Bash on Windows from converting /CN=localhost
+# to a Windows path (C:/Program Files/Git/CN=...). No-op on Linux/macOS.
+MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -keyout "$KEY" -out "$CERT" \
     -days 365 -nodes \
     -subj "/CN=localhost" \
     -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"

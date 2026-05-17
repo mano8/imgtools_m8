@@ -153,24 +153,47 @@ def regular_user(admin_headers: dict) -> dict:
     }
 
 
-# RS256-specific key fixtures — only requested by tests that need them, so
+# Asymmetric key fixtures — only requested by tests that need them, so
 # they won't fail when running against an HS256 stack.
 
+_RS256_STACK_DIRS = [
+    "examples/docker_compose/vault_rs256_postgres_m8/keys",
+    "examples/docker_compose/RS256_m8/keys",
+    "examples/docker_compose/lite_rs256_m8/keys",
+]
+_ES256_STACK_DIRS = [
+    "examples/docker_compose/lite_es256_m8/keys",
+    "examples/docker_compose/lite_hybrid_m8/keys",
+]
+
+
 def _find_key(filename: str) -> "Path":
-    """Return the first existing RSA key file across known compose stacks."""
+    """Return the first existing RSA key file across known RS256 compose stacks."""
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[2]
-    candidates = [
-        repo_root / "examples/docker_compose/vault_rs256_postgres_m8/keys" / filename,
-        repo_root / "examples/docker_compose/RS256_m8/keys" / filename,
-        repo_root / "examples/docker_compose/lite_rs256_m8/keys" / filename,
-    ]
-    for p in candidates:
+    for rel in _RS256_STACK_DIRS:
+        p = repo_root / rel / filename
         if p.exists():
             return p
     raise AssertionError(
-        f"RSA key '{filename}' not found in any known compose stack directory.\n"
+        f"RSA key '{filename}' not found in any known RS256 stack directory.\n"
+        "Generate keys by running: bash init.sh  (from the stack directory)"
+    )
+
+
+def _find_key_for_algorithm(filename: str, algorithm: str) -> "Path":
+    """Return the first existing key file for the given algorithm family."""
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    dirs = _RS256_STACK_DIRS if algorithm.startswith("RS") else _ES256_STACK_DIRS
+    for rel in dirs:
+        p = repo_root / rel / filename
+        if p.exists():
+            return p
+    raise AssertionError(
+        f"{algorithm} key '{filename}' not found in any known stack directory.\n"
         "Generate keys by running: bash init.sh  (from the stack directory)"
     )
 
@@ -183,6 +206,45 @@ def private_key_pem() -> str:
 @pytest.fixture(scope="session")
 def public_key_pem() -> str:
     return _find_key("public.pem").read_text()
+
+
+@pytest.fixture(scope="session")
+def committed_key_forge(stack_config: dict):
+    """Callable that forges tokens with the key committed to the repo for the
+    running stack's algorithm — simulates an attacker who read the repo.
+
+    Fetches the live kid from JWKS so the token header matches what the stack
+    expects, making the forgery cryptographically indistinguishable from a
+    legitimately issued token (if the key is the correct one).
+    """
+    from tests.live.suites.token_forge import forge_es256, forge_rs256
+
+    alg = stack_config.get("algorithm", "RS256")
+    if alg.startswith("RS"):
+        forge_fn = forge_rs256
+    elif alg.startswith("ES"):
+        forge_fn = forge_es256
+    else:
+        pytest.skip(f"No committed-key forge for symmetric algorithm {alg}")
+
+    try:
+        key_pem = _find_key_for_algorithm("private.pem", alg).read_text()
+    except AssertionError as exc:
+        pytest.skip(str(exc))
+
+    kid: str | None = None
+    try:
+        jwks = requests.get(_JWKS_URL, timeout=_DETECT_TIMEOUT)
+        kid = jwks.json()["keys"][0]["kid"]
+    except Exception:
+        pass
+
+    def _forge(**kw) -> str:
+        if kid:
+            kw.setdefault("kid", kid)
+        return forge_fn(key_pem, **kw)
+
+    return _forge
 
 
 # ---------------------------------------------------------------------------

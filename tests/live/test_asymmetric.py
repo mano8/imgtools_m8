@@ -72,6 +72,7 @@ class TestB_RS256JWTAttacks:
             "[CRITICAL-B02] Algorithm-confusion (RS256→HS256) attack SUCCEEDED"
         )
 
+    @pytest.mark.require_algorithm("RS256")
     def test_b03_forged_rs256_with_committed_key_accepted_documents_critical_finding(
         self, private_key_pem: str
     ):
@@ -95,6 +96,7 @@ class TestB_RS256JWTAttacks:
         )
         assert r.json().get("is_superuser") is True
 
+    @pytest.mark.require_algorithm("RS256")
     def test_b04_forged_token_reaches_admin_endpoint(self, private_key_pem: str):
         """CRITICAL: committed key grants admin access to all services."""
         token = forge_rs256(private_key_pem, is_superuser=True)
@@ -249,11 +251,23 @@ class TestH_JWKS:
     def test_h05_jwks_key_has_required_fields(self):
         r = requests.get(f"{AUTH_BASE}/.well-known/jwks.json", timeout=TIMEOUT)
         for key in r.json().get("keys", []):
-            for field in ("kty", "use", "kid", "alg", "n", "e"):
+            for field in ("kty", "use", "kid", "alg"):
                 assert field in key, (
                     f"[FINDING-H05] JWKS key missing required field '{field}'"
                 )
-            assert key["kty"] == "RSA"
+            kty = key["kty"]
+            if kty == "RSA":
+                for field in ("n", "e"):
+                    assert field in key, (
+                        f"[FINDING-H05] RSA JWKS key missing required field '{field}'"
+                    )
+            elif kty == "EC":
+                for field in ("crv", "x", "y"):
+                    assert field in key, (
+                        f"[FINDING-H05] EC JWKS key missing required field '{field}'"
+                    )
+            else:
+                pytest.fail(f"[FINDING-H05] Unknown key type: {kty!r}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -274,6 +288,7 @@ class TestI_CrossServiceTokens:
             f"Cross-service token propagation failed: {r.status_code} {r.text}"
         )
 
+    @pytest.mark.require_algorithm("RS256")
     def test_i02_forged_token_accepted_by_fastapi_service(
         self, private_key_pem: str
     ):
