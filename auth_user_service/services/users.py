@@ -4,7 +4,7 @@ Users Controller
 
 import uuid
 from typing import Any
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 from auth_user_service.core.security import SecurityHelper
 from auth_user_service.db_models.users import User, UserCreate, UserUpdate
 from auth_sdk_m8.schemas.base import AuthProviderType
@@ -83,13 +83,13 @@ class UserController:
         return db_user
 
     @staticmethod
-    def get_user(*, session: Session, user_id: uuid.uuid4) -> User:
+    def get_user(*, session: Session, user_id: uuid.UUID) -> User:
         """
-        Retrieve a user from the database by their email address.
+        Retrieve a user from the database by their ID.
 
         Args:
             session (Session): The database session to use for the query.
-            email (str): The email address of the user to retrieve.
+            user_id (uuid.UUID): The unique identifier of the user to retrieve.
 
         Returns:
             User | None: The user object if found, otherwise None.
@@ -125,6 +125,5 @@ class UserController:
         Returns:
             int: Number of users in data base
         """
-        statement = select(User)
-        result = session.exec(statement).all()
-        return len(result)
+        statement = select(func.count()).select_from(User)
+        return session.exec(statement).one()
