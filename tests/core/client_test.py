@@ -353,6 +353,50 @@ class TestRedisRefreshStore:
         assert RedisRefreshStore.PREFIX == "rt:"
 
 
+class TestResetAt:
+    """Cover the DAY and MONTH branches of RedisRateLimiter._reset_at."""
+
+    def setup_method(self):
+        self.mock_redis = MagicMock()
+        self.pipe = MagicMock()
+        self.mock_redis.pipeline.return_value.__enter__ = MagicMock(
+            return_value=self.pipe
+        )
+        self.mock_redis.pipeline.return_value.__exit__ = MagicMock(return_value=False)
+        self.pipe.execute.return_value = (1, True)
+        self.limiter = RedisRateLimiter(self.mock_redis)
+
+    def test_day_reset_at_is_next_midnight(self):
+        result = self.limiter.check_and_increment(
+            uuid.uuid4(), limit=10, period=Period.DAY
+        )
+        assert result.reset_at is not None
+        assert result.reset_at.hour == 0
+        assert result.reset_at.minute == 0
+        assert result.reset_at.second == 0
+
+    def test_month_reset_at_is_first_of_next_month(self):
+        result = self.limiter.check_and_increment(
+            uuid.uuid4(), limit=10, period=Period.MONTH
+        )
+        assert result.reset_at is not None
+        assert result.reset_at.day == 1
+        assert result.reset_at.hour == 0
+
+    def test_month_december_wraps_to_january(self):
+        from datetime import datetime as _dt, timezone
+        from unittest.mock import patch
+
+        frozen = _dt(2025, 12, 15, 10, 30, 0, tzinfo=timezone.utc)
+        with patch("auth_user_service.core.client.datetime") as mock_dt:
+            mock_dt.now.return_value = frozen
+            result = self.limiter._reset_at(Period.MONTH)
+
+        assert result.year == 2026
+        assert result.month == 1
+        assert result.day == 1
+
+
 class TestRedisSessionManager:
     def setup_method(self):
         self.mock_redis = MagicMock()

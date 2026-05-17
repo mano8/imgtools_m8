@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -120,6 +120,55 @@ class TestGetActiveKey:
         db_session.add(api_key)
         db_session.commit()
         assert ApiKeyService.get_active_key(db_session, plaintext) is None
+
+    def test_invalid_key_emits_metric(self, db_session):
+        mock_m = MagicMock()
+        mock_m.api_key_validations_total = MagicMock()
+        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_m):
+            result = ApiKeyService.get_active_key(db_session, "ak_nonexistent")
+        assert result is None
+        mock_m.api_key_validations_total.labels.assert_called_once_with(result="invalid")
+
+    def test_revoked_key_emits_metric(self, db_session, sample_user):
+        plaintext, key_hash = ApiKeyService.generate_key()
+        api_key = ApiKey(name="revoked-m", key_hash=key_hash, user_id=sample_user.id, revoked=True)
+        db_session.add(api_key)
+        db_session.commit()
+
+        mock_m = MagicMock()
+        mock_m.api_key_validations_total = MagicMock()
+        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_m):
+            result = ApiKeyService.get_active_key(db_session, plaintext)
+        assert result is None
+        mock_m.api_key_validations_total.labels.assert_called_once_with(result="revoked")
+
+    def test_expired_key_emits_metric(self, db_session, sample_user):
+        plaintext, key_hash = ApiKeyService.generate_key()
+        api_key = ApiKey(
+            name="expired-m",
+            key_hash=key_hash,
+            user_id=sample_user.id,
+            expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+            revoked=False,
+        )
+        db_session.add(api_key)
+        db_session.commit()
+
+        mock_m = MagicMock()
+        mock_m.api_key_validations_total = MagicMock()
+        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_m):
+            result = ApiKeyService.get_active_key(db_session, plaintext)
+        assert result is None
+        mock_m.api_key_validations_total.labels.assert_called_once_with(result="expired")
+
+    def test_valid_key_emits_success_metric(self, db_session, active_api_key):
+        plaintext, _ = active_api_key
+        mock_m = MagicMock()
+        mock_m.api_key_validations_total = MagicMock()
+        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_m):
+            result = ApiKeyService.get_active_key(db_session, plaintext)
+        assert result is not None
+        mock_m.api_key_validations_total.labels.assert_called_once_with(result="success")
 
     def test_returns_key_when_no_expiry(self, db_session, sample_user):
         plaintext, key_hash = ApiKeyService.generate_key()
@@ -248,6 +297,28 @@ class TestRateLimitEnforcer:
         result = enforcer.enforce(api_key, [])  # empty limits → use defaults
 
         assert result.allowed is True
+
+    def test_default_limits_includes_day_when_positive(self, mock_settings):
+        mock_settings.API_KEY_DEFAULT_LIMIT_MINUTE = 0
+        mock_settings.API_KEY_DEFAULT_LIMIT_HOUR = 0
+        mock_settings.API_KEY_DEFAULT_LIMIT_DAY = 5000
+        mock_settings.API_KEY_DEFAULT_LIMIT_MONTH = 0
+
+        enforcer = RateLimitEnforcer(MagicMock(), mock_settings)
+        defaults = enforcer._default_limits()
+
+        assert (Period.DAY, 5000) in defaults
+
+    def test_default_limits_includes_month_when_positive(self, mock_settings):
+        mock_settings.API_KEY_DEFAULT_LIMIT_MINUTE = 0
+        mock_settings.API_KEY_DEFAULT_LIMIT_HOUR = 0
+        mock_settings.API_KEY_DEFAULT_LIMIT_DAY = 0
+        mock_settings.API_KEY_DEFAULT_LIMIT_MONTH = 100000
+
+        enforcer = RateLimitEnforcer(MagicMock(), mock_settings)
+        defaults = enforcer._default_limits()
+
+        assert (Period.MONTH, 100000) in defaults
 
     def test_default_limits_excludes_zero_values(self, mock_settings):
         mock_settings.API_KEY_DEFAULT_LIMIT_MINUTE = 0
