@@ -1,8 +1,8 @@
 """Initial auth migration
 
-Revision ID: 0fbebbc9882c
+Revision ID: fb6ea2a0b401
 Revises:
-Create Date: 2026-05-14 15:51:44.707251
+Create Date: 2026-05-11 16:07:16.764482
 
 """
 
@@ -14,7 +14,7 @@ import sqlmodel
 
 
 # revision identifiers, used by Alembic.
-revision: str = "0fbebbc9882c"
+revision: str = "fb6ea2a0b401"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
