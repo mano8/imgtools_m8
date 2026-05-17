@@ -1,14 +1,25 @@
 """
 Live Security Tests — Asymmetric Algorithms (RS256 / ES256)
-============================================================
+===========================================================
 Target:  http://localhost:9000/user/    (auth_user_service)
          http://localhost:9000/fastapi/ (fastapi_service)
 Config:  ACCESS_TOKEN_ALGORITHM=RS256 or ES256
 
-The asymmetric attack surface (alg=none, algorithm confusion, JWKS key
-exposure, attacker-generated key) is the same for RS256 and ES256.
-Tests that forge tokens with committed RSA key material are RS256-specific
-but the security contract they verify applies to all asymmetric stacks.
+Attacker Scenarios
+------------------
+Scenario A — Network-only attacker (JWKS and HTTP access only)
+  alg=none, algorithm confusion, attacker-generated key.
+  All MUST be rejected: tests assert 403.
+
+Scenario B — Repo-read attacker (has git clone of this repository)
+  Forges tokens using a committed private key matched via JWKS public key
+  (DER identity comparison).  These SHOULD succeed and document a CRITICAL
+  FINDING.  A 200 response proves the committed key is the live key.
+  An unexpected rejection (key already rotated) causes pytest.skip.
+
+Scenario C — Protocol-level attacks (any attacker)
+  Expired token, wrong token type, tampered payload, path-traversal kid.
+  All MUST be rejected: tests assert 403.
 
 Auto-skipped when the running stack uses HS256.
 
@@ -29,8 +40,8 @@ from tests.live.suites.token_forge import (
     access_payload,
     b64url_nopad,
     forge_alg_none,
+    forge_asymmetric,
     forge_hs256_with_pubkey,
-    forge_rs256,
 )
 
 pytestmark = [
@@ -39,7 +50,6 @@ pytestmark = [
     pytest.mark.require_algorithm("RS256", "ES256"),
 ]
 
-_ACCESS_KEY_ID = "6dbedbd549ede665"
 _ME = f"{AUTH_BASE}/profile/get/me/"
 
 
@@ -48,12 +58,12 @@ def _auth(bearer: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# B  JWT ATTACKS  (RS256-specific)
+# B  JWT ATTACKS  (asymmetric algorithms)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class TestB_RS256JWTAttacks:
-    """Category B — RS256-specific token forgery and algorithm confusion."""
+class TestB_AsymmetricJWTAttacks:
+    """Category B — Asymmetric token forgery and algorithm confusion (RS256/ES256)."""
 
     def test_b01_alg_none_rejected(self):
         """CRITICAL GUARD: unsigned token must never be accepted."""
@@ -62,92 +72,113 @@ class TestB_RS256JWTAttacks:
             "[CRITICAL-B01] alg=none token ACCEPTED — full authentication bypass!"
         )
 
-    def test_b02_algorithm_confusion_hs256_pubkey_rejected(
-        self, public_key_pem: str
-    ):
-        """RS256→HS256 confusion: public key used as HMAC secret must be rejected."""
+    def test_b02_algorithm_confusion_hs256_pubkey_rejected(self, public_key_pem: str):
+        """Asymmetric→HS256 confusion: public key used as HMAC secret must be rejected.
+
+        public_key_pem is reconstructed directly from the live JWKS — available
+        to any network attacker without repo access.
+        """
         token = forge_hs256_with_pubkey(public_key_pem)
         r = requests.get(_ME, headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 403, (
-            "[CRITICAL-B02] Algorithm-confusion (RS256→HS256) attack SUCCEEDED"
+            "[CRITICAL-B02] Algorithm-confusion (asymmetric→HS256) attack SUCCEEDED"
         )
 
-    @pytest.mark.require_algorithm("RS256")
-    def test_b03_forged_rs256_with_committed_key_accepted_documents_critical_finding(
-        self, private_key_pem: str
+    def test_b03_forged_token_with_committed_key_accepted_documents_critical_finding(
+        self, committed_key_forge
     ):
         """
         CRITICAL FINDING — Private key committed to repository.
 
-        Anyone with read access to the repo can forge RS256 access tokens
-        claiming ANY identity and ANY privilege level.  The forged token is
-        cryptographically valid and therefore accepted by all services.
+        Anyone with read access to the repo can forge access tokens claiming
+        ANY identity and ANY privilege level.  The forged token is
+        cryptographically valid and accepted by all services.
+
+        Discovery: JWKS public key DER bytes matched against committed
+        public.pem files via rglob — no env files or stack config read.
 
         Remediation:
-          1. Rotate the RSA key pair immediately.
+          1. Rotate the key pair immediately.
           2. Move keys to a secret manager (Vault, AWS Secrets Manager, …).
           3. Never commit key material; use Docker secrets or env injection.
           4. Add a pre-commit hook / CI secret-scanner (truffleHog, gitleaks).
         """
-        token = forge_rs256(private_key_pem, is_superuser=True)
+        token = committed_key_forge(is_superuser=True)
         r = requests.get(_ME, headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 200, (
             "Forged token unexpectedly rejected — verify key matches running stack"
         )
         assert r.json().get("is_superuser") is True
 
-    @pytest.mark.require_algorithm("RS256")
-    def test_b04_forged_token_reaches_admin_endpoint(self, private_key_pem: str):
+    def test_b04_forged_token_reaches_admin_endpoint(self, committed_key_forge):
         """CRITICAL: committed key grants admin access to all services."""
-        token = forge_rs256(private_key_pem, is_superuser=True)
+        token = committed_key_forge(is_superuser=True)
         r = requests.get(f"{AUTH_BASE}/users/", headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 200, (
             "[CRITICAL-B04] Committed private key allows admin endpoint access"
         )
 
-    def test_b05_expired_token_rejected(self, private_key_pem: str):
-        """Token that expired an hour ago must be refused."""
+    def test_b05_expired_token_rejected(
+        self, asymmetric_key_pem: tuple[str, str, str | None]
+    ):
+        """Token that expired an hour ago must be refused.
+
+        Uses committed key when available so the server reaches expiry
+        validation with a trusted signature. Falls back to ephemeral key —
+        server then rejects at key identity (unknown kid); expiry check is
+        not reached but 403 holds.
+        """
+        key_pem, alg, kid = asymmetric_key_pem
         payload = access_payload()
         payload["exp"] = int(
             (datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()
         )
         token = jwt.encode(
             payload,
-            private_key_pem,
-            algorithm="RS256",
-            headers={"kid": _ACCESS_KEY_ID},
+            key_pem,
+            algorithm=alg,
+            headers={"kid": kid or "unknown"},
         )
         r = requests.get(_ME, headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 403
 
     def test_b06_wrong_token_type_refresh_as_access_rejected(
-        self, private_key_pem: str
+        self, asymmetric_key_pem: tuple[str, str, str | None]
     ):
         """A refresh token presented to an access-protected route must be refused."""
-        token = forge_rs256(private_key_pem, token_type="refresh")
-        r = requests.get(_ME, headers=_auth(token), timeout=TIMEOUT)
-        assert r.status_code == 403
-
-    def test_b07_inactive_user_claim_rejected(self, private_key_pem: str):
-        """is_active=False in token payload must always deny access."""
-        payload = access_payload(is_superuser=False)
-        payload["is_active"] = False
-        token = jwt.encode(
-            payload,
-            private_key_pem,
-            algorithm="RS256",
-            headers={"kid": _ACCESS_KEY_ID},
+        key_pem, alg, kid = asymmetric_key_pem
+        token = forge_asymmetric(
+            key_pem, alg, token_type="refresh", kid=kid or "unknown"
         )
         r = requests.get(_ME, headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 403
 
-    def test_b08_path_traversal_kid_does_not_crash(self, private_key_pem: str):
+    def test_b07_inactive_user_claim_rejected(
+        self, asymmetric_key_pem: tuple[str, str, str | None]
+    ):
+        """is_active=False in token payload must always deny access."""
+        key_pem, alg, kid = asymmetric_key_pem
+        payload = access_payload(is_superuser=False)
+        payload["is_active"] = False
+        token = jwt.encode(
+            payload,
+            key_pem,
+            algorithm=alg,
+            headers={"kid": kid or "unknown"},
+        )
+        r = requests.get(_ME, headers=_auth(token), timeout=TIMEOUT)
+        assert r.status_code == 403
+
+    def test_b08_path_traversal_kid_does_not_crash(
+        self, asymmetric_key_pem: tuple[str, str, str | None]
+    ):
         """Injecting a path-traversal kid must not cause 500 or load arbitrary keys."""
+        key_pem, alg, _ = asymmetric_key_pem
         payload = access_payload(is_superuser=True)
         token = jwt.encode(
             payload,
-            private_key_pem,
-            algorithm="RS256",
+            key_pem,
+            algorithm=alg,
             headers={"kid": "../../etc/passwd"},
         )
         r = requests.get(_ME, headers=_auth(token), timeout=TIMEOUT)
@@ -155,8 +186,8 @@ class TestB_RS256JWTAttacks:
             "[FINDING-B08] Path-traversal kid caused server error"
         )
 
-    def test_b09_tampered_rs256_payload_rejected(self, admin_token: str):
-        """Modify payload without re-signing — RS256 signature mismatch caught."""
+    def test_b09_tampered_payload_rejected(self, admin_token: str):
+        """Modify payload without re-signing — signature mismatch must be caught."""
         parts = admin_token.split(".")
         padded = parts[1] + "=" * (-len(parts[1]) % 4)
         import base64
@@ -168,29 +199,45 @@ class TestB_RS256JWTAttacks:
         r = requests.get(_ME, headers=_auth(tampered), timeout=TIMEOUT)
         assert r.status_code == 403
 
-    def test_b10_attacker_generated_rsa_key_rejected(self):
-        """Token signed with an attacker's own RSA key pair must be rejected."""
-        from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import rsa
+    def test_b10_attacker_generated_key_rejected(
+        self, stack_config: dict, live_jwks_keys: list[dict]
+    ):
+        """Token signed with attacker-generated key must be rejected.
 
-        attacker_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048
+        Generates a key matching the stack's algorithm family so the server
+        evaluates key identity rather than failing earlier on algorithm mismatch.
+        """
+        from cryptography.hazmat.primitives import serialization
+
+        alg = stack_config.get("algorithm", "RS256")
+        signing_jwk = next(
+            (
+                k
+                for k in live_jwks_keys
+                if k.get("kty") in {"RSA", "EC"} and k.get("use", "sig") == "sig"
+            ),
+            None,
         )
-        attacker_pem = attacker_key.private_bytes(
+        live_kid = signing_jwk.get("kid", "unknown") if signing_jwk else "unknown"
+
+        if alg.startswith("RS"):
+            from cryptography.hazmat.primitives.asymmetric import rsa
+
+            k = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        else:
+            from cryptography.hazmat.primitives.asymmetric import ec
+
+            k = ec.generate_private_key(ec.SECP256R1())
+
+        pem = k.private_bytes(
             serialization.Encoding.PEM,
             serialization.PrivateFormat.TraditionalOpenSSL,
             serialization.NoEncryption(),
         ).decode()
-        payload = access_payload(is_superuser=True)
-        token = jwt.encode(
-            payload,
-            attacker_pem,
-            algorithm="RS256",
-            headers={"kid": _ACCESS_KEY_ID},
-        )
+        token = forge_asymmetric(pem, alg, is_superuser=True, kid=live_kid)
         r = requests.get(_ME, headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 403, (
-            "[CRITICAL-B10] Token signed with attacker RSA key was ACCEPTED"
+            "[CRITICAL-B10] Token signed with attacker key was ACCEPTED"
         )
 
 
@@ -200,12 +247,12 @@ class TestB_RS256JWTAttacks:
 
 
 class TestH_JWKS:
-    """Category H — JWKS endpoint security for RS256 stacks."""
+    """Category H — JWKS endpoint security for asymmetric stacks."""
 
     def test_h01_jwks_endpoint_is_present(self):
         r = requests.get(f"{AUTH_BASE}/.well-known/jwks.json", timeout=TIMEOUT)
         assert r.status_code == 200, (
-            "[FINDING-H01] RS256 stack has no JWKS endpoint — "
+            "[FINDING-H01] Asymmetric stack has no JWKS endpoint — "
             "downstream consumers cannot fetch the public key"
         )
 
@@ -271,12 +318,12 @@ class TestH_JWKS:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# I  CROSS-SERVICE TOKEN PROPAGATION  (RS256)
+# I  CROSS-SERVICE TOKEN PROPAGATION  (asymmetric)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestI_CrossServiceTokens:
-    """Category I — RS256 token accepted/rejected by downstream fastapi service."""
+    """Category I — Asymmetric token accepted/rejected by downstream fastapi service."""
 
     _SVC_LIST = f"{SVC_BASE}/category/"
 
@@ -288,12 +335,9 @@ class TestI_CrossServiceTokens:
             f"Cross-service token propagation failed: {r.status_code} {r.text}"
         )
 
-    @pytest.mark.require_algorithm("RS256")
-    def test_i02_forged_token_accepted_by_fastapi_service(
-        self, private_key_pem: str
-    ):
-        """CRITICAL: committed key grants full access across all services."""
-        token = forge_rs256(private_key_pem, is_superuser=True)
+    def test_i02_forged_token_accepted_by_fastapi_service(self, committed_key_forge):
+        """CRITICAL: committed key grants full access to all downstream services."""
+        token = committed_key_forge(is_superuser=True)
         r = requests.get(self._SVC_LIST, headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 200, (
             "[CRITICAL-I02] Forged cross-service token unexpectedly rejected"
@@ -311,21 +355,39 @@ class TestI_CrossServiceTokens:
         r = requests.get(self._SVC_LIST, timeout=TIMEOUT)
         assert r.status_code in (401, 403)
 
-    def test_i05_attacker_rs256_key_rejected_by_fastapi_service(self):
-        """Downstream service must also reject tokens from an attacker's key."""
+    def test_i05_attacker_generated_key_rejected_by_fastapi_service(
+        self, stack_config: dict, live_jwks_keys: list[dict]
+    ):
+        """Downstream service must also reject tokens from an attacker-generated key."""
         from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import rsa
 
-        attacker_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048
+        alg = stack_config.get("algorithm", "RS256")
+        signing_jwk = next(
+            (
+                k
+                for k in live_jwks_keys
+                if k.get("kty") in {"RSA", "EC"} and k.get("use", "sig") == "sig"
+            ),
+            None,
         )
-        attacker_pem = attacker_key.private_bytes(
+        live_kid = signing_jwk.get("kid", "unknown") if signing_jwk else "unknown"
+
+        if alg.startswith("RS"):
+            from cryptography.hazmat.primitives.asymmetric import rsa
+
+            k = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        else:
+            from cryptography.hazmat.primitives.asymmetric import ec
+
+            k = ec.generate_private_key(ec.SECP256R1())
+
+        pem = k.private_bytes(
             serialization.Encoding.PEM,
             serialization.PrivateFormat.TraditionalOpenSSL,
             serialization.NoEncryption(),
         ).decode()
-        token = forge_rs256(attacker_pem, is_superuser=True)
+        token = forge_asymmetric(pem, alg, is_superuser=True, kid=live_kid)
         r = requests.get(self._SVC_LIST, headers=_auth(token), timeout=TIMEOUT)
         assert r.status_code == 403, (
-            "[CRITICAL-I05] Attacker RS256 token accepted by fastapi service"
+            "[CRITICAL-I05] Attacker key accepted by downstream fastapi service"
         )

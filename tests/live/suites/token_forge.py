@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 
-_ACCESS_KEY_ID = "6dbedbd549ede665"
+_FALLBACK_KID = "unknown"
 
 
 def b64url_nopad(data: bytes) -> str:
@@ -69,7 +69,7 @@ def forge_rs256(
     *,
     is_superuser: bool = True,
     token_type: str = "access",
-    kid: str = _ACCESS_KEY_ID,
+    kid: str = _FALLBACK_KID,
 ) -> str:
     """Forge a cryptographically valid RS256 token using the given private key."""
     return jwt.encode(
@@ -85,7 +85,7 @@ def forge_es256(
     *,
     is_superuser: bool = True,
     token_type: str = "access",
-    kid: str = _ACCESS_KEY_ID,
+    kid: str = _FALLBACK_KID,
 ) -> str:
     """Forge a cryptographically valid ES256 token using the given EC private key."""
     return jwt.encode(
@@ -94,6 +94,26 @@ def forge_es256(
         algorithm="ES256",
         headers={"kid": kid},
     )
+
+
+def forge_asymmetric(
+    key_pem: str,
+    alg: str,
+    *,
+    is_superuser: bool = True,
+    token_type: str = "access",
+    kid: str = _FALLBACK_KID,
+) -> str:
+    """Dispatch RS256/ES256 forgery based on detected algorithm."""
+    if alg.startswith("RS"):
+        return forge_rs256(
+            key_pem, is_superuser=is_superuser, token_type=token_type, kid=kid
+        )
+    if alg.startswith("ES"):
+        return forge_es256(
+            key_pem, is_superuser=is_superuser, token_type=token_type, kid=kid
+        )
+    raise ValueError(f"Unsupported asymmetric algorithm: {alg!r}")
 
 
 def forge_hs256(secret: str, *, sub: str | None = None) -> str:
