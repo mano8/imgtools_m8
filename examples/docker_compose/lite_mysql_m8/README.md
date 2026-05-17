@@ -62,6 +62,8 @@ bash init.sh
 
 Generates TLS certificates for Traefik. No keys needed for HS256.
 
+> **Windows:** `init.sh` requires bash — use **Git Bash** (included with Git for Windows) or **WSL**.
+
 ### 3. Start
 
 ```sh
