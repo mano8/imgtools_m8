@@ -5,16 +5,18 @@ database engines, token modes, and observability options.
 
 ## Which stack should I use?
 
-| Stack | Database | Token mode | Monitoring | Best for |
-| --- | --- | --- | --- | --- |
-| [local_mysql_m8](local_mysql_m8/) | MariaDB | hybrid | — | Fastest start, everyday dev |
-| [dev_postgres_m8](dev_postgres_m8/) | PostgreSQL 16 | stateful | — | PostgreSQL projects |
-| [stateful_m8](stateful_m8/) | MariaDB | stateful | Prometheus + Grafana | Testing metrics & dashboards |
-| [RS256_m8](RS256_m8/) | MariaDB | stateful | Prometheus + Grafana | Asymmetric signing, JWKS, key rotation |
+| Stack | Database | Token mode | Secrets | Monitoring | Best for |
+| --- | --- | --- | --- | --- | --- |
+| [local_mysql_m8](local_mysql_m8/) | MariaDB | hybrid | env file | — | Fastest start, everyday dev |
+| [dev_postgres_m8](dev_postgres_m8/) | PostgreSQL 16 | stateful | env file | — | PostgreSQL projects |
+| [stateful_m8](stateful_m8/) | MariaDB | stateful | env file | Prometheus + Grafana | Testing metrics & dashboards |
+| [RS256_m8](RS256_m8/) | MariaDB | stateful | env file | Prometheus + Grafana | Asymmetric signing, JWKS, key rotation |
+| [vault_rs256_postgres_m8](vault_rs256_postgres_m8/) | PostgreSQL 16 | stateful | **HashiCorp Vault** | Prometheus + Grafana | Vault secret injection, hardened setup |
 
 **Start here →** [local_mysql_m8](local_mysql_m8/) if you just want things running quickly.  
-**Use RS256_m8** if you need multiple consumer services that verify tokens independently,
-or when building toward a production setup.
+**Use RS256_m8** if you need asymmetric signing with JWKS and multiple consumer services.  
+**Use vault_rs256_postgres_m8** if you need a secrets manager (Vault) so credentials never
+live in plain env files — closest to a production-grade hardened setup.
 
 ---
 
@@ -173,7 +175,8 @@ a volume.
 | `8080` | `127.0.0.1` | Traefik dashboard |
 | `3306` / `5432` | `127.0.0.1` | Database |
 | `6379` | `127.0.0.1` | Redis |
-| `9090` | `127.0.0.1` | Prometheus (stateful_m8, RS256_m8 only) |
-| `3000` | `127.0.0.1` | Grafana (stateful_m8, RS256_m8 only) |
+| `8200` | `127.0.0.1` | HashiCorp Vault UI/API (vault_rs256_postgres_m8 only) |
+| `9090` | `127.0.0.1` | Prometheus (stateful_m8, RS256_m8, vault_rs256_postgres_m8) |
+| `3000` | `127.0.0.1` | Grafana (stateful_m8, RS256_m8, vault_rs256_postgres_m8) |
 
 Port `9000` is the one you'll use most in development — all API requests go through it.

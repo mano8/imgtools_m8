@@ -156,30 +156,33 @@ def regular_user(admin_headers: dict) -> dict:
 # RS256-specific key fixtures — only requested by tests that need them, so
 # they won't fail when running against an HS256 stack.
 
-@pytest.fixture(scope="session")
-def private_key_pem() -> str:
+def _find_key(filename: str) -> "Path":
+    """Return the first existing RSA key file across known compose stacks."""
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[2]
-    path = repo_root / "examples/docker_compose/RS256_m8/keys/private.pem"
-    assert path.exists(), (
-        f"RS256 private key not found at {path}. "
-        "Start the RS256_m8 compose stack or generate keys."
+    candidates = [
+        repo_root / "examples/docker_compose/vault_rs256_postgres_m8/keys" / filename,
+        repo_root / "examples/docker_compose/RS256_m8/keys" / filename,
+        repo_root / "examples/docker_compose/lite_rs256_m8/keys" / filename,
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    raise AssertionError(
+        f"RSA key '{filename}' not found in any known compose stack directory.\n"
+        "Generate keys by running: bash init.sh  (from the stack directory)"
     )
-    return path.read_text()
+
+
+@pytest.fixture(scope="session")
+def private_key_pem() -> str:
+    return _find_key("private.pem").read_text()
 
 
 @pytest.fixture(scope="session")
 def public_key_pem() -> str:
-    from pathlib import Path
-
-    repo_root = Path(__file__).resolve().parents[2]
-    path = repo_root / "examples/docker_compose/RS256_m8/keys/public.pem"
-    assert path.exists(), (
-        f"RS256 public key not found at {path}. "
-        "Start the RS256_m8 compose stack or generate keys."
-    )
-    return path.read_text()
+    return _find_key("public.pem").read_text()
 
 
 # ---------------------------------------------------------------------------

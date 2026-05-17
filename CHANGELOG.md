@@ -4,6 +4,25 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`vault_rs256_postgres_m8` compose stack** — new production-grade example combining PostgreSQL 16, RS256 asymmetric signing, HashiCorp Vault secret injection, and Prometheus/Grafana observability.
+  - Vault dev-mode service with a one-shot `vault_init` container that writes `DB_PASSWORD` and `REDIS_PASSWORD` to `secret/data/app`; `auth_user_service` depends on it via `service_completed_successfully`.
+  - `SECRET_PROVIDER` and `VAULT_ADDR` moved to the docker-compose `environment` block (not the dotenv file) to avoid pydantic `extra="forbid"` rejection.
+  - `hvac>=2.0.0` added to `requirements_prod.txt` so Vault injection is available in Docker builds.
+  - Production hardening guide (server mode, scoped app-policy token, Vault agent sidecar) and key-rotation procedure documented in stack README.
+
+### Fixed
+
+- **`CommonSettings.settings_customise_sources` classmethod** (auth-sdk-m8): pydantic-settings 2.x calls sources with no positional arguments and uses a 5-arg classmethod calling convention (`settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings`). The standalone function passed via `model_config` was silently ignored. Vault injection is now wired as a proper `@classmethod` override on `CommonSettings`, so all subclasses inherit it without any `model_config` entry.
+- **Vault source callable signature**: pydantic-settings 2.x calls each source with no arguments (`source()`); the inner `_vault_source` function no longer declares a settings parameter.
+- **`auth_user_service/core/config.py`**: removed the `settings_customise_sources=` entry from `SettingsConfigDict` (it was a no-op) and the corresponding import.
+- **`tests/live/conftest.py`**: RSA key lookup now searches `vault_rs256_postgres_m8/keys/` first, then falls back to `RS256_m8/` and `lite_rs256_m8/`.
+
+---
+
 ## [0.7.1] - 2026-05-17
 
 ### Fixed

@@ -9,7 +9,7 @@ from typing import Optional
 from pydantic import EmailStr, SecretStr
 from pydantic_settings import SettingsConfigDict
 from auth_sdk_m8.utils.paths import find_dotenv
-from auth_sdk_m8.core.config import CommonSettings, settings_customise_sources
+from auth_sdk_m8.core.config import CommonSettings
 from auth_sdk_m8.observability.settings import ObservabilitySettingsMixin
 # pylint: disable=invalid-name, import-outside-toplevel
 
@@ -26,7 +26,6 @@ class Settings(ObservabilitySettingsMixin, CommonSettings):
         env_file_encoding="utf-8",
         env_ignore_empty=True,
         extra="forbid",
-        settings_customise_sources=settings_customise_sources,
     )
 
     # Extend validation lists

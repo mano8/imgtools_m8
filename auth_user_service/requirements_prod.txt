@@ -2,3 +2,6 @@
 
 # Production server (optional but recommended)
 gunicorn>=26.0.0
+
+# Vault secret injection (activated when SECRET_PROVIDER=vault in staging/production)
+hvac>=2.4.0
