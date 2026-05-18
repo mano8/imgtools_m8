@@ -17,7 +17,7 @@ from auth_sdk_m8.models.shared import Token
 from auth_sdk_m8.schemas.auth import TokenSecret
 from auth_sdk_m8.schemas.base import ResponseMessage
 
-from auth_user_service.core.client import LoginRateLimiter, RedisRefreshStore
+from auth_user_service.core.client import LoginRateLimiter, RedisRefreshStore, RefreshRateLimiter
 from auth_user_service.core.config import settings
 from auth_sdk_m8.observability.metrics import get as _get_metrics
 from auth_user_service.core.deps import (
@@ -179,6 +179,26 @@ def login_refresh_token(
         if _m and _m.token_refresh_total:
             _m.token_refresh_total.labels(result="invalid").inc()
         raise HTTPException(status_code=401, detail=str(err)) from err
+
+    if redis is not None:
+        if not RefreshRateLimiter(redis).is_allowed(str(user_id)):
+            if _m and _m.token_refresh_total:
+                _m.token_refresh_total.labels(result="rate_limited").inc()
+            logger.warning(
+                "event=refresh.rate_limited user_id=%s ip=%s ts=%s",
+                str(user_id),
+                ip,
+                _now_iso(),
+            )
+            raise HTTPException(
+                status_code=429,
+                detail="Too many refresh attempts. Try again later.",
+            )
+    elif settings.effective_failure_mode("rate_limit") == "fail_closed":
+        raise HTTPException(
+            status_code=503,
+            detail="Rate limiting service temporarily unavailable",
+        )
 
     # Allowlist check: stateful/hybrid modes require the JTI to be registered.
     if not settings.is_stateless:
