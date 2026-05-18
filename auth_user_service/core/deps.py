@@ -68,18 +68,17 @@ class _LoggingHooks:
 _hooks: ValidationHooks = _LoggingHooks()
 
 _redis_degraded_since: Optional[datetime] = None
+_REDIS_CIRCUIT_BREAKER_SECS = 30
+_REDIS_CONNECT_TIMEOUT_SECS = 2
 
-# Redis pool is skipped entirely in stateless mode.
-_redis_pool: Optional[ConnectionPool] = (
-    ConnectionPool(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        username=settings.REDIS_USER,
-        password=settings.REDIS_PASSWORD.get_secret_value() or None,
-        decode_responses=True,
-    )
-    if settings.requires_redis
-    else None
+_redis_pool: Optional[ConnectionPool] = ConnectionPool(
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    username=settings.REDIS_USER,
+    password=settings.REDIS_PASSWORD.get_secret_value() or None,
+    decode_responses=True,
+    socket_connect_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
+    socket_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
 )
 
 
@@ -92,13 +91,17 @@ _access_validator = build_access_validator(settings, _hooks)
 def get_redis_client() -> Optional[Redis]:
     """Return a Redis client from the shared pool, or None when unavailable.
 
-    A ping is issued on every call so that ``if redis is not None:`` guards in
-    routes correctly reflect the actual connection state rather than always
-    passing because the pool object exists.
+    Circuit breaker: after the first failure, skips the ping for
+    ``_REDIS_CIRCUIT_BREAKER_SECS`` seconds so that an unreachable Redis
+    server does not add per-request latency. Resets on first successful ping.
     """
     global _redis_degraded_since
     if _redis_pool is None:
         return None
+    if _redis_degraded_since is not None:
+        elapsed = (datetime.now(timezone.utc) - _redis_degraded_since).total_seconds()
+        if elapsed < _REDIS_CIRCUIT_BREAKER_SECS:
+            return None
     try:
         client = Redis(connection_pool=_redis_pool)
         client.ping()
