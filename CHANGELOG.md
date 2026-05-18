@@ -6,6 +6,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **`SameSite=Strict` on refresh-token cookie** — upgraded from `SameSite=Lax`. The auth service has no legitimate cross-site POST use case, so `Strict` provides the maximum CSRF protection at no functional cost.
+- **`REFRESH_TOKEN_ALGORITHM` startup enforcement** — `CommonSettings._sync_token_algorithms` now raises `ValueError` at startup if `REFRESH_TOKEN_ALGORITHM` is configured to anything other than `HS256`. Refresh tokens are internal-only and must use symmetric signing; this converts a silent misconfiguration trap into a hard startup failure.
+- **`SecurityHelper.verify_password` exception narrowed** — `except Exception` tightened to `except ValueError`; removed the dead `# return pwd_context.verify(...)` comment. Previously, bcrypt internal errors (malformed stored hash, memory fault) silently returned `False` with no log or metric, masking legitimate failures and reducing anomaly-detection sensitivity.
+
 ### Added
 
 - **`vault_rs256_postgres_m8` production Vault examples** — three new files for deploying with an external Vault:
@@ -35,6 +41,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   - Production hardening guide (server mode, scoped app-policy token, Vault agent sidecar) and key-rotation procedure documented in stack README.
 
 ### Fixed
+
+- **`SessionController.revoke_session_jti`** (`services/client_sessions.py`) — refactored to accept an optional `redis: Optional[Redis] = None` parameter, consistent with all sibling session methods. Logout now passes the route-scoped client directly instead of calling `get_redis_client()` internally.
+- **`user_id` type standardised to `str`** in `SessionController.get_user_active_sessions` and `revoke_all_user_sessions` — JWT `sub` claims are always strings; the previous `uuid.UUID` annotation created a type-system mismatch at every call site.
+- **`UserController.get_user` return type** corrected to `Optional[User]` (`services/users.py`) — `.first()` returns `None` when no row is found.
+- **`logging.basicConfig()` removed** from `services/client_sessions.py` — library modules must not override the root logger configuration of the host application.
+- **`get_tokens_expire()` return type** corrected from `Union[timedelta, timedelta]` to `tuple[timedelta, timedelta]` (`services/auth.py`).
+- **`PKCEStore.pop` simplified** — `return result if result is not None else None` → `return result` (`core/client.py`).
+- Typo `expiarition` → `expiration` in `AuthController.get_tokens_expire` docstring.
 
 - **`CommonSettings.settings_customise_sources` classmethod** (auth-sdk-m8): pydantic-settings 2.x calls sources with no positional arguments and uses a 5-arg classmethod calling convention (`settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings`). The standalone function passed via `model_config` was silently ignored. Vault injection is now wired as a proper `@classmethod` override on `CommonSettings`, so all subclasses inherit it without any `model_config` entry.
 - **Vault source callable signature**: pydantic-settings 2.x calls each source with no arguments (`source()`); the inner `_vault_source` function no longer declares a settings parameter.

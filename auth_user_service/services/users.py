@@ -3,7 +3,7 @@ Users Controller
 """
 
 import uuid
-from typing import Any
+from typing import Any, Optional
 from sqlmodel import Session, func, select
 from auth_user_service.core.security import SecurityHelper
 from auth_user_service.db_models.users import User, UserCreate, UserUpdate
@@ -83,7 +83,7 @@ class UserController:
         return db_user
 
     @staticmethod
-    def get_user(*, session: Session, user_id: uuid.UUID) -> User:
+    def get_user(*, session: Session, user_id: uuid.UUID) -> Optional[User]:
         """
         Retrieve a user from the database by their ID.
 
