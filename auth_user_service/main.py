@@ -33,6 +33,30 @@ _metrics.setup(
 )
 
 
+def _init_degradation_gauges() -> None:
+    """Set auth_degradation_mode_active gauge from configured settings at startup."""
+    m = _metrics.get()
+    if m is None or m.degradation_mode_active is None:
+        return
+    m.degradation_mode_active.labels(
+        control="rate_limit", mode=settings.effective_failure_mode("rate_limit")
+    ).set(1)
+    m.degradation_mode_active.labels(
+        control="refresh_validation",
+        mode=settings.effective_failure_mode("refresh_validation"),
+    ).set(1)
+    m.degradation_mode_active.labels(
+        control="session_write", mode=settings.effective_failure_mode("session_write")
+    ).set(1)
+    m.degradation_mode_active.labels(
+        control="access_revocation",
+        mode=settings.effective_failure_mode("access_revocation"),
+    ).set(1)
+
+
+_init_degradation_gauges()
+
+
 def _flush_last_used_at() -> None:
     """Batch-write api_key last_used_at from the Redis write-behind hash to the DB.
 

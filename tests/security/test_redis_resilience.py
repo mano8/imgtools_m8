@@ -110,6 +110,34 @@ class TestGetRedisClientResilience:
         warning_msg = mock_logger.warning.call_args[0][0]
         assert "unavailable" in warning_msg or "degraded" in warning_msg
 
+    def test_circuit_breaker_gauge_set_to_0_on_success(self):
+        """Successful ping must set redis_circuit_breaker_open gauge to 0."""
+        mock_client = MagicMock()
+        mock_client.ping.return_value = True
+        mock_metrics = MagicMock()
+        mock_metrics.redis_circuit_breaker_open = MagicMock()
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+            patch("auth_user_service.core.deps._get_metrics", return_value=mock_metrics),
+        ):
+            get_redis_client()
+        mock_metrics.redis_circuit_breaker_open.set.assert_called_once_with(0)
+
+    def test_circuit_breaker_gauge_set_to_1_on_failure(self):
+        """Failed ping must set redis_circuit_breaker_open gauge to 1."""
+        mock_client = MagicMock()
+        mock_client.ping.side_effect = RedisConnectionError("down")
+        mock_metrics = MagicMock()
+        mock_metrics.redis_circuit_breaker_open = MagicMock()
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+            patch("auth_user_service.core.deps._get_metrics", return_value=mock_metrics),
+        ):
+            get_redis_client()
+        mock_metrics.redis_circuit_breaker_open.set.assert_called_once_with(1)
+
 
 class TestGoogleOAuthRedisRequirement:
     """PKCE requires Redis — must fail closed with 503 when Redis is down."""

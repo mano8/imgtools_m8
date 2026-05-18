@@ -27,6 +27,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **`auth_degraded_decision_total` Prometheus counter** (auth metrics group) — emitted on every degraded-mode decision, i.e. each time a Redis-dependent control is consulted while Redis is unavailable. Labels: `control` (`rate_limit | refresh_validation | session_write | access_revocation`), `mode` (`fail_open | fail_closed`), `reason` (`redis_unavailable | revocation_failed`). Allows building Prometheus alerts on degraded-mode frequency and mode distribution before HTTP 503s appear in error rates.
 
+- **`auth_redis_circuit_breaker_open` Prometheus gauge** (auth metrics group) — set to `1` when the Redis circuit breaker is open (Redis unavailable, requests short-circuited) and `0` when closed (Redis healthy). Updated on every successful or failed ping in `get_redis_client()`.
+
+- **`auth_degradation_mode_active` Prometheus gauge** (auth metrics group) — set at startup from `CommonSettings` for each security control. Labels: `control`, `mode`. Value is always `1` for the active configured mode. Allows alert rules like `auth_degradation_mode_active{control="rate_limit", mode="fail_open"} == 1 and auth_redis_circuit_breaker_open == 1` to page on unprotected degraded paths.
+
+- **`/health` circuit breaker and degradation mode fields** — health endpoint now includes `circuit_breaker` (`"open"` | `"closed"`) and `degradation_modes` object showing the effective mode per control. Operators can see the degradation posture without scraping Prometheus.
+
 - **Revocation failure log level upgraded** — all three logout revocation failures (`access_blacklist`, `refresh_allowlist`, `db_session`) now emit `ERROR` instead of `WARNING`, producing a structured log event that incident-response tooling can page on.
 
 - **`vault_rs256_postgres_m8` production Vault examples** — three new files for deploying with an external Vault:

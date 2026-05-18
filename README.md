@@ -407,14 +407,23 @@ GET {API_PREFIX}/health/
   "token_mode": "stateful",
   "effective_mode": "stateful",
   "redis": "ok",
+  "circuit_breaker": "closed",
   "database": "ok",
   "revocation_available": true,
   "rate_limiting_available": true,
-  "degraded_since": null
+  "degraded_since": null,
+  "degradation_modes": {
+    "rate_limit": "fail_open",
+    "refresh_validation": "fail_closed",
+    "session_write": "fail_closed",
+    "access_revocation": "fail_open"
+  }
 }
 ```
 
-`degraded_since` is the UTC timestamp when Redis first became unreachable in the current process lifetime, or `null` when healthy.
+`circuit_breaker` is `"open"` when Redis is required but currently unavailable (requests are short-circuited), and `"closed"` when healthy or not required.
+
+`degradation_modes` shows the effective per-control policy (respecting `AUTH_STRICT_MODE`). `degraded_since` is the UTC timestamp when Redis first became unreachable in the current process lifetime, or `null` when healthy.
 
 ---
 
@@ -608,6 +617,8 @@ Enabled with `METRICS_ENABLED=true`. The metric prefix is derived from `API_PREF
 | auth | `{prefix}auth_oauth_attempts_total` | Counter | provider, result: success \| failed |
 | auth | `{prefix}auth_revocation_failure_total` | Counter | operation: access_blacklist \| refresh_allowlist \| db_session |
 | auth | `{prefix}auth_degraded_decision_total` | Counter | control: rate_limit \| refresh_validation \| session_write \| access_revocation; mode: fail_open \| fail_closed; reason: redis_unavailable \| revocation_failed |
+| auth | `{prefix}auth_redis_circuit_breaker_open` | Gauge | 1 = Redis unavailable (circuit open), 0 = Redis healthy (circuit closed) |
+| auth | `{prefix}auth_degradation_mode_active` | Gauge | control × mode label pair; value always 1 for active mode; set at startup |
 | auth | `{prefix}auth_api_key_validations_total` | Counter | result: success \| invalid \| revoked \| expired |
 | auth | `{prefix}auth_api_key_rate_limit_checks_total` | Counter | result: checked \| allowed \| blocked |
 | auth | `{prefix}auth_api_key_rate_limit_hits_total` | Counter | period: minute \| hour \| day \| month |

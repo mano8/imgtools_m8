@@ -107,11 +107,17 @@ def get_redis_client() -> Optional[Redis]:
         client = Redis(connection_pool=_redis_pool)
         client.ping()
         _redis_degraded_since = None
+        _m = _get_metrics()
+        if _m and _m.redis_circuit_breaker_open:
+            _m.redis_circuit_breaker_open.set(0)
         return client
     except Exception:
         if _redis_degraded_since is None:
             _redis_degraded_since = datetime.now(timezone.utc)
         _logger.warning("redis.unavailable degraded_mode=true")
+        _m = _get_metrics()
+        if _m and _m.redis_circuit_breaker_open:
+            _m.redis_circuit_breaker_open.set(1)
         return None
 
 
