@@ -40,7 +40,7 @@ if [[ "$RESET_DB" == "true" ]]; then
             exit 1
         fi
         read -rp "         Are you sure? [y/N] " confirm
-        [[ "${confirm,,}" == "y" ]] || { echo "Aborted."; exit 0; }
+        [[ "$confirm" == "y" || "$confirm" == "Y" ]] || { echo "Aborted."; exit 0; }
     fi
     docker compose down
     rm -rf db_data/

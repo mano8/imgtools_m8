@@ -79,9 +79,12 @@ def login_access_token(
     email = form_data.username
     ip = _client_ip(request)
 
+    if "\x00" in email or "\x00" in form_data.password:
+        raise HTTPException(status_code=422, detail="Invalid characters in credentials")
+
     _m = _get_metrics()
 
-    if redis is not None and not settings.is_stateless:
+    if redis is not None:
         rate_limiter = LoginRateLimiter(redis)
         if not rate_limiter.is_allowed(email):
             if _m and _m.login_attempts_total:
@@ -110,7 +113,7 @@ def login_access_token(
             detail="Invalid credentials or inactive user",
         )
 
-    if redis is not None and not settings.is_stateless:
+    if redis is not None:
         LoginRateLimiter(redis).reset(email)
 
     if _m and _m.login_attempts_total:

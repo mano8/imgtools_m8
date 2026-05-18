@@ -4,6 +4,124 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`vault_rs256_postgres_m8` production Vault examples** — three new files for deploying with an external Vault:
+  - `.env.prod_example` — `.env` with `AUTH_DB_PASSWORD`, `REDIS_PASSWORD`, and `VAULT_DEV_TOKEN` removed; shows what CI/CD injects at deploy time.
+  - `auth.env.prod_example` — `auth.env` with `ENVIRONMENT=production`, API docs disabled, and no DB/Redis passwords; documents injection via Docker secrets.
+  - `vault/docker-compose.vault.yml` + `vault/config/vault.hcl` — standalone Vault compose in server mode (persistent file storage) for local integration testing without dev mode.
+  - README section "Using with an external Vault" covering option A (separate local Vault compose), option B (managed Vault), the prod example files, and how to extend Vault coverage to additional secrets.
+
+- **README overhaul across all 10 Docker Compose stacks** — every stack README rewritten or substantially extended:
+  - Root `README.md`: stack table expanded to all 10 stacks, Quick Start updated, architecture diagram fixed.
+  - `examples/docker_compose/README.md`: complete rewrite with decision guide, algorithm and token mode comparison tables, live test commands for each stack.
+  - `lite_mysql_m8`, `lite_postgres_m8`: fixed stale titles (`local_mysql_m8`, `dev_postgres_m8`), added Architecture, Limitations, and Live testing sections.
+  - `lite_rs256_m8`: removed phantom monitoring sections, corrected Limitations.
+  - `lite_es256_m8`, `lite_hybrid_m8`, `lite_stateless_m8`: written from scratch with correct algorithm/mode settings, explicit warnings about env example defaults, Redis-usage tables.
+  - `stateful_m8`: added Summary nav, Architecture diagram, Live testing section.
+  - `env_rs256_m8`: new README distinguishing this stack from `vault_rs256_postgres_m8` (env-file secrets vs Vault).
+  - `vault_rs256_postgres_m8`: added "not production-ready as-is" disclaimer, plaintext-exposure table, bundled-vs-separate Vault comparison, and the new external-Vault section.
+  - `template`: updated stack comparison table to list all 10 stacks with correct names.
+  - All READMEs have a Summary with in-page links and a nav footer.
+
+- **`RS256_m8` directory renamed to `env_rs256_m8`** — clarifies that this stack uses plain env files, distinguishing it from `vault_rs256_postgres_m8` which uses HashiCorp Vault.
+
+- **`vault_rs256_postgres_m8` compose stack** — new production-grade example combining PostgreSQL 16, RS256 asymmetric signing, HashiCorp Vault secret injection, and Prometheus/Grafana observability.
+  - Vault dev-mode service with a one-shot `vault_init` container that writes `DB_PASSWORD` and `REDIS_PASSWORD` to `secret/data/app`; `auth_user_service` depends on it via `service_completed_successfully`.
+  - `SECRET_PROVIDER` and `VAULT_ADDR` moved to the docker-compose `environment` block (not the dotenv file) to avoid pydantic `extra="forbid"` rejection.
+  - `hvac>=2.0.0` added to `requirements_prod.txt` so Vault injection is available in Docker builds.
+  - Production hardening guide (server mode, scoped app-policy token, Vault agent sidecar) and key-rotation procedure documented in stack README.
+
+### Fixed
+
+- **`CommonSettings.settings_customise_sources` classmethod** (auth-sdk-m8): pydantic-settings 2.x calls sources with no positional arguments and uses a 5-arg classmethod calling convention (`settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings`). The standalone function passed via `model_config` was silently ignored. Vault injection is now wired as a proper `@classmethod` override on `CommonSettings`, so all subclasses inherit it without any `model_config` entry.
+- **Vault source callable signature**: pydantic-settings 2.x calls each source with no arguments (`source()`); the inner `_vault_source` function no longer declares a settings parameter.
+- **`auth_user_service/core/config.py`**: removed the `settings_customise_sources=` entry from `SettingsConfigDict` (it was a no-op) and the corresponding import.
+- **`tests/live/conftest.py`**: RSA key lookup now searches `vault_rs256_postgres_m8/keys/` first, then falls back to `RS256_m8/` and `lite_rs256_m8/`.
+
+---
+
+## [0.7.1] - 2026-05-17
+
+### Fixed
+
+- **`get_user` by ID**: `users.get_user()` was looking up by email when called with an ID argument; query corrected to use `user_id`. User count query simplified.
+
+### Added
+
+- **Modular live test suite** — monolithic `test_redteam_rs256.py` replaced by six focused modules, each gated by a pytest mark so only relevant tests run against a given stack:
+  - `test_security_universal.py` — 13 attack categories (A–M) that apply to any algorithm and token mode.
+  - `test_asymmetric.py` — asymmetric-only attacks (alg=none confusion, JWKS exposure, attacker-generated key); auto-skipped when the stack uses HS256.
+  - `test_hs256.py` — HS256-specific attacks; auto-skipped on asymmetric stacks.
+  - `test_stateful.py` — token-revocation and session-chain guarantees for `TOKEN_MODE=stateful`.
+  - `test_hybrid.py` — degraded-mode and partial-Redis behaviour for `TOKEN_MODE=hybrid`.
+  - `test_stateless.py` — no-Redis guarantees for `TOKEN_MODE=stateless`.
+  - `tests/live/suites/` — shared helpers (`auth_flows.py`, `token_forge.py`) that de-duplicate login flows and JWT forgery fixtures across all modules.
+  - `conftest.py` auto-detects the running stack's algorithm and token mode; `require_algorithm` / `require_token_mode` marks trigger automatic skip.
+- **New `pytest.ini` markers**: `live_security`, `live_asymmetric`, `live_hs256`, `live_stateful`, `live_hybrid`, `live_stateless`, `require_algorithm`, `require_token_mode`, `destructive`.
+- **Session deletion and revocation tests** (`tests/services/client_sessions_test.py`) — covers `delete_session`, `revoke_session`, and Redis JTI cleanup paths.
+- **100% branch coverage** across `core/client.py`, `core/deps.py`, and `services/api_keys.py`.
+
+---
+
+## [0.7.0] - 2026-05-16
+
+### Added
+
+- **API key rate limiting** — full fixed-window enforcement across MINUTE, HOUR, DAY, and MONTH periods.
+  - Redis `INCR + EXPIRE` in a pipeline (atomic) per window; correct per-period bucket format prevents HOUR/DAY/MONTH counters from resetting every minute.
+  - Priority chain: per-key `RateLimit` rows → per-user defaults → `API_KEY_DEFAULT_LIMIT_*` settings.
+  - `RateLimitResult` dataclass carries `allowed`, `exceeded_period`, `limit`, `remaining`, `reset_at`.
+  - `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` response headers populated from the tightest (MINUTE) window.
+  - `Retry-After` header on 429 responses.
+  - Degraded-mode support: when Redis is unavailable and `API_KEY_STRICT_RATE_LIMIT=false` (default), requests are allowed through; strict mode returns 503.
+- **`get_current_api_key` FastAPI dependency** (`core/deps.py`): validates `X-API-Key` header, enforces rate limits, and queues a write-behind `last_used_at` update to Redis.
+- **Write-behind `last_used_at` flush** (`main.py` lifespan): hardened asyncio background task — exception-shielded loop, final flush on graceful shutdown (5 s timeout), Prometheus histogram for flush latency.
+- **API key endpoints** under `/user/profile/api-keys/`:
+  - `GET /verify` — validate `X-API-Key` header, enforce rate limits, return key metadata (used by consumer services).
+  - `POST /` — create key, enforce `API_KEY_MAX_PER_USER` cap, return plaintext once.
+  - `GET /` — list all keys for the current user (metadata only; hash never exposed).
+  - `GET /{key_id}` — retrieve metadata for a single key.
+  - `DELETE /{key_id}` — revoke a key; emits `api_key_lifecycle_total{action="revoked"}`.
+- **`Period.MONTH`** added to `auth_sdk_m8.schemas.base.Period` enum.
+- **5 new Prometheus metrics** in `auth_sdk_m8.observability.metrics` (auth group):
+  - `auth_api_key_validations_total` — result: success | invalid | revoked | expired.
+  - `auth_api_key_rate_limit_checks_total` — result: checked | allowed | blocked.
+  - `auth_api_key_rate_limit_hits_total` — period: minute | hour | day | month.
+  - `auth_api_key_lifecycle_total` — action: created | revoked.
+  - `auth_api_key_flush_duration_seconds` — histogram for write-behind flush latency.
+- **`RateLimit` DB model redesigned**: `api_key_id` (nullable FK → `auth_api_key.id`, CASCADE) added as primary enforcement axis; `user_id` made nullable (fallback default); `period` enum extended with MONTH; two UNIQUE constraints (`uq_ratelimit_api_key_period`, `uq_ratelimit_user_period`) and a CHECK constraint (`ck_ratelimit_has_owner`) added.
+- **`ApiKey.id`** migrated from VARCHAR to `Uuid` for type consistency with `user.id`.
+- **Alembic migration** `99540139637b_api_key_rate_limit_redesign` for all five compose examples.
+- **`API_KEY_*` settings** in `auth_user_service/core/config.py`:
+  - `API_KEY_STRICT_RATE_LIMIT` (default `false`), `API_KEY_DEFAULT_LIMIT_MINUTE/HOUR/DAY/MONTH`, `API_KEY_MAX_PER_USER`.
+- **Prometheus alert rules** (`prometheus/alerts.yml`) for all three Prometheus-enabled compose stacks:
+  - `ApiKeyBlockRatioHigh` — hits/checks > 10% over 5 min.
+  - `ApiKeyRateLimitInvariantViolation` — hits > checks × 1.1 (instrumentation sanity guard).
+  - `ApiKeyFlushLatencyHigh` — p99 flush > 500 ms.
+  - `ApiKeyHighInvalidRate` — > 1 invalid/revoked/expired key/s over 5 min.
+
+### Fixed
+
+- **`RedisRateLimiter` bucket format bug**: HOUR, DAY, and MONTH periods were using the same `%Y%m%d%H%M` format as MINUTE, creating a new Redis key every minute instead of accumulating in a single window. Each period now has a distinct bucket format.
+- **INCR + EXPIRE race condition**: the two Redis calls are now issued in a single pipeline, preventing a key with no TTL if the service crashes between them.
+
+### Changed
+
+- `RedisRateLimiter` public API: `increment()` replaced by `check_and_increment()` (returns `RateLimitResult`) and `check_all_limits()`. Internal `_increment()` handles the pipelined atomic counter.
+
+---
+
+## [0.6.1] - 2026-05-16
+
+### Fixed
+
+- **Idempotent superuser seed**: `initial_user_db` now guards on the presence of any superuser in the database instead of looking up the specific bootstrap email. On subsequent `compose up` runs the seed is skipped entirely and a log line confirms it — `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD` remain required by config but are never applied again after the first run.
+
+---
+
 ## [0.6.0] - 2026-05-14
 
 ### Security

@@ -63,33 +63,23 @@ openssl pkey -pubin -in "$PUB" -pubout -outform DER >/dev/null 2>&1 || {
 }
 
 # KID: SHA256 of canonical DER bytes — stable across PEM formatting differences.
-# Uses system python3 + stdlib only: no virtualenv, no cryptography lib dependency.
-python3 - "$AUTH_ENV" "$PUB" <<'PY'
-import sys, re, hashlib, subprocess
+# Pure openssl pipeline — no Python dependency (avoids Windows Store stub issue).
+# awk '{print $NF}' extracts the hex digest regardless of OpenSSL version prefix format.
+kid=$(openssl pkey -pubin -in "$PUB" -pubout -outform DER 2>/dev/null \
+      | openssl dgst -sha256 2>/dev/null \
+      | awk '{print $NF}' \
+      | cut -c1-16)
 
-env_file, pub_path = sys.argv[1:]
+[[ -n "$kid" ]] || { echo "ERROR: failed to compute KID from ${PUB}" >&2; exit 1; }
 
-result = subprocess.run(
-    ['openssl', 'pkey', '-pubin', '-in', pub_path, '-pubout', '-outform', 'DER'],
-    capture_output=True,
-    text=False,
-    check=True,
-)
-if not result.stdout:
-    raise RuntimeError("openssl returned empty DER output — key generation may have failed")
-
-kid = hashlib.sha256(result.stdout).hexdigest()[:16]
-
-with open(env_file) as f:
-    content = f.read()
-
-if re.search(r'^ACCESS_KEY_ID=', content, re.M):
-    content = re.sub(r'^ACCESS_KEY_ID=.*', f'ACCESS_KEY_ID={kid}', content, flags=re.M)
-    with open(env_file, 'w') as f:
-        f.write(content)
-    print(f"    updated ACCESS_KEY_ID={kid} in {env_file}")
-else:
-    print(f"    WARNING: ACCESS_KEY_ID not found in {env_file}")
-PY
+# Update ACCESS_KEY_ID in auth.env.
+# Uses a temp file instead of sed -i to avoid macOS/GNU sed portability differences.
+if grep -q "^ACCESS_KEY_ID=" "$AUTH_ENV"; then
+    tmp=$(mktemp)
+    sed "s/^ACCESS_KEY_ID=.*/ACCESS_KEY_ID=${kid}/" "$AUTH_ENV" > "$tmp" && mv "$tmp" "$AUTH_ENV"
+    echo "    updated ACCESS_KEY_ID=${kid} in ${AUTH_ENV}"
+else
+    echo "    WARNING: ACCESS_KEY_ID not found in ${AUTH_ENV}"
+fi
 
 echo "==> init-keys done: ${PRIV}, ${PUB}"

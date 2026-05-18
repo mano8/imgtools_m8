@@ -10,7 +10,44 @@ import pytest
 from pydantic import SecretStr
 
 import auth_user_service.services.auth as _auth_module
-from auth_user_service.services.auth import AuthController
+from auth_user_service.services.auth import AuthController, _resolve_kid
+
+
+class TestResolveKid:
+    def test_symmetric_algo_returns_none(self):
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.ACCESS_TOKEN_ALGORITHM = "HS256"
+            assert _resolve_kid("HS256") is None
+
+    def test_asymmetric_explicit_key_id_returned(self):
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.ACCESS_KEY_ID = "my-key-id"
+            mock_cfg.ACCESS_PUBLIC_KEY = (
+                "-----BEGIN PUBLIC KEY-----\nfake\n-----END PUBLIC KEY-----"
+            )
+            result = _resolve_kid("RS256")
+        assert result == "my-key-id"
+
+    def test_asymmetric_falls_back_to_pubkey_fingerprint(self):
+        pub = "-----BEGIN PUBLIC KEY-----\nfake_pub\n-----END PUBLIC KEY-----"
+        expected = hashlib.sha256(pub.strip().encode()).hexdigest()[:16]
+
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.ACCESS_KEY_ID = None
+            mock_cfg.ACCESS_PUBLIC_KEY = pub
+            result = _resolve_kid("RS256")
+
+        assert result == expected
+
+    def test_asymmetric_empty_key_id_falls_back(self):
+        pub = "-----BEGIN PUBLIC KEY-----\nfake_pub\n-----END PUBLIC KEY-----"
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.ACCESS_KEY_ID = ""
+            mock_cfg.ACCESS_PUBLIC_KEY = pub
+            result = _resolve_kid("ES256")
+
+        assert result is not None
+        assert len(result) == 16
 
 
 class TestGenerateCodeVerifier:

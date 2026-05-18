@@ -1,40 +1,47 @@
 # Docker Compose Examples
 
-Four ready-to-run stacks for local development. Each runs the same services with different
-database engines, token modes, and observability options.
-
-## Which stack should I use?
-
-| Stack | Database | Token mode | Monitoring | Best for |
-| --- | --- | --- | --- | --- |
-| [local_mysql_m8](local_mysql_m8/) | MariaDB | hybrid | — | Fastest start, everyday dev |
-| [dev_postgres_m8](dev_postgres_m8/) | PostgreSQL 16 | stateful | — | PostgreSQL projects |
-| [stateful_m8](stateful_m8/) | MariaDB | stateful | Prometheus + Grafana | Testing metrics & dashboards |
-| [RS256_m8](RS256_m8/) | MariaDB | stateful | Prometheus + Grafana | Asymmetric signing, JWKS, key rotation |
-
-**Start here →** [local_mysql_m8](local_mysql_m8/) if you just want things running quickly.  
-**Use RS256_m8** if you need multiple consumer services that verify tokens independently,
-or when building toward a production setup.
+Ten ready-to-run stacks covering every combination of database, signing algorithm, token mode, and secret-management strategy. Each runs the same two application services with different infrastructure and configuration.
 
 ---
 
-## Quick start
+## Summary
 
-Every stack follows the same three steps:
+- [Which stack should I use?](#which-stack-should-i-use)
+- [Common architecture](#common-architecture)
+- [Token modes](#token-modes)
+- [Quick start](#quick-start)
+- [Environment file system](#environment-file-system)
+- [Database isolation](#database-isolation)
+- [Shared migrations](#shared-migrations)
+- [Ports](#ports-same-for-all-stacks)
+- [Live testing](#live-testing)
 
-```sh
-# 1. copy env files and fill in secrets
-cp .env.example .env && cp auth.env.example auth.env && cp api.env.example api.env
+---
 
-# 2. generate keys (RS256/ES* stacks) and TLS certificates
-bash init.sh
+## Which stack should I use?
 
-# 3. bring up the stack — DB is provisioned automatically on first boot
-docker compose up -d --build
-```
+| Stack | Database | Algorithm | Token mode | Secrets | Monitoring | Best for |
+| --- | --- | --- | --- | --- | --- | --- |
+| [lite_mysql_m8](lite_mysql_m8/) | MariaDB | HS256 | `hybrid` | env file | — | **Fastest start**, everyday dev |
+| [lite_postgres_m8](lite_postgres_m8/) | PostgreSQL 16 | HS256 | `stateful` | env file | — | PostgreSQL projects |
+| [lite_rs256_m8](lite_rs256_m8/) | MariaDB | RS256 | `stateful` | env file | — | Asymmetric signing + JWKS |
+| [lite_es256_m8](lite_es256_m8/) | MariaDB | ES256 | `stateful` | env file | — | ECDSA asymmetric signing |
+| [lite_hybrid_m8](lite_hybrid_m8/) | MariaDB | RS256 | `hybrid` | env file | — | RS256 + hybrid mode |
+| [lite_stateless_m8](lite_stateless_m8/) | MariaDB | HS256 | `stateless` | env file | — | No Redis for JWT validation |
+| [stateful_m8](stateful_m8/) | MariaDB | HS256 | `stateful` | env file | Prometheus + Grafana | Metrics dashboards, stateful flow |
+| [env_rs256_m8](env_rs256_m8/) | MariaDB | RS256 | `stateful` | env file | Prometheus + Grafana | RS256 + JWKS + metrics |
+| [vault_rs256_postgres_m8](vault_rs256_postgres_m8/) | PostgreSQL 16 | RS256 | `stateful` | **HashiCorp Vault** | Prometheus + Grafana | Hardened secrets management |
+| [template](template/) | configurable | configurable | configurable | env file | — | Starting point for new stacks |
 
-To reset the database: `bash init.sh --reset-db` (prompts for confirmation; use `--yes` for CI).
-To rotate cryptographic keys: `bash init.sh --rotate-keys`.
+**Decision guide:**
+
+- **Just want things running** → [lite_mysql_m8](lite_mysql_m8/)
+- **Need PostgreSQL** → [lite_postgres_m8](lite_postgres_m8/)
+- **Asymmetric signing / multiple consumers** → [lite_rs256_m8](lite_rs256_m8/) or [env_rs256_m8](env_rs256_m8/)
+- **Explore token modes** → [lite_hybrid_m8](lite_hybrid_m8/) (hybrid) or [lite_stateless_m8](lite_stateless_m8/) (stateless)
+- **ECDSA tokens (ES256)** → [lite_es256_m8](lite_es256_m8/)
+- **Metrics and dashboards** → [stateful_m8](stateful_m8/) or [env_rs256_m8](env_rs256_m8/)
+- **Secrets manager (Vault)** → [vault_rs256_postgres_m8](vault_rs256_postgres_m8/) — credentials never live in plain env files
 
 ---
 
@@ -42,7 +49,7 @@ To rotate cryptographic keys: `bash init.sh --rotate-keys`.
 
 All stacks share the same service layout:
 
-```
+```text
 Browser / Frontend
        │
        ▼
@@ -57,17 +64,85 @@ auth_user_service :8000            fastapi_service :8000
           ▼                ▼
         m8_db          redis_cache
    (MariaDB / PG)      (Redis 7.4)
+
+(stateful_m8, env_rs256_m8, vault_rs256_postgres_m8 also include Prometheus + Grafana)
 ```
 
-Traefik is the single entry point. Both services sit on an internal Docker network and
-are not directly reachable from the host.
+Traefik is the single entry point. Both application services sit on an internal Docker network (`m8_app_network`) and are not directly reachable from the host.
+
+---
+
+## Token modes
+
+Set `TOKEN_MODE` in `auth.env` to control how access tokens are validated:
+
+| Mode | How it works | Redis for JWT | Google OAuth | Use case |
+| --- | --- | --- | --- | --- |
+| `stateless` | Verify JWT signature only — no server-side state | No | ❌ disabled | Maximum scalability, no revocation needed |
+| `hybrid` | JWT access token + Redis-stored refresh allowlist | Refresh only | ✅ | Good balance: scalable access + revocable refresh |
+| `stateful` | Every request checks Redis blacklist | Yes | ✅ | Instant logout guarantee |
+
+> **Stateless limitation:** Google OAuth requires Redis for the PKCE code-exchange flow and is
+> disabled when `TOKEN_MODE=stateless`. All other features work normally.
+>
+> **Hybrid trade-off:** A stolen access token remains valid for its full lifetime after logout.
+> Refresh tokens are revoked immediately. Use `stateful` if instant access token revocation is required.
+
+---
+
+## Quick start
+
+Every stack follows the same four steps:
+
+```sh
+# 1. Copy env files and fill in all secrets (replace every 'changethis')
+cp auth.env.example auth.env
+cp api.env.example api.env
+
+# 2. Generate keys (RS256/ES256 stacks) and TLS certificates
+bash init.sh
+
+# 3. (Optional) Reset the database volume if it already exists
+# bash init.sh --reset-db    # prompts for confirmation; use --yes for CI
+
+# 4. Bring up the stack — DB is provisioned automatically on first boot
+docker compose up -d --build
+```
+
+> **Windows:** `init.sh` requires bash — use **Git Bash** (included with Git for Windows) or **WSL**.
+
+Generate secret values with:
+
+```sh
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+To rotate cryptographic keys without reinitializing: `bash init.sh --rotate-keys`.
+
+---
+
+## Environment file system
+
+Each stack uses **two env files** for the application services. Copy the `.example` files and fill in your values:
+
+```text
+auth.env      ← auth_user_service: algorithm, token mode, secrets, DB/Redis config, expiry
+api.env       ← fastapi_service: consumer role, token validation config, JWKS URI if RS256/ES256
+```
+
+Some stacks also use a shared `.env` file at the stack root for infrastructure variables (DB root password, Redis password) that are read directly by the database container's init script.
+
+Generate secrets with:
+
+```sh
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
 
 ---
 
 ## Database isolation
 
-`init-db.sh` runs inside the DB container on first volume creation and provisions
-databases automatically. Choose one model in `.env`:
+`init-db.sh` runs inside the DB container on first volume creation and provisions databases automatically. Choose one model:
 
 **Scenario 1 — single shared DB** (simplest):
 
@@ -95,71 +170,25 @@ WORKER_DB_USER=worker_user  WORKER_DB_PASSWORD=...  WORKER_DB_NAME=worker_db
 SEARCH_DB_USER=search_user  SEARCH_DB_PASSWORD=...  SEARCH_DB_NAME=search_db
 ```
 
-Add any `PREFIX_DB_{USER,PASSWORD,NAME}` triplet. Prefixes must be `UPPERCASE`,
-start with a letter, and use only `[A-Z0-9_]`. No compose edits needed — the DB
-container sees all `.env` vars via `env_file:` and discovers triplets automatically.
+Add any `PREFIX_DB_{USER,PASSWORD,NAME}` triplet. Prefixes must be `UPPERCASE`, start with a letter, and use only `[A-Z0-9_]`. No compose edits needed — the DB container sees all `.env` vars via `env_file:` and discovers triplets automatically.
 
-**Validation**: `init-db.sh` detects and rejects: missing/empty fields, duplicate
-`DB_NAME` or `DB_USER` across prefixes (silent isolation collapse), invalid identifier
-characters, and mixed bare+prefixed configuration. Weak or reused passwords produce
-warnings without blocking startup.
+**Validation**: `init-db.sh` detects and rejects: missing/empty fields, duplicate `DB_NAME` or `DB_USER` across prefixes (silent isolation collapse), invalid identifier characters, and mixed bare+prefixed configuration. Weak or reused passwords produce warnings without blocking startup.
 
-**Stale volume**: Database provisioning runs **once** on first volume creation.
-If `.env` DB config changes after the volume exists, reset with `bash init.sh --reset-db`.
-
----
-
-## Environment file system
-
-Each stack uses **three env files**. Copy the `.example` files and fill in your values:
-
-```
-.env          ← shared config: database, Redis, token algorithm, first superuser
-auth.env      ← auth_user_service specific settings (API prefix, secrets, expiry)
-api.env       ← fastapi_service specific settings (service role, JWKS URI if RS256)
-```
-
-Docker Compose reads `.env` automatically and injects the shared variables into both
-services via the `environment:` block. Service-specific files are loaded via `env_file:`.
-You never need to duplicate a shared variable in both files.
-
-Generate secrets with:
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(64))"
-```
-
----
-
-## Token modes
-
-Set `TOKEN_MODE` in `.env` to control how access tokens are validated:
-
-| Mode | How it works | Redis required | Use case |
-| --- | --- | --- | --- |
-| `stateless` | Verify JWT signature only — no server state | No | Maximum scalability |
-| `hybrid` | JWT access token + Redis-stored refresh token | Yes | Good balance |
-| `stateful` | Every request checks Redis blacklist | Yes | Instant logout guarantee |
-
-> **Note:** `stateless` mode disables Google OAuth (OAuth requires server-side state
-> for the code-exchange flow). All stacks here default to `hybrid` or `stateful`
-> because Redis is included in every stack.
+**Stale volume**: Database provisioning runs **once** on first volume creation. If DB config changes after the volume exists, reset with `bash init.sh --reset-db`.
 
 ---
 
 ## Shared migrations
 
-The `shared_migrations/` directory is created automatically on first start. It holds
-Alembic version files for both the auth schema and the application schema:
+The `shared_migrations/` directory is created automatically on first start. It holds Alembic version files for both the auth schema and the application schema:
 
-```
+```text
 shared_migrations/
 ├── auth_user/versions/   ← users, sessions, API keys, rate limits
 └── m8_app/versions/      ← your application tables
 ```
 
-Migrations run automatically every time the containers start. If you switch stacks,
-the migration history is preserved across restarts because the directory is mounted as
-a volume.
+Migrations run automatically every time the containers start. If you switch stacks, the migration history is preserved across restarts because the directory is mounted as a volume.
 
 ---
 
@@ -169,11 +198,43 @@ a volume.
 | --- | --- | --- |
 | `8000` | `0.0.0.0` | Traefik HTTP — public |
 | `4430` | `0.0.0.0` | Traefik HTTPS — public |
-| `9000` | `127.0.0.1` | API services entry (override with `API_BIND_IP`) |
+| `9000` | `127.0.0.1` | API services entry (override with `API_BIND_IP` in auth.env) |
 | `8080` | `127.0.0.1` | Traefik dashboard |
 | `3306` / `5432` | `127.0.0.1` | Database |
 | `6379` | `127.0.0.1` | Redis |
-| `9090` | `127.0.0.1` | Prometheus (stateful_m8, RS256_m8 only) |
-| `3000` | `127.0.0.1` | Grafana (stateful_m8, RS256_m8 only) |
+| `8200` | `127.0.0.1` | HashiCorp Vault UI/API (`vault_rs256_postgres_m8` only) |
+| `9090` | `127.0.0.1` | Prometheus (`stateful_m8`, `env_rs256_m8`, `vault_rs256_postgres_m8`) |
+| `3000` | `127.0.0.1` | Grafana (`stateful_m8`, `env_rs256_m8`, `vault_rs256_postgres_m8`) |
 
 Port `9000` is the one you'll use most in development — all API requests go through it.
+
+---
+
+## Live testing
+
+The repo includes a modular live test suite in `tests/live/` that runs against any running stack. Tests are automatically skipped when the running stack algorithm or token mode does not match.
+
+```sh
+# From the repo root — run against any stack
+pytest -m live --no-cov
+
+# Target specific algorithm or mode
+pytest -m live_asymmetric --no-cov    # RS256 / ES256 stacks
+pytest -m live_hs256 --no-cov         # HS256 stacks
+pytest -m live_stateful --no-cov      # TOKEN_MODE=stateful
+pytest -m live_hybrid --no-cov        # TOKEN_MODE=hybrid
+pytest -m live_stateless --no-cov     # TOKEN_MODE=stateless
+```
+
+For a manual smoke test, check the health endpoint after `docker compose up`:
+
+```sh
+curl http://localhost:9000/user/health/
+# Expected: {"status":"ok","token_mode":"...","redis":"ok","database":"ok",...}
+```
+
+Then open `http://localhost:9000/user/docs` in a browser (requires `SET_DOCS=true` in `auth.env`).
+
+---
+
+> Back to [repository root](https://github.com/mano8/fa-auth-m8/tree/main)

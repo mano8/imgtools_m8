@@ -2,8 +2,8 @@
 set -e
 
 # Run migrations
-# Check if alembic/versions is empty
-if [ -z "$(ls -A /opt/shared_migrations/m8_app/versions)" ]; then
+# Check if alembic/versions has no .py files (ignores .gitkeep)
+if [ -z "$(find /opt/shared_migrations/m8_app/versions -maxdepth 1 -name '*.py' -print -quit)" ]; then
     echo "Generating Alembic migration..."
     if ! alembic -c /opt/fastapi_service/alembic.ini revision --autogenerate -m "Initial m8 migration"; then
         echo "Failed to generate initial migration"

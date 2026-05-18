@@ -1,10 +1,51 @@
 # stateful_m8
 
-**MariaDB 12** + HS256 symmetric tokens + **stateful** token mode + **Prometheus & Grafana**
-observability. Designed for validating the complete stateful auth flow and exploring metrics.
+**MariaDB 12** + **HS256** symmetric tokens + **stateful** token mode + **Prometheus & Grafana** observability. Designed for validating the complete stateful auth flow and exploring metrics.
 
-**Choose this when:** you want to watch what happens in Redis and the database during
-login/logout cycles, or need to develop against a metrics dashboard.
+**Choose this when:** you want to watch what happens in Redis and the database during login/logout cycles, or need to develop against a metrics dashboard.
+
+---
+
+## Summary
+
+- [Architecture](#architecture)
+- [Services](#services)
+- [Setup](#setup)
+- [Token mode: stateful](#token-mode-stateful)
+- [Observability](#observability)
+- [URLs](#urls)
+- [Port map](#port-map)
+- [Configuration reference](#configuration-reference)
+- [Volumes](#volumes)
+- [Database isolation](#database-isolation)
+- [Common operations](#common-operations)
+- [Live testing](#live-testing)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Architecture
+
+```text
+Browser / Frontend
+       │
+       ▼
+  Traefik :9000
+       │
+       ├──► /user/*      → auth_user_service :8000
+       └──► /fastapi/*   → fastapi_service :8000
+                │
+       ┌────────┴────────┐
+       ▼                 ▼
+  m8_db (MariaDB 12)  redis_cache (Redis 7.4)
+                         │
+                   (access token blacklist
+                    + refresh token store)
+
+  Prometheus :9090  ←── scrapes /user/metrics
+       │
+  Grafana :3000
+```
 
 ---
 
@@ -270,3 +311,33 @@ at least one request to generate metrics. Check Prometheus targets at
 **Port conflict** — if `3306`, `6379`, `9090`, or `3000` are already in use, identify
 the process and stop it, or comment out the conflicting `ports:` entry in
 `docker-compose.yml` if you don't need direct host access to that service.
+
+---
+
+## Live testing
+
+Run the live test suite against this stack (requires the stack to be up):
+
+```sh
+# From the repo root
+pytest -m live_hs256 --no-cov      # HS256-specific attacks
+pytest -m live_stateful --no-cov   # Token revocation guarantees
+pytest -m live_security --no-cov   # Universal attack categories (A–M)
+```
+
+Manual smoke test:
+
+```sh
+curl http://localhost:9000/user/health/
+# Expected: {"status":"ok","token_mode":"stateful","redis":"ok","database":"ok",...}
+```
+
+After at least one request, check Prometheus has data:
+
+```sh
+curl http://localhost:9090/api/v1/query?query=up
+```
+
+---
+
+> [Docker Compose examples](../README.md) · [Repository root](https://github.com/mano8/fa-auth-m8/tree/main)

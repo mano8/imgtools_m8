@@ -7,6 +7,7 @@ This module provides Redis-backed utilities for:
 """
 
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Final, Optional
 
@@ -15,57 +16,137 @@ from redis import Redis
 from auth_sdk_m8.schemas.base import Period
 
 
+@dataclass
+class RateLimitResult:
+    """Result of a rate limit enforcement check."""
+
+    allowed: bool
+    exceeded_period: Optional[Period] = None
+    limit: Optional[int] = None
+    remaining: Optional[int] = None
+    reset_at: Optional[datetime] = None
+    headers: dict = field(default_factory=dict)
+
+
 class RedisRateLimiter:
-    """
-    Provides fast, in-memory API rate limiting using Redis.
-    """
+    """Fixed-window API rate limiter backed by Redis."""
+
+    # Bucket timestamp format per period — each window maps to exactly one key.
+    # Using full-minute format for ALL periods was the previous bug: HOUR/DAY
+    # created a new key every minute instead of accumulating in one window.
+    _BUCKET_FORMAT: Final[dict[Period, str]] = {
+        Period.MINUTE: "%Y%m%d%H%M",
+        Period.HOUR: "%Y%m%d%H",
+        Period.DAY: "%Y%m%d",
+        Period.MONTH: "%Y%m",
+    }
 
     _EXPIRATION_SECONDS: Final[dict[Period, int]] = {
         Period.MINUTE: 60,
         Period.HOUR: 3600,
         Period.DAY: 86400,
+        Period.MONTH: 32 * 86400,  # 32 days — covers any calendar month
     }
 
     def __init__(self, client: Redis) -> None:
-        """
-        Initialize the RedisRateLimiter.
+        """Initialize the RedisRateLimiter.
 
         Args:
-            client (Redis, optional): Redis client. If None, use default from core.deps.
+            client: Redis client instance.
         """
         self.client = client
 
     def _key(self, api_key_id: uuid.UUID, period: Period) -> str:
-        """
-        Construct a unique Redis key for the given API key and time period.
+        """Construct the Redis key for this api_key + period + current bucket."""
+        bucket = datetime.now(timezone.utc).strftime(self._BUCKET_FORMAT[period])
+        return f"rate:api:{api_key_id}:{period.value}:{bucket}"
 
-        Args:
-            api_key_id (uuid.UUID): The UUID of the API key.
-            period (Period): The rate limit period.
+    def _reset_at(self, period: Period) -> datetime:
+        """Return the UTC datetime when the current window resets."""
+        now = datetime.now(timezone.utc)
+        if period == Period.MINUTE:
+            return now.replace(second=0, microsecond=0) + timedelta(minutes=1)
+        if period == Period.HOUR:
+            return now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        if period == Period.DAY:
+            return now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+                days=1
+            )
+        # MONTH: first second of next month
+        if now.month == 12:
+            return now.replace(
+                year=now.year + 1,
+                month=1,
+                day=1,
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+        return now.replace(
+            month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
 
-        Returns:
-            str: A Redis key string.
-        """
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
-        return f"rate:{api_key_id}:{period.value}:{timestamp}"
+    def _increment(self, api_key_id: uuid.UUID, period: Period) -> int:
+        """Atomically increment the window counter and set TTL on first call.
 
-    def increment(self, api_key_id: uuid.UUID, period: Period) -> int:
-        """
-        Increments the usage count for the given API key and period.
-        Sets an expiration if it's the first usage in that window.
-
-        Args:
-            api_key_id (uuid.UUID): The UUID of the API key.
-            period (Period): The rate limit period.
-
-        Returns:
-            int: The current usage count.
+        Uses a pipeline so INCR + EXPIRE are issued together — avoids the
+        race where a crash between the two calls leaves a key with no TTL.
         """
         key = self._key(api_key_id, period)
-        count = self.client.incr(key)
-        if count == 1:
-            self.client.expire(key, self._EXPIRATION_SECONDS[period])
+        ttl = self._EXPIRATION_SECONDS[period]
+        with self.client.pipeline() as pipe:
+            pipe.incr(key)
+            pipe.expire(key, ttl)
+            count, _ = pipe.execute()
         return count
+
+    def check_and_increment(
+        self, api_key_id: uuid.UUID, limit: int, period: Period
+    ) -> RateLimitResult:
+        """Increment the counter for one period and return the result.
+
+        Increments checks_total before branching so the ratio
+        allowed / checks_total remains well-defined even on exception paths.
+        """
+        count = self._increment(api_key_id, period)
+        reset_at = self._reset_at(period)
+        remaining = max(0, limit - count)
+        allowed = count <= limit
+        return RateLimitResult(
+            allowed=allowed,
+            exceeded_period=None if allowed else period,
+            limit=limit,
+            remaining=remaining,
+            reset_at=reset_at,
+        )
+
+    def check_all_limits(
+        self, api_key_id: uuid.UUID, limits: list[tuple[Period, int]]
+    ) -> RateLimitResult:
+        """Enforce all configured rate limit windows in order (MINUTE first).
+
+        Stops at the first exceeded window. Returns the tightest window's
+        result when all pass (useful for response header population).
+
+        Callers must increment the checks_total metric BEFORE calling this.
+
+        Args:
+            api_key_id: The API key being rate-checked.
+            limits: List of (Period, max_requests) tuples, ordered from
+                    finest to coarsest granularity.
+
+        Returns:
+            RateLimitResult with allowed=True if all windows pass.
+        """
+        first_result: Optional[RateLimitResult] = None
+        for period, max_requests in limits:
+            result = self.check_and_increment(api_key_id, max_requests, period)
+            if first_result is None:
+                first_result = result
+            if not result.allowed:
+                return result
+        return first_result or RateLimitResult(allowed=True)
 
 
 class PKCEStore:

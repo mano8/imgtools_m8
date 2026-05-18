@@ -9,6 +9,7 @@ Verifies that:
 - Rate-limiting guard is correctly skipped when redis is None
 """
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,6 +22,11 @@ from auth_user_service.services.auth import AuthController
 
 
 class TestGetRedisClientResilience:
+    def setup_method(self):
+        import auth_user_service.core.deps as _deps
+
+        _deps._redis_degraded_since = None
+
     def test_returns_none_when_pool_is_none(self):
         """Stateless mode: pool never created, must return None immediately."""
         with patch("auth_user_service.core.deps._redis_pool", None):
@@ -59,6 +65,36 @@ class TestGetRedisClientResilience:
         ):
             result = get_redis_client()
         assert result is mock_client
+
+    def test_circuit_breaker_returns_none_within_cooling_window(self):
+        """Within 30 s of first failure the circuit is open: no ping attempt."""
+        import auth_user_service.core.deps as _deps
+
+        _deps._redis_degraded_since = datetime.now(timezone.utc)
+        mock_redis_cls = MagicMock()
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", mock_redis_cls),
+        ):
+            result = get_redis_client()
+        assert result is None
+        mock_redis_cls.assert_not_called()
+
+    def test_repeated_failure_does_not_overwrite_degraded_since(self):
+        """If already degraded and ping fails again, the original timestamp is kept."""
+        import auth_user_service.core.deps as _deps
+
+        original_ts = datetime.now(timezone.utc) - timedelta(seconds=60)
+        _deps._redis_degraded_since = original_ts
+        mock_client = MagicMock()
+        mock_client.ping.side_effect = RedisConnectionError("still down")
+        with (
+            patch("auth_user_service.core.deps._redis_pool", MagicMock()),
+            patch("auth_user_service.core.deps.Redis", return_value=mock_client),
+        ):
+            result = get_redis_client()
+        assert result is None
+        assert _deps._redis_degraded_since == original_ts
 
     def test_logs_warning_when_ping_fails(self):
         """Degraded mode must be logged so ops can detect it."""

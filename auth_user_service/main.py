@@ -1,9 +1,13 @@
 """auth_user_service/fastapi/main.py"""
 
+import asyncio
 import logging
+import time as _time
+import uuid
 import uvicorn
 
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.routing import APIRoute
@@ -20,11 +24,78 @@ from auth_sdk_m8.observability.middleware import MetricsMiddleware
 
 _logger = logging.getLogger(__name__)
 
+_FLUSH_INTERVAL_SECONDS = 60
+
 _metrics.setup(
     enabled=settings.METRICS_ENABLED,
     groups_str=settings.METRICS_GROUPS,
     api_prefix=settings.API_PREFIX,
 )
+
+
+def _flush_last_used_at() -> None:
+    """Batch-write api_key last_used_at from the Redis write-behind hash to the DB.
+
+    Uses HGETALL + pipeline DELETE for a near-atomic snapshot: any writes that
+    arrive in the tiny gap between the two calls are deferred to the next cycle.
+    Rows are updated only when the new timestamp is strictly greater, preserving
+    the last-writer-wins invariant without dialect-specific SQL (GREATEST).
+    """
+    from auth_user_service.core.deps import LAST_USED_AT_HASH, get_redis_client
+    from auth_user_service.core.engine_sync import engine
+    from auth_user_service.db_models.api_keys import ApiKey
+    from sqlmodel import Session
+
+    redis = get_redis_client()
+    if redis is None:
+        return
+
+    with redis.pipeline() as pipe:
+        pipe.hgetall(LAST_USED_AT_HASH)
+        pipe.delete(LAST_USED_AT_HASH)
+        data, _ = pipe.execute()
+
+    if not data:
+        return
+
+    with Session(engine) as session:
+        for key_id_str, ts_str in data.items():
+            try:
+                api_key = session.get(ApiKey, uuid.UUID(key_id_str))
+                if api_key is None:
+                    continue
+                new_ts = datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc)
+                current = api_key.last_used_at
+                if current is None or current.replace(tzinfo=timezone.utc) < new_ts:
+                    api_key.last_used_at = new_ts
+                    session.add(api_key)
+            except Exception:
+                _logger.exception("flush.last_used_at.row_error key_id=%s", key_id_str)
+        session.commit()
+
+
+async def _last_used_at_flush_loop() -> None:
+    """Hardened flush loop: shields exceptions, re-raises CancelledError cleanly."""
+    while True:
+        try:
+            await asyncio.sleep(_FLUSH_INTERVAL_SECONDS)
+            start = _time.monotonic()
+            await asyncio.to_thread(_flush_last_used_at)
+            elapsed = _time.monotonic() - start
+            m = _metrics.get()
+            if m and m.api_key_flush_duration_seconds:
+                m.api_key_flush_duration_seconds.observe(elapsed)
+        except asyncio.CancelledError:
+            _logger.info("flush.last_used_at.shutdown — running final flush")
+            try:
+                await asyncio.wait_for(
+                    asyncio.to_thread(_flush_last_used_at), timeout=5.0
+                )
+            except Exception:
+                _logger.exception("flush.last_used_at.final_flush_error")
+            raise
+        except Exception:
+            _logger.exception("flush.last_used_at.loop_error")
 
 
 def _startup_checks() -> None:
@@ -61,7 +132,15 @@ def _startup_checks() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _startup_checks()
-    yield
+    flush_task = asyncio.create_task(_last_used_at_flush_loop())
+    try:
+        yield
+    finally:
+        flush_task.cancel()
+        try:
+            await asyncio.wait_for(asyncio.shield(flush_task), timeout=6.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:

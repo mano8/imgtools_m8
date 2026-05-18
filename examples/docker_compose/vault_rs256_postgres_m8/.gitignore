@@ -1,0 +1,11 @@
+prometheus/data/*
+grafana/data/*
+db_data/*
+redis/*
+keys/*.pem
+traefik/certs/*.pem
+traefik/certs/*.crt
+traefik/certs/*.key
+*.pem
+*README_DEV*
+vault/data/*
