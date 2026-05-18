@@ -4,6 +4,8 @@ engines:
     enabled: true
   ruff:
     enabled: true
+  markdownlint:
+    enabled: true
   pylint:
     enabled: false
   prospector:
