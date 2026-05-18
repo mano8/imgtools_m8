@@ -244,7 +244,8 @@ def _apply_rate_limit(
             datetime.now(timezone.utc).isoformat(),
         )
     except Exception:
-        _logger.warning("api_key.luat.queue_failed id=%s", api_key.id)  # nosec B506
+        ref = str(api_key.id)
+        _logger.warning("luat.write_failed ref=%s", ref)
 
 
 def get_current_api_key(
