@@ -7,7 +7,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
-from fastapi.responses import Response
 
 from auth_user_service.core.client import RateLimitResult
 from auth_user_service.core.deps import (
