@@ -124,9 +124,8 @@ class SecurityHelper(ComSecurityHelper):
             return bcrypt.checkpw(
                 plain_password.encode("utf-8"), hashed_password.encode("utf-8")
             )
-        except Exception:
+        except ValueError:
             return False
-        # return pwd_context.verify(plain_password, hashed_password)
 
     @staticmethod
     def _fernet(encryption_key: str) -> Fernet:

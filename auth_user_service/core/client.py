@@ -181,7 +181,7 @@ class PKCEStore:
         Returns None if the state is unknown or already consumed.
         """
         result = self.client.getdel(self.PREFIX + state)
-        return result if result is not None else None
+        return result
 
 
 class LoginRateLimiter:

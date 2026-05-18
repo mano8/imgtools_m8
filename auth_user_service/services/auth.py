@@ -148,9 +148,9 @@ class AuthController:
         return db_user
 
     @staticmethod
-    def get_tokens_expire() -> Union[timedelta, timedelta]:
+    def get_tokens_expire() -> tuple[timedelta, timedelta]:
         """
-        Get tokens expiarition timedelta.
+        Get tokens expiration timedelta.
         """
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         refresh_token_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)

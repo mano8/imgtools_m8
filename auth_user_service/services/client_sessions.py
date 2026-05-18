@@ -6,7 +6,6 @@ Redis for revocation and SQLModel for persistence.
 """
 
 import logging
-import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -17,7 +16,6 @@ from auth_user_service.db_models.sessions import ClientSessionCreate, ClientSess
 from auth_user_service.core.client import RedisRefreshStore, RedisSessionManager
 from auth_user_service.core.deps import CurrentUser, get_redis_client
 
-logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -77,13 +75,16 @@ class SessionController:
         return db_session
 
     @staticmethod
-    def revoke_session_jti(jti: str, expires_at: datetime) -> None:
+    def revoke_session_jti(
+        jti: str, expires_at: datetime, redis: Optional[Redis] = None
+    ) -> None:
         """
         Blacklist a JWT identifier via Redis (manual revocation).
 
         Args:
             jti (str): JWT token identifier.
             expires_at (datetime): When the token would naturally expire.
+            redis: Live Redis client, or None to fall back to get_redis_client().
         """
         now = datetime.now(timezone.utc)
 
@@ -93,7 +94,9 @@ class SessionController:
         raw_ttl = int((expires_at - now).total_seconds())
         if raw_ttl >= 0:
             safe_ttl = max(raw_ttl, 0)
-            RedisSessionManager(get_redis_client()).blacklist_jti(jti, safe_ttl)
+            RedisSessionManager(
+                redis if redis is not None else get_redis_client()
+            ).blacklist_jti(jti, safe_ttl)
         else:
             logger.warning(
                 "Not blacklisting JTI %s because TTL was %d seconds", jti, raw_ttl
@@ -154,9 +157,7 @@ class SessionController:
         return deleted
 
     @staticmethod
-    def get_user_active_sessions(
-        session: Session, user_id: uuid.UUID
-    ) -> list[ClientSession]:
+    def get_user_active_sessions(session: Session, user_id: str) -> list[ClientSession]:
         """
         Retrieve all non-revoked, non-expired sessions for a user.
 
@@ -177,7 +178,7 @@ class SessionController:
 
     @staticmethod
     def revoke_all_user_sessions(
-        session: Session, user_id: uuid.UUID, redis: Optional[Redis]
+        session: Session, user_id: str, redis: Optional[Redis]
     ) -> int:
         """Revoke every active session for *user_id* — reuse-attack response.
 
@@ -191,7 +192,7 @@ class SessionController:
 
         Args:
             session: SQLModel DB session.
-            user_id: UUID of the compromised user (string form).
+            user_id: String UUID of the compromised user.
             redis: Live Redis client, or None when Redis is unavailable.
         """
         active = SessionController.get_user_active_sessions(session, user_id)
