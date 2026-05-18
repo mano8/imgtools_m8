@@ -4,7 +4,9 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/edab51cc8805468fb3884e1d9e57ccdc)](https://app.codacy.com/gh/mano8/fa-auth-m8/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![codecov](https://codecov.io/gh/mano8/fa-auth-m8/graph/badge.svg?token=LH7GTT2JZY)](https://codecov.io/gh/mano8/fa-auth-m8)
 
-A self-contained FastAPI authentication microservice designed to run as a Docker container via Docker Compose. It provides JWT-based authentication, Google OAuth2, session management, user management, API key management, and private inter-service endpoints — ready to integrate with any Docker-based microservice project.
+A self-contained FastAPI authentication microservice designed to run as a Docker container via Docker Compose. It provides JWT-based authentication, Google OAuth2 with PKCE, session management, user management, API key management, and private inter-service endpoints — ready to integrate with any Docker-based microservice project.
+
+Consumer services validate tokens **locally** using the companion [auth-sdk-m8](https://github.com/mano8/auth-sdk-m8) package (`pip install auth-sdk-m8`) — no round-trip to the auth service on every request.
 
 The included example stacks use `_m8` in their names as a personal naming convention — not a framework requirement. Any stack can be copied and adapted for your own project by renaming the Docker services, network, and env files.
 
@@ -74,7 +76,7 @@ The included example stacks use `_m8` in their names as a personal naming conven
 └────────┘
 ```
 
-Other services on the same Docker network call the private API at `http://auth-service:8000/user/private/`.
+Consumer services validate tokens locally (JWT signature check + optional Redis blacklist via `auth-sdk-m8`) — no per-request call to the auth service. Other services on the same Docker network can also call the private API at `http://auth-service:8000/user/private/` for operations such as creating users programmatically.
 
 ---
 
@@ -91,11 +93,23 @@ Ten ready-to-run stacks are provided under [`examples/docker_compose/`](https://
 | [`lite_hybrid_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_hybrid_m8) | MariaDB | RS256 | `hybrid` | — | RS256 + hybrid mode |
 | [`lite_stateless_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_stateless_m8) | MariaDB | HS256 | `stateless` | — | No Redis for JWT validation |
 | [`stateful_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/stateful_m8) | MariaDB | HS256 | `stateful` | Prometheus + Grafana | Full stateful stack + metrics |
-| [`RS256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/RS256_m8) | MariaDB | RS256 | `stateful` | Prometheus + Grafana | RS256 + JWKS + metrics |
+| [`env_rs256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/env_rs256_m8) | MariaDB | RS256 | `stateful` | Prometheus + Grafana | RS256 + JWKS + metrics |
 | [`vault_rs256_postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/vault_rs256_postgres_m8) | PostgreSQL 16 | RS256 | `stateful` | Prometheus + Grafana | HashiCorp Vault + hardened |
 | [`template`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/template) | configurable | configurable | configurable | — | Bare template for new stacks |
 
 **Start here →** [`lite_mysql_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_mysql_m8) for the fastest path to a running stack.
+
+### Token modes at a glance
+
+The `TOKEN_MODE` column in the table above controls how tokens are validated across your services:
+
+| Mode | Redis for JWT | Instant revocation | Google OAuth | Best for |
+| ---- | ------------- | ------------------ | ------------ | -------- |
+| `stateless` | No | ✗ | ✗ | Maximum scalability, no revocation needed |
+| `hybrid` | Refresh only | Refresh tokens only | ✓ | Balance: scalable access + revocable refresh |
+| `stateful` | Yes (every request) | ✓ | ✓ | Instant logout guarantee, highest security |
+
+`stateless` disables Google OAuth (PKCE requires Redis). `hybrid` leaves a stolen access token valid until expiry after logout; use `stateful` if instant revocation is required.
 
 ---
 
@@ -164,7 +178,7 @@ See the [Docker Compose stack guide](https://github.com/mano8/fa-auth-m8/tree/ma
 cp .env.example .env
 cp auth.env.example auth.env
 cp api.env.example api.env
-# Fill in all `changethis` values in .env and auth.env
+# Fill in all `changethis` values in .env, auth.env and api.env
 ```
 
 Generate secrets with:
@@ -260,7 +274,7 @@ Set `SELECTED_DB` in `.env` (or `auth.env`):
 
 **HS256 (default)** — set `ACCESS_SECRET_KEY` and `REFRESH_SECRET_KEY`; leave asymmetric key vars blank.
 
-**RS256 / ES256** — set `ACCESS_TOKEN_ALGORITHM`, `ACCESS_PRIVATE_KEY_FILE`, `ACCESS_PUBLIC_KEY_FILE`. Mount the key files into the container (see `examples/docker_compose/RS256_m8/keys/`). Generate a key pair:
+**RS256 / ES256** — set `ACCESS_TOKEN_ALGORITHM`, `ACCESS_PRIVATE_KEY_FILE`, `ACCESS_PUBLIC_KEY_FILE`. Mount the key files into the container (see `examples/docker_compose/env_rs256_m8/keys/`). Generate a key pair:
 
 ```bash
 # RS256
@@ -577,7 +591,7 @@ Enabled with `METRICS_ENABLED=true`. The metric prefix is derived from `API_PREF
 | auth | `{prefix}auth_api_key_lifecycle_total` | Counter | action: created \| revoked |
 | auth | `{prefix}auth_api_key_flush_duration_seconds` | Histogram | — |
 
-Alert rules for `stateful_m8`, `RS256_m8`, and `vault_rs256_postgres_m8` stacks (`prometheus/alerts.yml`):
+Alert rules for `stateful_m8`, `env_rs256_m8`, and `vault_rs256_postgres_m8` stacks (`prometheus/alerts.yml`):
 
 - `ApiKeyBlockRatioHigh` — hits/checks > 10% over 5 min
 - `ApiKeyRateLimitInvariantViolation` — hits > checks × 1.1 (instrumentation sanity guard)
