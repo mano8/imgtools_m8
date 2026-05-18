@@ -4,7 +4,9 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/edab51cc8805468fb3884e1d9e57ccdc)](https://app.codacy.com/gh/mano8/fa-auth-m8/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![codecov](https://codecov.io/gh/mano8/fa-auth-m8/graph/badge.svg?token=LH7GTT2JZY)](https://codecov.io/gh/mano8/fa-auth-m8)
 
-A self-contained FastAPI authentication microservice designed to run as a Docker container via Docker Compose. It provides JWT-based authentication, Google OAuth2, session management, user management, API key management, and private inter-service endpoints for any project in the m8 stack.
+A self-contained FastAPI authentication microservice designed to run as a Docker container via Docker Compose. It provides JWT-based authentication, Google OAuth2, session management, user management, API key management, and private inter-service endpoints — ready to integrate with any Docker-based microservice project.
+
+The included example stacks use `_m8` in their names as a personal naming convention — not a framework requirement. Any stack can be copied and adapted for your own project by renaming the Docker services, network, and env files.
 
 ---
 
@@ -193,6 +195,15 @@ Alembic migrations run automatically. The first start seeds the superuser from `
 ```http
 GET http://localhost:9000/user/health/
 ```
+
+### 6. Adapt for your own project
+
+The example stacks are ready-to-copy templates. To use one as the base for a new project:
+
+- Copy the stack directory and rename it.
+- In `docker-compose.yml`, rename the Docker services and internal network to match your project.
+- Update all `changethis` values in the env files.
+- Add your own microservices to `docker-compose.yml` on the same internal network.
 
 ---
 
@@ -436,6 +447,12 @@ Endpoints under `/user/private/` are for inter-service calls only:
 ## Consumer Service Integration
 
 `examples/fastapi_service` is a reference implementation showing how a downstream microservice integrates with `auth_user_service` using `auth-sdk-m8`.
+
+`auth-sdk-m8` is a standard pip package — install it in any FastAPI consumer service:
+
+```bash
+pip install auth-sdk-m8
+```
 
 ### Token validation
 
