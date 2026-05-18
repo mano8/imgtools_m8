@@ -1,56 +1,120 @@
 # vault_rs256_postgres_m8
 
-**PostgreSQL 16** + **RS256 asymmetric token signing** + **HashiCorp Vault** secret
-injection + stateful token mode + **Prometheus & Grafana** observability.
+**PostgreSQL 16** + **RS256 asymmetric token signing** + **HashiCorp Vault** secret injection + **stateful** token mode + **Prometheus & Grafana** observability.
 
-Access tokens are signed with a private RSA key (auth service only) and verified with
-the corresponding public key (consumer services). Consumers discover the public key
-automatically via the **JWKS endpoint** — no manual key distribution needed.
+The auth service's database password and Redis password are stored in HashiCorp Vault and injected at startup via the `VaultProvider` in `auth-sdk-m8`. `auth.env` intentionally omits these two fields — the auth service never reads them from a file.
 
-Sensitive secrets (`DB_PASSWORD`, `REDIS_PASSWORD`) are stored in HashiCorp Vault and
-injected at startup via the built-in `VaultProvider` in `auth-sdk-m8`. The env files
-for the auth service intentionally omit these fields.
+> **What Vault protects here (and what it does not):** `DB_PASSWORD` and `REDIS_PASSWORD` are absent from `auth.env`. However, they are still present in the shared `.env` file because the PostgreSQL container and the `vault_init` bootstrap service need them. In this stack, `.env` is the bootstrap source of truth. In a real production deployment you would replace that `.env` with CI/CD variable injection or Docker secrets — see [Recommended production architecture](#recommended-production-architecture).
 
 **Choose this when:**
 
 - You need PostgreSQL as the database engine.
 - You want asymmetric RS256 signing with zero-downtime key rotation via JWKS.
-- You want a secrets manager (Vault) integrated from day one, so credentials never
-  live in plain `.env` files for the auth service.
-- You are building toward a production-grade hardened setup.
+- You want to learn or test the `VaultProvider` injection pattern before wiring it into a real Vault deployment.
 
-> **Note on Vault image**: This stack uses `hashicorp/vault:1.17` — the hardened
-> UBI9-based image. Update the tag to `hashicorp/vault:2.x-ubi` once Vault 2.x ships.
-> The dev-mode configuration is identical across patch and minor versions.
+---
+
+## Summary
+
+- [This stack is an example — not production-ready as-is](#this-stack-is-an-example--not-production-ready-as-is)
+  - [What the stack still exposes in plaintext](#what-the-stack-still-exposes-in-plaintext)
+  - [Vault in the same compose vs. separate deployment](#vault-in-the-same-compose-vs-separate-deployment)
+- [Architecture](#architecture)
+- [Services](#services)
+- [Setup](#setup)
+- [How Vault secret injection works](#how-vault-secret-injection-works)
+- [How JWKS works](#how-jwks-works)
+- [Token mode: stateful](#token-mode-stateful)
+- [Vault dev mode notes](#vault-dev-mode-notes)
+- [Recommended production architecture](#recommended-production-architecture)
+- [Using with an external Vault](#using-with-an-external-vault)
+- [Observability](#observability)
+- [URLs](#urls)
+- [Port map](#port-map)
+- [Configuration reference](#configuration-reference)
+- [Key rotation](#key-rotation)
+- [Common operations](#common-operations)
+- [Live testing](#live-testing)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## This stack is an example — not production-ready as-is
+
+> **Important:** The Vault configuration in this stack uses **dev mode** — an ephemeral, in-memory Vault that auto-unseals on startup and loses all data on restart. It is intentionally simple for learning and local testing.
+>
+> **Do not use this compose file in production without the changes listed in [Recommended production architecture](#recommended-production-architecture).**
+
+### What the stack still exposes in plaintext
+
+Even with Vault, the shared `.env` file still contains plaintext secrets:
+
+| Secret in `.env` | Why it is there | How to eliminate it in production |
+| --- | --- | --- |
+| `DB_PASSWORD` (Postgres superuser) | Required by the `postgres:16-alpine` container on first boot | Pre-provision the DB outside compose; inject via CI/CD variable |
+| `AUTH_DB_PASSWORD` | Used by `vault_init` to write the secret to Vault | Inject via CI/CD or a secrets bootstrap pipeline |
+| `REDIS_PASSWORD` | Used by `vault_init` to write the secret to Vault | Same as above |
+| `VAULT_DEV_TOKEN` | Required to authenticate to Vault dev mode | Replace with Docker secret or AppRole — never in `.env` |
+
+The `auth_user_service` container does **not** read `DB_PASSWORD` or `REDIS_PASSWORD` from env files — it gets them from Vault. But the bootstrap infrastructure still needs a source of truth. Removing that from `.env` is part of a full production hardening.
+
+### Vault in the same compose vs. separate deployment
+
+This stack bundles Vault inside the same `docker-compose.yml` as the application services. That is convenient for learning but wrong for production:
+
+| Aspect | Bundled (this stack) | Separate (production) |
+| --- | --- | --- |
+| Lifecycle | Vault starts and stops with the app | Vault is long-lived infrastructure, independent of the app |
+| Data | Wiped on `docker compose down` (dev mode) | Persistent storage, outlives any single deployment |
+| Access | All compose services share a network with Vault | Vault exposed only to specific services via firewall/network policy |
+| Token scope | Root token in `.env` | Scoped app token, auto-renewed by Vault Agent |
+| Init | `vault_init` runs `kv put` at compose start | Secrets pre-loaded by your secrets-management pipeline |
+
+**Recommendation:** treat Vault as a separate infrastructure component — either a managed service (HCP Vault, AWS Secrets Manager), a dedicated Docker Compose stack (`vault.docker-compose.yml`), or a Kubernetes deployment. The app compose should only contain `VAULT_ADDR` and the authentication method — not the Vault server itself.
+
+| What this stack demonstrates | What you must change for production |
+| --- | --- |
+| `VaultProvider` injection pattern | Pre-existing Vault with persistent storage (not dev mode) |
+| Secrets absent from `auth.env` | Also remove `DB_PASSWORD` / `REDIS_PASSWORD` / `VAULT_DEV_TOKEN` from `.env` |
+| `vault_init` bootstrap service | Replace with your secrets-management pipeline |
+| Root token usage | Scope to a policy; use AppRole or Kubernetes auth |
+| Vault bundled in app compose | Move Vault to its own stack / managed service |
+| TLS disabled on Vault listener | Enable TLS on the Vault listener |
+
+The compose file is structured to make the Vault integration pattern clear and testable. Treat it as a reference implementation, not a deployment template.
 
 ---
 
 ## Architecture
 
 ```text
-Browser → Traefik :9000 ──→ auth_user_service :8000   (RS256 issuer + Vault client)
-                     └──→ fastapi_service :8000    (RS256 consumer via JWKS)
-                          │
-               ┌──────────┴──────────────────────────┐
-               │           m8_app_network              │
-               │                                       │
-           m8_db (PostgreSQL 16)    redis_cache (Redis 7.4)
-               │                                       │
-           vault (HashiCorp Vault 1.17, dev mode)
-               └── vault_init (one-shot secret loader)
-               │
-           prometheus + grafana (observability)
+Browser / Frontend
+       │
+       ▼
+  Traefik :9000
+       │
+       ├──► /user/*      → auth_user_service :8000  (RS256 issuer + Vault client)
+       └──► /fastapi/*   → fastapi_service :8000    (RS256 consumer via JWKS)
+                │
+       ┌────────┴──────────────────────────┐
+       ▼                                   ▼
+  m8_db (PostgreSQL 16)          redis_cache (Redis 7.4)
+       │                                   │
+  vault (HashiCorp Vault 1.17, dev mode)
+       └── vault_init (one-shot secret loader)
+       │
+  Prometheus :9090 + Grafana :3000
 ```
 
 **Vault secret flow:**
 
 ```text
-.env AUTH_DB_PASSWORD, REDIS_PASSWORD
+.env  AUTH_DB_PASSWORD, REDIS_PASSWORD
         │
-        ▼ (at compose up — via vault_init service)
+        ▼  (at compose up — via vault_init service)
 vault kv put secret/app DB_PASSWORD=... REDIS_PASSWORD=...
         │
-        ▼ (at auth_user_service startup — VaultProvider in auth-sdk-m8)
+        ▼  (at auth_user_service startup — VaultProvider in auth-sdk-m8)
 auth_user_service reads secret/data/app → injects into CommonSettings
 ```
 
@@ -103,7 +167,7 @@ FIRST_SUPERUSER=admin@example.com
 FIRST_SUPERUSER_PASSWORD=<strong-password>
 ```
 
-`api.env` needs:
+Open `api.env` and replace:
 
 ```ini
 DB_USER=<same-as-API_DB_USER-in-.env>
@@ -112,17 +176,13 @@ REDIS_PASSWORD=<same-as-REDIS_PASSWORD-in-.env>
 REFRESH_SECRET_KEY=<64-char-random>
 ```
 
-`ACCESS_KEY_ID` in `auth.env` can stay as `changethis_hex_kid` — `init.sh` derives and
-writes the correct fingerprint automatically.
+`ACCESS_KEY_ID` in `auth.env` can stay as `changethis_hex_kid` — `init.sh` derives and writes the correct fingerprint automatically.
 
 ### 2. Generate RSA key pair + TLS certificates
 
 ```sh
 bash init.sh
 ```
-
-Generates `keys/private.pem`, `keys/public.pem`, derives a stable `kid`, writes
-`ACCESS_KEY_ID` into `auth.env`, and creates the self-signed Traefik TLS certificate.
 
 ### 3. Start
 
@@ -133,15 +193,10 @@ docker compose up --build
 **Startup order:**
 
 1. `vault` starts (dev mode, in-memory KV).
-2. `vault_init` waits for Vault to be healthy, then writes `DB_PASSWORD` and
-   `REDIS_PASSWORD` to `secret/data/app`, then exits 0.
+2. `vault_init` waits for Vault to be healthy, then writes `DB_PASSWORD` and `REDIS_PASSWORD` to `secret/data/app`, then exits 0.
 3. `m8_db` and `redis_cache` start in parallel.
-4. `auth_user_service` starts after `vault_init` completes AND `m8_db`/`redis_cache`
-   are healthy. VaultProvider reads `secret/data/app` and injects secrets into settings.
+4. `auth_user_service` starts after `vault_init` completes AND `m8_db`/`redis_cache` are healthy. `VaultProvider` reads `secret/data/app` and injects secrets into settings.
 5. `fastapi_service` starts after `auth_user_service`.
-
-Migrations run automatically on first boot. The superuser defined in `auth.env` is
-created if it does not exist.
 
 ---
 
@@ -153,38 +208,31 @@ created if it does not exist.
 - `SECRET_PROVIDER=vault`
 - `VAULT_ADDR` and `VAULT_TOKEN` are set
 
-It reads `secret/data/app` from the KV v2 engine and injects the following fields into
-`CommonSettings` (overriding env-file values if present):
+It reads `secret/data/app` from the KV v2 engine and injects:
 
 | Vault key | CommonSettings field | Notes |
 | --- | --- | --- |
-| `DB_PASSWORD` | `DB_PASSWORD` | Auth service DB password — omit from auth.env |
-| `REDIS_PASSWORD` | `REDIS_PASSWORD` | Shared Redis password — omit from auth.env |
+| `DB_PASSWORD` | `DB_PASSWORD` | Auth service DB password — omit from `auth.env` |
+| `REDIS_PASSWORD` | `REDIS_PASSWORD` | Shared Redis password — omit from `auth.env` |
 
-`VAULT_TOKEN` is passed from `.env` via the `environment` section in `docker-compose.yml`
-and is intentionally absent from `auth.env`. For production, replace with a Docker secret
-or Vault agent sidecar (see [Production hardening](#production-hardening)).
+`VAULT_TOKEN` is passed from `.env` via the `environment` section in `docker-compose.yml` and is intentionally absent from `auth.env`.
 
 ---
 
-## How JWKS works in this stack
+## How JWKS works
 
 ```text
-Consumer receives JWT with header: {"alg": "RS256", "kid": "my-key-v1"}
+Consumer receives JWT with header: {"alg": "RS256", "kid": "abc123"}
          │
          ▼
-Is "my-key-v1" in local cache?
+Is "abc123" in local cache?
    Yes → verify signature → done
    No  → GET http://auth_user_service:8000/user/.well-known/jwks.json
               │
-              ▼  (returns all public keys indexed by kid)
+              ▼
          Cache result for JWKS_CACHE_TTL_SECONDS (default: 300 s)
          Verify signature → done
 ```
-
-- **Key rotation**: run `bash init.sh --rotate-keys` → restart `auth_user_service` →
-  consumers auto-refresh on the next unknown `kid`.
-- **No manual key sync**: consumers only need `JWKS_URI` pointing to the auth service.
 
 ---
 
@@ -196,23 +244,21 @@ Is "my-key-v1" in local cache?
 | `hybrid` | JWT signature only | Redis allowlist | No |
 | **`stateful`** | **JWT signature + Redis blacklist** | **Redis allowlist** | **Yes** |
 
-In `stateful` mode, logout immediately invalidates the access token via the Redis
-blacklist, regardless of its remaining lifetime.
+In `stateful` mode, logout immediately invalidates the access token via the Redis blacklist, regardless of its remaining lifetime.
 
 ---
 
 ## Vault dev mode notes
 
-| Aspect | Dev mode (this stack) | Production recommendation |
+| Aspect | Dev mode (this stack) | Why it matters |
 | --- | --- | --- |
-| Storage | In-memory — wiped on restart | File or Raft storage |
-| Unseal | Auto-unsealed | Manual or auto-unseal (KMS) |
-| Token | Root token (VAULT_DEV_TOKEN) | Scoped app token via policy |
-| TLS | Disabled (internal Docker network) | Enable TLS on Vault listener |
-| Persistence | Secrets lost on Vault restart | Persistent storage |
+| Storage | **In-memory — wiped on restart** | All secrets lost if vault container restarts |
+| Unseal | Auto-unsealed at startup | No unseal keys to manage (convenient but insecure) |
+| Token | Root token (`VAULT_DEV_TOKEN`) | Full Vault access — no least-privilege |
+| TLS | Disabled | Traffic between containers is unencrypted |
+| Persistence | None | Not suitable for persistent workloads |
 
-**If the vault container restarts** (e.g., `docker compose restart vault`), dev-mode
-secrets are wiped. Re-populate them with:
+**If the vault container restarts**, dev-mode secrets are wiped. Re-populate them with:
 
 ```sh
 docker compose start vault_init
@@ -222,13 +268,183 @@ This re-runs `vault-init.sh` which is idempotent — safe to run at any time.
 
 ---
 
-## Database isolation
+## Recommended production architecture
 
-This stack defaults to **Scenario 2** (per-service isolation): `auth_db` and `api_db`
-are created as separate databases with separate users on first volume init.
+The following changes are required before using Vault in a real deployment:
 
-Database provisioning runs **once** on first volume creation. To reprovision:
-`bash init.sh --reset-db`.
+### 1. Switch to Vault server mode
+
+Replace the `vault` service in `docker-compose.yml`:
+
+```yaml
+vault:
+  image: hashicorp/vault:1.17
+  cap_add:
+    - IPC_LOCK
+  command: ["vault", "server", "-config=/vault/config/vault.hcl"]
+  volumes:
+    - ./vault/config/vault.hcl:/vault/config/vault.hcl:ro
+    - ./vault/data:/vault/data
+```
+
+`vault/config/vault.hcl` (minimal):
+
+```hcl
+storage "file" {
+  path = "/vault/data"
+}
+
+listener "tcp" {
+  address     = "0.0.0.0:8200"
+  tls_disable = 1   # enable TLS for production
+}
+
+ui = true
+```
+
+Initialize with `vault operator init`, save unseal keys and root token securely, then unseal.
+
+### 2. Use a scoped app token (not the root token)
+
+```sh
+vault policy write app-read vault/policies/app-policy.hcl
+APP_TOKEN=$(vault token create -policy=app-read -period=24h -format=json | jq -r .auth.client_token)
+```
+
+Pass `APP_TOKEN` as a Docker secret:
+
+```yaml
+secrets:
+  vault_token:
+    file: ./secrets/vault_token
+
+auth_user_service:
+  secrets:
+    - vault_token
+  # Remove VAULT_TOKEN from environment: section
+  # VaultProvider reads /run/secrets/vault_token automatically
+```
+
+### 3. Use Vault Agent for automatic token renewal
+
+Add a Vault Agent sidecar that handles token renewal and writes secrets to a shared volume mounted into the app container. See the [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent).
+
+### 4. Enable TLS on the Vault listener
+
+Set `tls_cert_file` and `tls_key_file` in `vault.hcl` and set `VAULT_SKIP_VERIFY=false` in all clients.
+
+### 5. Use AppRole or Kubernetes auth instead of static tokens
+
+Static tokens work for single-machine setups. For multi-node or Kubernetes deployments, use [AppRole](https://developer.hashicorp.com/vault/docs/auth/approle) or the Kubernetes auth method so each service authenticates with short-lived credentials.
+
+---
+
+## Using with an external Vault
+
+The bundled `vault` service is for learning and local testing only. For any persistent
+deployment, run Vault as a separate stack or use a managed service.
+
+### Which approach to choose
+
+| Scenario | Recommended approach |
+| --- | --- |
+| Local development / CI | Bundled dev-mode Vault (this compose file) |
+| Local integration testing with persistence | Separate local Vault — `vault/docker-compose.vault.yml` |
+| Staging / production | Managed Vault (HCP Vault, AWS Secrets Manager) or a dedicated Vault cluster |
+
+### Option A — Separate local Vault compose
+
+`vault/docker-compose.vault.yml` runs Vault in server mode with persistent file
+storage. Unlike the bundled dev mode, secrets survive container restarts.
+
+```sh
+# Start Vault (first time — follow the init steps printed in the file header)
+docker compose -f vault/docker-compose.vault.yml up -d
+
+# Initialize and unseal (see vault/docker-compose.vault.yml for full instructions)
+docker compose -f vault/docker-compose.vault.yml exec vault_server vault operator init
+# Unseal with 3 of the 5 keys, then write secrets and create a scoped token.
+```
+
+After init, write a scoped app token to a secrets file:
+
+```sh
+mkdir -p secrets
+echo "<scoped-app-token>" > secrets/vault_token
+chmod 600 secrets/vault_token
+```
+
+Then update `docker-compose.yml` to remove the bundled Vault and point
+`auth_user_service` at the external Vault:
+
+```yaml
+services:
+  auth_user_service:
+    environment:
+      SECRET_PROVIDER: vault
+      VAULT_ADDR: http://host.docker.internal:8200   # host from inside container
+    secrets:
+      - vault_token
+    # Remove VAULT_TOKEN from environment — VaultProvider reads /run/secrets/vault_token
+
+secrets:
+  vault_token:
+    file: ./secrets/vault_token
+```
+
+Remove the `vault` and `vault_init` service blocks from `docker-compose.yml` and
+drop the `vault_init` condition from `auth_user_service.depends_on`.
+
+### Option B — Managed Vault (HCP Vault, cloud secrets manager)
+
+Point `VAULT_ADDR` at your managed service endpoint. The `VaultProvider` in
+`auth-sdk-m8` only needs `VAULT_ADDR`, `VAULT_TOKEN` (or AppRole credentials), and
+the secret path — it does not care whether Vault is local or remote.
+
+```yaml
+services:
+  auth_user_service:
+    environment:
+      SECRET_PROVIDER: vault
+      VAULT_ADDR: https://vault.example.com:8200
+    secrets:
+      - vault_token
+
+secrets:
+  vault_token:
+    file: ./secrets/vault_token   # or use a CI/CD injected Docker secret
+```
+
+### Production env examples
+
+Two example files show what configuration looks like without the bundled Vault:
+
+| File | Purpose |
+| --- | --- |
+| [`.env.prod_example`](.env.prod_example) | `.env` with `AUTH_DB_PASSWORD`, `REDIS_PASSWORD`, and `VAULT_DEV_TOKEN` removed — shows what CI/CD injects |
+| [`auth.env.prod_example`](auth.env.prod_example) | `auth.env` with `ENVIRONMENT=production`, `SET_DOCS=false`, and no DB/Redis passwords |
+
+Copy and adapt these instead of `*.example` when targeting a staging or production
+environment.
+
+### Extending Vault coverage
+
+`DB_PASSWORD` and `REDIS_PASSWORD` are the only secrets currently stored in Vault.
+You can extend coverage by adding more fields to `vault-init.sh` and to the
+`app-policy.hcl` read policy:
+
+```sh
+# In your secrets pipeline (or vault-init.sh equivalent):
+vault kv put secret/app \
+  DB_PASSWORD=<auth-db-password> \
+  REDIS_PASSWORD=<redis-password> \
+  REFRESH_SECRET_KEY=<value> \
+  PRIVATE_API_SECRET=<value> \
+  TOKENS_ENCRYPTION_KEY=<value>
+```
+
+Then remove the corresponding fields from `auth.env` — `VaultProvider` will inject
+them at startup. Update `app-policy.hcl` if you add paths.
 
 ---
 
@@ -244,8 +460,7 @@ Scrapes `/user/metrics` and `/fastapi/metrics` from both services.
 
 ### Vault UI — `http://localhost:8200`
 
-Vault dev-mode UI. Log in with `VAULT_DEV_TOKEN` from `.env`. Use it to inspect
-`secret/data/app` or test token policies.
+Dev-mode Vault UI. Log in with `VAULT_DEV_TOKEN` from `.env`. Use it to inspect `secret/data/app` or test token policies.
 
 ---
 
@@ -257,6 +472,7 @@ Vault dev-mode UI. Log in with `VAULT_DEV_TOKEN` from `.env`. Use it to inspect
 | Auth interactive docs | `http://localhost:9000/user/docs` |
 | JWKS endpoint | `http://localhost:9000/user/.well-known/jwks.json` |
 | FastAPI service docs | `http://localhost:9000/fastapi/docs` |
+| Health check | `http://localhost:9000/user/health/` |
 | Vault UI | `http://localhost:8200` |
 | Traefik dashboard | `http://localhost:8080` |
 | Prometheus | `http://localhost:9090` |
@@ -287,9 +503,8 @@ Vault dev-mode UI. Log in with `VAULT_DEV_TOKEN` from `.env`. Use it to inspect
 
 | Variable | Notes |
 | --- | --- |
-| `DB_USER` | PostgreSQL superuser for engine bootstrap (not used by app services) |
+| `DB_USER` | PostgreSQL superuser for engine bootstrap |
 | `DB_PASSWORD` | PostgreSQL superuser password |
-| `DB_PORT` | PostgreSQL port (default `5432`) |
 | `AUTH_DB_USER/PASSWORD/NAME` | Per-service auth DB credentials — also written to Vault |
 | `API_DB_USER/PASSWORD/NAME` | Per-service API DB credentials — NOT written to Vault |
 | `REDIS_PASSWORD` | Redis password — also written to Vault |
@@ -322,71 +537,7 @@ Vault dev-mode UI. Log in with `VAULT_DEV_TOKEN` from `.env`. Use it to inspect
 
 ---
 
-## Production hardening
-
-### 1. Switch Vault to server mode
-
-Replace the `vault` service in `docker-compose.yml`:
-
-```yaml
-vault:
-  image: hashicorp/vault:1.17
-  cap_add:
-    - IPC_LOCK
-  command: ["vault", "server", "-config=/vault/config/vault.hcl"]
-  volumes:
-    - ./vault/config/vault.hcl:/vault/config/vault.hcl:ro
-    - ./vault/data:/vault/data
-```
-
-Use `vault/config/vault.hcl`:
-
-```hcl
-storage "file" {
-  path = "/vault/data"
-}
-
-listener "tcp" {
-  address     = "0.0.0.0:8200"
-  tls_disable = 1   # enable TLS for production
-}
-
-ui = true
-```
-
-Initialize: `vault operator init`, save unseal keys and root token securely.
-
-### 2. Create a scoped app token
-
-Apply `vault/policies/app-policy.hcl` and issue a limited token:
-
-```sh
-vault policy write app-read vault/policies/app-policy.hcl
-APP_TOKEN=$(vault token create -policy=app-read -period=24h -format=json | jq -r .auth.client_token)
-```
-
-Pass `APP_TOKEN` as a Docker secret instead of the root token:
-
-```yaml
-secrets:
-  vault_token:
-    file: ./secrets/vault_token   # write APP_TOKEN here
-
-auth_user_service:
-  secrets:
-    - vault_token
-  # Remove VAULT_TOKEN from environment — VaultProvider reads /run/secrets/vault_token
-```
-
-### 3. Use Vault agent for automatic token renewal
-
-Add a Vault agent sidecar that handles token renewal and writes secrets to shared
-volume, then mount the output into the app container. See the
-[Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent).
-
----
-
-## Key rotation procedure
+## Key rotation
 
 ```sh
 # 1. Regenerate the RSA key pair and update ACCESS_KEY_ID in auth.env
@@ -397,9 +548,6 @@ docker compose up -d --build auth_user_service
 
 # 3. Consumers self-update automatically — no restart needed
 ```
-
-Old tokens remain valid until they expire. After `JWKS_CACHE_TTL_SECONDS` the cache
-refreshes; tokens with the old `kid` will then fail verification.
 
 ---
 
@@ -421,38 +569,51 @@ VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=<your-VAULT_DEV_TOKEN> vault kv get
 # Verify JWKS endpoint
 curl http://localhost:9000/user/.well-known/jwks.json | python -m json.tool
 
-# Full reset — stops containers and wipes the database
+# Full reset
 bash init.sh --reset-db
+```
+
+---
+
+## Live testing
+
+Run the live test suite against this stack (requires the stack to be up):
+
+```sh
+# From the repo root
+pytest -m live_asymmetric --no-cov   # RS256/ES256-specific attacks
+pytest -m live_stateful --no-cov     # Token revocation guarantees
+pytest -m live_security --no-cov     # Universal attack categories (A–M)
+```
+
+Manual smoke test:
+
+```sh
+curl http://localhost:9000/user/health/
+# Expected: {"status":"ok","token_mode":"stateful","redis":"ok","database":"ok",...}
 ```
 
 ---
 
 ## Troubleshooting
 
-**auth_user_service fails to start — VaultProvider error**
-Vault may not be ready or vault_init may have failed. Check:
+**auth_user_service fails to start — VaultProvider error** — Vault may not be ready or vault_init may have failed:
 
 ```sh
 docker compose logs vault_init
 docker compose logs vault
 ```
 
-If vault restarted after vault_init completed, re-run: `docker compose start vault_init`,
-then restart auth: `docker compose restart auth_user_service`.
+If vault restarted after vault_init completed, re-run: `docker compose start vault_init`, then restart auth: `docker compose restart auth_user_service`.
 
-**`VAULT_TOKEN` is empty or wrong**
-Ensure `VAULT_DEV_TOKEN` is set in `.env` and that you ran `docker compose up` (not just
-`docker compose restart`) after editing `.env`.
+**`VAULT_TOKEN` is empty or wrong** — ensure `VAULT_DEV_TOKEN` is set in `.env` and that you ran `docker compose up` (not just `docker compose restart`) after editing `.env`.
 
-**Auth service fails — key file not found**
-Run `bash init.sh` to generate `keys/private.pem` and `keys/public.pem`.
+**Auth service fails — key file not found** — run `bash init.sh` to generate `keys/private.pem` and `keys/public.pem`.
 
-**JWKS endpoint returns empty `keys` array**
-The auth service started before the key files were mounted. Restart:
-`docker compose restart auth_user_service`.
+**JWKS endpoint returns empty `keys` array** — restart: `docker compose restart auth_user_service`.
 
-**`changethis` rejection on startup**
-Replace all `changethis` values. For RS256, `ACCESS_SECRET_KEY` must be absent (not set).
+**`changethis` rejection on startup** — replace all `changethis` values. For RS256, `ACCESS_SECRET_KEY` must be absent (not set).
 
-**Port conflict**
-Identify with `netstat -ano | findstr <PORT>` (Windows) or `lsof -i :<PORT>` (Mac/Linux).
+---
+
+> [Docker Compose examples](../README.md) · [Repository root](https://github.com/mano8/fa-auth-m8/tree/main)

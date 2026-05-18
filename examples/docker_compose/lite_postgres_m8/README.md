@@ -1,10 +1,48 @@
-# dev_postgres_m8
+# lite_postgres_m8
 
-Local development stack using **PostgreSQL 16** as the primary database.
-HS256 symmetric tokens + **stateful** token mode. No monitoring services.
+**PostgreSQL 16** + **HS256** symmetric tokens + **stateful** token mode. No monitoring services.
 
-**Choose this when:** your project targets PostgreSQL and you want the auth service to
-match your production database engine.
+**Choose this when:** your project targets PostgreSQL and you want the auth service to match your production database engine.
+
+---
+
+## Summary
+
+- [Architecture](#architecture)
+- [Services](#services)
+- [Limitations](#limitations)
+- [Setup](#setup)
+- [Token mode: stateful](#token-mode-stateful)
+- [PostgreSQL vs MariaDB](#postgresql-vs-mariadb)
+- [URLs](#urls)
+- [Port map](#port-map)
+- [Configuration reference](#configuration-reference)
+- [Google OAuth](#google-oauth-optional)
+- [Volumes](#volumes)
+- [Database isolation](#database-isolation)
+- [Common operations](#common-operations)
+- [Live testing](#live-testing)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Architecture
+
+```text
+Browser / Frontend
+       │
+       ▼
+  Traefik :9000
+       │
+       ├──► /user/*      → auth_user_service :8000
+       └──► /fastapi/*   → fastapi_service :8000
+                │
+       ┌────────┴────────┐
+       ▼                 ▼
+  m8_db (PostgreSQL 16)  redis_cache (Redis 7.4)
+```
+
+Traefik is the single entry point. Both services run on the internal `m8_app_network` bridge and are not reachable directly from the host.
 
 ---
 
@@ -13,10 +51,18 @@ match your production database engine.
 | Service | Image | Accessible at |
 | --- | --- | --- |
 | traefik | traefik:v3.3 | `:8000` (HTTP), `:4430` (HTTPS), `:9000` (API), `:8080` (dashboard) |
-| m8_db | postgres:16-alpine | `127.0.0.1:5432` (or `DB_PORT` value) |
+| m8_db | postgres:16-alpine | `127.0.0.1:5432` |
 | redis_cache | redis:7.4-alpine | `127.0.0.1:6379` |
 | auth_user_service | local build | via Traefik at `/user` |
 | fastapi_service | local build | via Traefik at `/fastapi` |
+
+---
+
+## Limitations
+
+- **No Prometheus / Grafana.** Use [stateful_m8](../stateful_m8/) or [env_rs256_m8](../env_rs256_m8/) if you need dashboards.
+- **HS256 symmetric signing.** All services share the same secret. Use [lite_rs256_m8](../lite_rs256_m8/) for asymmetric signing with JWKS.
+- **No Vault.** Secrets live in the `auth.env` file. Use [vault_rs256_postgres_m8](../vault_rs256_postgres_m8/) for secrets-manager integration.
 
 ---
 
@@ -25,32 +71,27 @@ match your production database engine.
 ### 1. Copy and edit the env files
 
 ```sh
-cp .env.example .env
 cp auth.env.example auth.env
 cp api.env.example api.env
 ```
 
-Open `.env` and replace every `changethis`:
+Open `auth.env` and replace every `changethis`:
 
 ```ini
 FIRST_SUPERUSER="admin@example.com"
 FIRST_SUPERUSER_PASSWORD="a-strong-password"
 
 ACCESS_SECRET_KEY="<run: python -c \"import secrets; print(secrets.token_urlsafe(64))\">"
-REFRESH_SECRET_KEY="<generate>"
+REFRESH_SECRET_KEY="<generate same way>"
 
-DB_USER="myuser"
+DB_USER="auth_user"
 DB_PASSWORD="<generate>"
-# No DB_ROOT_PASSWORD needed for PostgreSQL
+# No DB_ROOT_PASSWORD for PostgreSQL
 
 REDIS_PASSWORD="<generate>"
-```
 
-Open `auth.env` and replace:
-
-```ini
 PRIVATE_API_SECRET="<generate>"     # for internal service-to-service calls
-TOKENS_ENCRYPTION_KEY="<generate>"  # encrypts refresh token payloads at rest
+TOKENS_ENCRYPTION_KEY="<generate>"  # encrypts refresh token payloads in Redis
 ```
 
 `api.env` requires no changes for local development.
@@ -61,7 +102,7 @@ TOKENS_ENCRYPTION_KEY="<generate>"  # encrypts refresh token payloads at rest
 bash init.sh
 ```
 
-Generates TLS certificates for Traefik. No keys needed for HS256.
+Generates TLS certificates for Traefik. No key pair needed for HS256.
 
 > **Windows:** `init.sh` requires bash — use **Git Bash** (included with Git for Windows) or **WSL**.
 
@@ -71,8 +112,7 @@ Generates TLS certificates for Traefik. No keys needed for HS256.
 docker compose up --build
 ```
 
-Migrations run automatically on first boot. The superuser defined in `.env` is created
-if it does not exist.
+Migrations run automatically on first boot. The superuser defined in `auth.env` is created if it does not exist.
 
 ---
 
@@ -86,20 +126,16 @@ This stack defaults to `TOKEN_MODE=stateful`:
 | `hybrid` | JWT signature only | Redis allowlist | No |
 | **`stateful`** | **JWT signature + Redis blacklist** | **Redis allowlist** | **Yes** |
 
-In `stateful` mode:
+What happens during a session:
 
 - **Login** → writes `rt:<jti>` to Redis and creates a `client_session` DB row.
-- **Token refresh** → atomically rotates `rt:<old_jti>` → `rt:<new_jti>` in Redis and
-  updates the DB row.
-- **Logout** → deletes `rt:<jti>`, writes `jwt:blacklist:<jti>` (TTL = remaining access
-  token lifetime), and removes the DB session row.
+- **Token refresh** → atomically rotates `rt:<old_jti>` → `rt:<new_jti>` in Redis and updates the DB row.
+- **Logout** → deletes `rt:<jti>`, writes `jwt:blacklist:<jti>` (TTL = remaining access token lifetime), and removes the DB session row.
 - **Request validation** → checks `jwt:blacklist:<jti>` on every authenticated request.
 
-This gives you **immediate logout guarantees**: a logged-out access token is rejected on
-the next request, even before it expires. The tradeoff is one extra Redis lookup per
-authenticated request.
+This gives **immediate logout guarantees**: a logged-out access token is rejected on the next request, even before it expires. The trade-off is one extra Redis lookup per authenticated request.
 
-To reduce Redis load during development, switch to `hybrid` in `.env`:
+To reduce Redis load during development, switch to `hybrid` in `auth.env`:
 
 ```ini
 TOKEN_MODE=hybrid
@@ -107,23 +143,19 @@ TOKEN_MODE=hybrid
 
 ---
 
-## PostgreSQL vs MySQL
+## PostgreSQL vs MariaDB
 
-This stack sets `SELECTED_DB=Postgres` in `.env`. The auth service supports both
-engines; the only differences are:
+This stack sets `SELECTED_DB=Postgres` in `auth.env`. The only differences from a MariaDB stack are:
 
-- Connection driver (`asyncpg` vs `aiomysql`)
-- No `DB_ROOT_PASSWORD` (PostgreSQL uses the app user for everything)
-- `DB_PORT` defaults to `5432` and is passed explicitly to the container via `PGPORT`
+- Connection driver (`asyncpg` / `psycopg2` vs `aiomysql` / `pymysql`)
+- No `DB_ROOT_PASSWORD` — PostgreSQL uses the app user for initial setup
+- `DB_PORT` defaults to `5432` and is passed explicitly to the container
 
-To use a GUI client (e.g. pgAdmin, TablePlus), connect to `localhost:5432` with the
-`DB_USER` and `DB_PASSWORD` from `.env`.
+To connect with a GUI client (pgAdmin, TablePlus, DBeaver), use `localhost:5432` with the `DB_USER` and `DB_PASSWORD` from `auth.env`.
 
 ---
 
 ## URLs
-
-All requests go through Traefik. Use port `9000` (HTTP) during development:
 
 | What | URL |
 | --- | --- |
@@ -131,6 +163,7 @@ All requests go through Traefik. Use port `9000` (HTTP) during development:
 | Auth interactive docs | `http://localhost:9000/user/docs` |
 | Auth ReDoc | `http://localhost:9000/user/redoc` |
 | FastAPI service docs | `http://localhost:9000/fastapi/docs` |
+| Health check | `http://localhost:9000/user/health/` |
 | Traefik dashboard | `http://localhost:8080` |
 | HTTPS | `https://localhost:4430/user/docs` (self-signed cert — accept browser warning) |
 
@@ -142,41 +175,36 @@ All requests go through Traefik. Use port `9000` (HTTP) during development:
 | --- | --- | --- |
 | `8000` | `0.0.0.0` | Traefik HTTP |
 | `4430` | `0.0.0.0` | Traefik HTTPS |
-| `9000` | `127.0.0.1` | API services entry (set `API_BIND_IP` in `.env` to expose on LAN) |
+| `9000` | `127.0.0.1` | API services entry (set `API_BIND_IP` in `auth.env` to expose on LAN) |
 | `8080` | `127.0.0.1` | Traefik dashboard |
-| `5432` | `127.0.0.1` | PostgreSQL (configurable via `DB_PORT`) |
+| `5432` | `127.0.0.1` | PostgreSQL |
 | `6379` | `127.0.0.1` | Redis |
 
 ---
 
 ## Configuration reference
 
-### `.env` — shared across all services
+### `auth.env` — auth service
 
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `TOKEN_MODE` | `stateful` | `stateless` / `hybrid` / `stateful` |
-| `ACCESS_TOKEN_ALGORITHM` | `HS256` | `HS256` for symmetric, `RS256` for asymmetric |
+| `ACCESS_TOKEN_ALGORITHM` | `HS256` | `HS256` for symmetric signing |
 | `ACCESS_SECRET_KEY` | — | HMAC secret (HS256 only) |
 | `REFRESH_SECRET_KEY` | — | HMAC secret for refresh tokens |
 | `SELECTED_DB` | `Postgres` | `Mysql` or `Postgres` |
 | `DB_HOST` | `m8_db` | Docker service name — do not change for compose |
 | `DB_PORT` | `5432` | PostgreSQL port |
 | `FRONTEND_HOST` | `http://localhost:5173` | Added to CORS allowed origins |
-| `AUTH_PREFIX` | `/user` | Path prefix consumers use to reach auth |
+| `API_PREFIX` | `/user` | URL prefix for all auth routes |
+| `PRIVATE_API_SECRET` | — | Secret for `X-Internal-Token` header |
+| `TOKENS_ENCRYPTION_KEY` | — | Fernet key for encrypting refresh token payloads in Redis |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime |
+| `REFRESH_TOKEN_EXPIRE_MINUTES` | `3600` | Refresh token lifetime (60 h) |
+| `METRICS_ENABLED` | `false` | Set to `true` to expose `/user/metrics` |
+| `AUTH_SERVICE_ROLE` | `issuer` | This service signs tokens |
 
-### `auth.env` — auth service only
-
-| Variable | Notes |
-| --- | --- |
-| `PRIVATE_API_SECRET` | Secret for `X-Internal-Token` header (service-to-service calls) |
-| `TOKENS_ENCRYPTION_KEY` | Fernet key for encrypting refresh token payloads in Redis |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Default: 60 min |
-| `REFRESH_TOKEN_EXPIRE_MINUTES` | Default: 3600 min (60 h) |
-| `METRICS_ENABLED` | `false` — set to `true` to expose `/metrics` |
-| `AUTH_SERVICE_ROLE` | `issuer` — this service signs tokens |
-
-### `api.env` — consumer service only
+### `api.env` — consumer service
 
 | Variable | Notes |
 | --- | --- |
@@ -187,15 +215,14 @@ All requests go through Traefik. Use port `9000` (HTTP) during development:
 
 ## Google OAuth (optional)
 
-Uncomment and fill in `.env`:
+Uncomment and fill in `auth.env`:
 
 ```ini
 GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET="your-client-secret"
 ```
 
-Redis is required for the OAuth code-exchange callback. This stack includes Redis,
-so OAuth works once credentials are set.
+Redis is required for the OAuth code-exchange callback. This stack includes Redis, so OAuth works once credentials are set.
 
 ---
 
@@ -212,13 +239,9 @@ so OAuth works once credentials are set.
 
 ## Database isolation
 
-This stack defaults to **Scenario 2** (per-service isolation): `auth_db` and `api_db`
-are created as separate databases with separate users on first volume init. To switch
-to a single shared DB or add more services, see the scenario blocks in `.env.example`
-and the [database isolation guide](../README.md#database-isolation).
+This stack defaults to **Scenario 2** (per-service isolation): `auth_db` and `api_db` are created as separate databases with separate users on first volume init. To switch to a single shared DB or add more services, see the scenario blocks in `auth.env.example` and the [database isolation guide](../README.md#database-isolation).
 
-Database provisioning runs **once** on first volume creation. If `.env` DB config
-changes after the volume exists, reset with `bash init.sh --reset-db`.
+Database provisioning runs **once** on first volume creation. If DB config changes after the volume exists, reset with `bash init.sh --reset-db`.
 
 ---
 
@@ -231,17 +254,14 @@ docker compose up -d --build
 # Follow logs for all services
 docker compose logs -f
 
-# Follow logs for one service
-docker compose logs -f auth_user_service
-
 # Connect to PostgreSQL directly
 docker compose exec m8_db psql -U <DB_USER> -d <DB_DATABASE>
 
+# Inspect Redis keyspace after a login
+docker compose exec redis_cache redis-cli -a "$REDIS_PASSWORD" INFO keyspace
+
 # Stop (keeps volumes and data)
 docker compose stop
-
-# Stop and remove containers (keeps data volumes)
-docker compose down
 
 # Full reset — stops containers and wipes the database (prompts for confirmation)
 bash init.sh --reset-db
@@ -249,16 +269,36 @@ bash init.sh --reset-db
 
 ---
 
+## Live testing
+
+Run the live test suite against this stack (requires the stack to be up):
+
+```sh
+# From the repo root
+pytest -m live_hs256 --no-cov      # HS256-specific attacks
+pytest -m live_stateful --no-cov   # Token revocation guarantees
+pytest -m live_security --no-cov   # Universal attack categories
+```
+
+Manual smoke test:
+
+```sh
+curl http://localhost:9000/user/health/
+# Expected: {"status":"ok","token_mode":"stateful","redis":"ok","database":"ok",...}
+```
+
+---
+
 ## Troubleshooting
 
-**Services fail to start immediately** — `auth_user_service` waits for PostgreSQL to pass
-its health check (`pg_isready`). PostgreSQL can take 15–20 s on first boot.
+**Services fail to start immediately** — `auth_user_service` waits for PostgreSQL to pass its health check (`pg_isready`). PostgreSQL can take 15–20 s on first boot.
 
-**`changethis` rejection on startup** — the service refuses to start if placeholder
-secrets are detected. Replace all `changethis` values in `.env` and `auth.env`.
+**`changethis` rejection on startup** — replace all `changethis` values in `auth.env`.
 
-**Port conflict on 5432** — if a local PostgreSQL instance is running, it holds port
-`5432`. Stop it or change `DB_PORT` in `.env` (e.g. to `5433`).
+**Port conflict on 5432** — if a local PostgreSQL instance is running, it holds port `5432`. Stop it or change `DB_PORT` in `auth.env` (e.g. to `5433`).
 
-**Database connection refused** — keep `DB_HOST=m8_db` in `.env`. Services reach the
-database over the internal Docker network using the service name, not `localhost`.
+**Database connection refused** — keep `DB_HOST=m8_db` in `auth.env`. Services reach the database over the internal Docker network using the service name, not `localhost`.
+
+---
+
+> [Docker Compose examples](../README.md) · [Repository root](https://github.com/mano8/fa-auth-m8/tree/main)

@@ -8,6 +8,26 @@ A self-contained FastAPI authentication microservice designed to run as a Docker
 
 ---
 
+## Summary
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Docker Compose Stacks](#docker-compose-stacks)
+- [API Endpoints](#api-endpoints)
+- [Quick Start](#quick-start)
+- [Choosing a Database](#choosing-a-database)
+- [Environment Variables](#environment-variables)
+- [Infrastructure Resilience](#infrastructure-resilience)
+- [Deployment Modes](#deployment-modes)
+- [API Key Authentication](#api-key-authentication)
+- [Private API](#private-api)
+- [Consumer Service Integration](#consumer-service-integration)
+- [Development](#development)
+- [Prometheus Metrics](#prometheus-metrics)
+- [Dependencies](#dependencies)
+
+---
+
 ## Features
 
 - Email/password login with bcrypt password hashing (timing-attack safe)
@@ -32,7 +52,7 @@ A self-contained FastAPI authentication microservice designed to run as a Docker
 
 ## Architecture
 
-```
+```text
                         Internet
                            │
                     ┌──────▼──────┐
@@ -58,17 +78,22 @@ Other services on the same Docker network call the private API at `http://auth-s
 
 ## Docker Compose Stacks
 
-Five ready-to-run stacks are provided under `examples/docker_compose/`:
+Ten ready-to-run stacks are provided under [`examples/docker_compose/`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose). See the [stack selection guide](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose#which-stack-should-i-use) for help choosing.
 
-| Stack | Database | Token mode | Observability | Notes |
-| ----- | -------- | ---------- | ------------- | ----- |
-| `local_mysql_m8` | MariaDB | `stateful` (HS256) | — | Simplest starting point |
-| `dev_postgres_m8` | PostgreSQL 16 | `stateful` (HS256) | — | PostgreSQL variant with Traefik |
-| `stateful_m8` | MariaDB | `stateful` (HS256) | Prometheus + Grafana | Full stateful stack |
-| `RS256_m8` | MariaDB | `hybrid` (RS256) | Prometheus + Grafana | Asymmetric signing + JWKS |
-| `template` | MariaDB | configurable | — | Bare template for new projects |
+| Stack | Database | Algorithm | Token mode | Observability | Notes |
+| ----- | -------- | --------- | ---------- | ------------- | ----- |
+| [`lite_mysql_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_mysql_m8) | MariaDB | HS256 | `hybrid` | — | Fastest start |
+| [`lite_postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_postgres_m8) | PostgreSQL 16 | HS256 | `stateful` | — | PostgreSQL variant |
+| [`lite_rs256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_rs256_m8) | MariaDB | RS256 | `stateful` | — | Asymmetric signing + JWKS |
+| [`lite_es256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_es256_m8) | MariaDB | ES256 | `stateful` | — | ECDSA asymmetric signing |
+| [`lite_hybrid_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_hybrid_m8) | MariaDB | RS256 | `hybrid` | — | RS256 + hybrid mode |
+| [`lite_stateless_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_stateless_m8) | MariaDB | HS256 | `stateless` | — | No Redis for JWT validation |
+| [`stateful_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/stateful_m8) | MariaDB | HS256 | `stateful` | Prometheus + Grafana | Full stateful stack + metrics |
+| [`RS256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/RS256_m8) | MariaDB | RS256 | `stateful` | Prometheus + Grafana | RS256 + JWKS + metrics |
+| [`vault_rs256_postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/vault_rs256_postgres_m8) | PostgreSQL 16 | RS256 | `stateful` | Prometheus + Grafana | HashiCorp Vault + hardened |
+| [`template`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/template) | configurable | configurable | configurable | — | Bare template for new stacks |
 
-Each stack ships its own `example.env.txt`, `traefik/`, and Alembic migrations.
+**Start here →** [`lite_mysql_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_mysql_m8) for the fastest path to a running stack.
 
 ---
 
@@ -121,23 +146,49 @@ Interactive docs at `{BACKEND_HOST}{API_PREFIX}/docs` when `SET_DOCS=true`.
 
 ## Quick Start
 
-### 1. Choose a stack and copy the env file
+### 1. Choose a stack
 
 ```bash
-cd examples/docker_compose/stateful_m8
-cp example.env.txt .env
-# edit .env — fill in all required values
+cd examples/docker_compose/lite_mysql_m8      # fastest start — HS256 + hybrid mode
+# or
+cd examples/docker_compose/lite_rs256_m8      # asymmetric RS256 + JWKS
 ```
 
-### 2. Start the stack
+See the [Docker Compose stack guide](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose) to pick the right stack.
+
+### 2. Copy env files and generate secrets
+
+```bash
+cp .env.example .env
+cp auth.env.example auth.env
+cp api.env.example api.env
+# Fill in all `changethis` values in .env and auth.env
+```
+
+Generate secrets with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+### 3. Generate keys and TLS certificate
+
+```bash
+bash init.sh
+# RS256/ES256 stacks: also generates the key pair and writes ACCESS_KEY_ID
+```
+
+> **Windows:** use **Git Bash** (included with Git for Windows) or **WSL**.
+
+### 4. Start the stack
 
 ```bash
 docker compose up --build
 ```
 
-Alembic migrations run automatically. The first start seeds the superuser from `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD`. On all subsequent starts the seed is skipped if any superuser already exists in the database.
+Alembic migrations run automatically. The first start seeds the superuser from `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD`.
 
-### 3. Verify
+### 5. Verify
 
 ```http
 GET http://localhost:9000/user/health/
@@ -147,12 +198,12 @@ GET http://localhost:9000/user/health/
 
 ## Choosing a Database
 
-Set `SELECTED_DB` in `.env`:
+Set `SELECTED_DB` in `.env` (or `auth.env`):
 
-| Value | Driver (sync) | Default port |
-| ----- | ------------- | ------------ |
-| `Mysql` (default) | `pymysql` | 3306 |
-| `Postgres` | `psycopg2` | 5432 |
+| Value | Driver | Default port |
+| ----- | ------ | ------------ |
+| `Mysql` (default) | `pymysql` / `aiomysql` | 3306 |
+| `Postgres` | `psycopg2` / `asyncpg` | 5432 |
 
 ---
 
@@ -210,7 +261,7 @@ openssl ecparam -genkey -name prime256v1 -noout -out private.pem
 openssl ec -in private.pem -pubout -out public.pem
 ```
 
-Or use `examples/docker_compose/RS256_m8/keys/generate_keys.sh`.
+Or use `bash init.sh` in any asymmetric stack — it generates the correct key type automatically.
 
 ### Database
 
@@ -509,7 +560,7 @@ Enabled with `METRICS_ENABLED=true`. The metric prefix is derived from `API_PREF
 | auth | `{prefix}auth_api_key_lifecycle_total` | Counter | action: created \| revoked |
 | auth | `{prefix}auth_api_key_flush_duration_seconds` | Histogram | — |
 
-Alert rules for `stateful_m8` and `RS256_m8` stacks (`prometheus/alerts.yml`):
+Alert rules for `stateful_m8`, `RS256_m8`, and `vault_rs256_postgres_m8` stacks (`prometheus/alerts.yml`):
 
 - `ApiKeyBlockRatioHigh` — hits/checks > 10% over 5 min
 - `ApiKeyRateLimitInvariantViolation` — hits > checks × 1.1 (instrumentation sanity guard)

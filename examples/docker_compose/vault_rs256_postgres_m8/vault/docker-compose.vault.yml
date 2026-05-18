@@ -1,0 +1,91 @@
+# vault/docker-compose.vault.yml
+#
+# Standalone HashiCorp Vault compose — server mode with persistent file storage.
+# Run this as a separate stack to simulate an external Vault for local development
+# and integration testing. Unlike the bundled dev-mode Vault in docker-compose.yml,
+# this stack persists secrets across restarts.
+#
+# ── First-time setup ──────────────────────────────────────────────────────────
+#
+# 1. Start Vault:
+#      docker compose -f vault/docker-compose.vault.yml up -d
+#
+# 2. Initialize (generates unseal keys and root token — save these securely):
+#      docker compose -f vault/docker-compose.vault.yml exec vault_server \
+#        vault operator init
+#
+# 3. Unseal (repeat with 3 of the 5 unseal keys from step 2):
+#      docker compose -f vault/docker-compose.vault.yml exec vault_server \
+#        vault operator unseal <key1>
+#      docker compose -f vault/docker-compose.vault.yml exec vault_server \
+#        vault operator unseal <key2>
+#      docker compose -f vault/docker-compose.vault.yml exec vault_server \
+#        vault operator unseal <key3>
+#
+# 4. Enable KV v2 and write app secrets (replace passwords with your values):
+#      export VAULT_ADDR=http://localhost:8200
+#      export VAULT_TOKEN=<root-token-from-step-2>
+#      vault secrets enable -path=secret kv-v2
+#      vault kv put secret/app \
+#        DB_PASSWORD=<auth-db-password> \
+#        REDIS_PASSWORD=<redis-password>
+#
+# 5. Create a scoped app policy and token:
+#      vault policy write app-read policies/app-policy.hcl
+#      vault token create -policy=app-read -period=24h -format=json \
+#        | python -c "import sys,json; print(json.load(sys.stdin)['auth']['client_token'])"
+#
+# 6. Write the scoped token to a Docker secret file for the main compose:
+#      mkdir -p ../secrets
+#      echo "<scoped-app-token>" > ../secrets/vault_token
+#      chmod 600 ../secrets/vault_token
+#
+# ── Connecting the app compose to this Vault ─────────────────────────────────
+#
+# In docker-compose.yml, replace the bundled vault service with these settings
+# on auth_user_service:
+#
+#   services:
+#     auth_user_service:
+#       environment:
+#         SECRET_PROVIDER: vault
+#         VAULT_ADDR: http://host.docker.internal:8200  # reach host from container
+#       secrets:
+#         - vault_token
+#       # Remove VAULT_TOKEN from environment — VaultProvider reads /run/secrets/vault_token
+#
+#   secrets:
+#     vault_token:
+#       file: ./secrets/vault_token
+#
+# ── Restart after host reboot ─────────────────────────────────────────────────
+#
+# Unlike dev mode, server mode requires unsealing after every restart.
+# Run the unseal commands from step 3 again whenever the container restarts.
+# To automate this, use Vault's auto-unseal feature with a cloud KMS provider.
+
+services:
+  vault_server:
+    image: hashicorp/vault:1.17
+    cap_add:
+      - IPC_LOCK
+    entrypoint: ["vault"]
+    command: ["server", "-config=/vault/config/vault.hcl"]
+    volumes:
+      - ./config/vault.hcl:/vault/config/vault.hcl:ro
+      - vault_data:/vault/data
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "127.0.0.1:8200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -format=json 2>&1 | grep -q '\"initialized\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  vault_data:
+    driver: local

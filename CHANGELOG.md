@@ -8,6 +8,26 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`vault_rs256_postgres_m8` production Vault examples** — three new files for deploying with an external Vault:
+  - `.env.prod_example` — `.env` with `AUTH_DB_PASSWORD`, `REDIS_PASSWORD`, and `VAULT_DEV_TOKEN` removed; shows what CI/CD injects at deploy time.
+  - `auth.env.prod_example` — `auth.env` with `ENVIRONMENT=production`, API docs disabled, and no DB/Redis passwords; documents injection via Docker secrets.
+  - `vault/docker-compose.vault.yml` + `vault/config/vault.hcl` — standalone Vault compose in server mode (persistent file storage) for local integration testing without dev mode.
+  - README section "Using with an external Vault" covering option A (separate local Vault compose), option B (managed Vault), the prod example files, and how to extend Vault coverage to additional secrets.
+
+- **README overhaul across all 10 Docker Compose stacks** — every stack README rewritten or substantially extended:
+  - Root `README.md`: stack table expanded to all 10 stacks, Quick Start updated, architecture diagram fixed.
+  - `examples/docker_compose/README.md`: complete rewrite with decision guide, algorithm and token mode comparison tables, live test commands for each stack.
+  - `lite_mysql_m8`, `lite_postgres_m8`: fixed stale titles (`local_mysql_m8`, `dev_postgres_m8`), added Architecture, Limitations, and Live testing sections.
+  - `lite_rs256_m8`: removed phantom monitoring sections, corrected Limitations.
+  - `lite_es256_m8`, `lite_hybrid_m8`, `lite_stateless_m8`: written from scratch with correct algorithm/mode settings, explicit warnings about env example defaults, Redis-usage tables.
+  - `stateful_m8`: added Summary nav, Architecture diagram, Live testing section.
+  - `env_rs256_m8`: new README distinguishing this stack from `vault_rs256_postgres_m8` (env-file secrets vs Vault).
+  - `vault_rs256_postgres_m8`: added "not production-ready as-is" disclaimer, plaintext-exposure table, bundled-vs-separate Vault comparison, and the new external-Vault section.
+  - `template`: updated stack comparison table to list all 10 stacks with correct names.
+  - All READMEs have a Summary with in-page links and a nav footer.
+
+- **`RS256_m8` directory renamed to `env_rs256_m8`** — clarifies that this stack uses plain env files, distinguishing it from `vault_rs256_postgres_m8` which uses HashiCorp Vault.
+
 - **`vault_rs256_postgres_m8` compose stack** — new production-grade example combining PostgreSQL 16, RS256 asymmetric signing, HashiCorp Vault secret injection, and Prometheus/Grafana observability.
   - Vault dev-mode service with a one-shot `vault_init` container that writes `DB_PASSWORD` and `REDIS_PASSWORD` to `secret/data/app`; `auth_user_service` depends on it via `service_completed_successfully`.
   - `SECRET_PROVIDER` and `VAULT_ADDR` moved to the docker-compose `environment` block (not the dotenv file) to avoid pydantic `extra="forbid"` rejection.
