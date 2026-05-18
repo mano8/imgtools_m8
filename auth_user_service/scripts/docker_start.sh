@@ -8,8 +8,8 @@ if [ -d /opt/auth_sdk_m8_src ]; then
 fi
 
 # Run migrations
-# Check if alembic/versions is empty
-if [ -z "$(ls -A /opt/shared_migrations/auth_user/versions)" ]; then
+# Check if alembic/versions has no .py files (ignores .gitkeep)
+if [ -z "$(find /opt/shared_migrations/auth_user/versions -maxdepth 1 -name '*.py' -print -quit)" ]; then
     echo "Generating Alembic migration..."
     if ! alembic -c /opt/auth_user_service/alembic.ini revision --autogenerate -m "Initial auth migration"; then
         echo "Failed to generate initial migration"
