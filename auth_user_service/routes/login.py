@@ -79,6 +79,9 @@ def login_access_token(
     email = form_data.username
     ip = _client_ip(request)
 
+    if "\x00" in email or "\x00" in form_data.password:
+        raise HTTPException(status_code=422, detail="Invalid characters in credentials")
+
     _m = _get_metrics()
 
     if redis is not None and not settings.is_stateless:
