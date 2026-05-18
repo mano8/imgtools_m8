@@ -151,7 +151,13 @@ def get_current_user(token: TokenDep) -> UserModel:
     # In hybrid mode, access tokens are stateless; only refresh JTIs are tracked.
     if settings.is_stateful:
         redis = get_redis_client()
-        if redis is not None and RedisSessionManager(redis).is_blacklisted(payload.jti):
+        if redis is None:
+            if settings.effective_failure_mode("access_revocation") == "fail_closed":
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Authentication service temporarily unavailable",
+                )
+        elif RedisSessionManager(redis).is_blacklisted(payload.jti):
             _m = _get_metrics()
             if _m and _m.token_validation_failures_total:
                 _m.token_validation_failures_total.labels(reason="revoked").inc()

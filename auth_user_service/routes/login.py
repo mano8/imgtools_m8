@@ -94,6 +94,11 @@ def login_access_token(
                 status_code=429,
                 detail="Too many login attempts. Try again in 15 minutes.",
             )
+    elif settings.effective_failure_mode("rate_limit") == "fail_closed":
+        raise HTTPException(
+            status_code=503,
+            detail="Rate limiting service temporarily unavailable",
+        )
 
     user = AuthController.authenticate(
         session=session,
@@ -176,8 +181,14 @@ def login_refresh_token(
         raise HTTPException(status_code=401, detail=str(err)) from err
 
     # Allowlist check: stateful/hybrid modes require the JTI to be registered.
-    if not settings.is_stateless and redis is not None:
-        if not RedisRefreshStore(redis).is_valid(old_jti):
+    if not settings.is_stateless:
+        if redis is None:
+            if settings.effective_failure_mode("refresh_validation") == "fail_closed":
+                raise HTTPException(
+                    status_code=503,
+                    detail="Authentication service temporarily unavailable",
+                )
+        elif not RedisRefreshStore(redis).is_valid(old_jti):
             if _m and _m.token_refresh_total:
                 _m.token_refresh_total.labels(result="revoked").inc()
             response.delete_cookie(key="refresh_token")
@@ -247,6 +258,8 @@ def logout(
 ) -> ResponseMessage:
     """Revoke both tokens, delete the DB session, and clear the cookie."""
     jti: str | None = None
+    _revocation_failed = False
+    _m = _get_metrics()
 
     # Blacklist the access token JTI so it cannot be reused until natural expiry.
     if settings.is_stateful:
@@ -262,26 +275,32 @@ def logout(
             SessionController.revoke_session_jti(payload.jti, expires_at, redis)
         except Exception:  # noqa: BLE001
             logger.error("Could not blacklist access token JTI on logout.")
-            _m = _get_metrics()
             if _m and _m.revocation_failure_total:
                 _m.revocation_failure_total.labels(operation="access_blacklist").inc()
+            _revocation_failed = True
 
     # Revoke the refresh JTI from the Redis allowlist.
-    if redis is not None and not settings.is_stateless:
-        try:
-            _, refresh_jti = SecurityHelper.decode_refresh_token(
-                refresh_token,
-                secrets=_REFRESH_SECRETS,
-                return_jti=True,
-            )
-            RedisRefreshStore(redis).revoke(refresh_jti)
-            if jti is None:
-                jti = refresh_jti
-        except Exception:  # noqa: BLE001
-            logger.error("Could not revoke refresh JTI on logout.")
-            _m = _get_metrics()
+    if not settings.is_stateless:
+        if redis is not None:
+            try:
+                _, refresh_jti = SecurityHelper.decode_refresh_token(
+                    refresh_token,
+                    secrets=_REFRESH_SECRETS,
+                    return_jti=True,
+                )
+                RedisRefreshStore(redis).revoke(refresh_jti)
+                if jti is None:
+                    jti = refresh_jti
+            except Exception:  # noqa: BLE001
+                logger.error("Could not revoke refresh JTI on logout.")
+                if _m and _m.revocation_failure_total:
+                    _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
+                _revocation_failed = True
+        elif settings.effective_failure_mode("session_write") == "fail_closed":
+            logger.error("Could not revoke refresh JTI on logout: Redis unavailable.")
             if _m and _m.revocation_failure_total:
                 _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
+            _revocation_failed = True
 
     # Remove the DB session record.
     if not settings.is_stateless and jti is not None:
@@ -289,11 +308,16 @@ def logout(
             SessionController.delete_session_by_jti(session=session, jti=jti)
         except Exception:  # noqa: BLE001
             logger.error("Could not delete DB session on logout.")
-            _m = _get_metrics()
             if _m and _m.revocation_failure_total:
                 _m.revocation_failure_total.labels(operation="db_session").inc()
+            _revocation_failed = True
 
-    _m = _get_metrics()
+    if _revocation_failed and settings.effective_failure_mode("session_write") == "fail_closed":
+        raise HTTPException(
+            status_code=503,
+            detail="Logout failed: session could not be fully revoked. Please try again.",
+        )
+
     if _m and _m.logout_total:
         _m.logout_total.inc()
 
