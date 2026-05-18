@@ -174,7 +174,7 @@ class RateLimitEnforcer:
         else:
             _emit_rate_check_metric("blocked")
             _emit_rate_hit_metric(result.exceeded_period)
-            _logger.warning(
+            _logger.warning(  # nosec B506
                 "api_key.rate_limited id=%s period=%s",
                 api_key.id,
                 result.exceeded_period,
