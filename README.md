@@ -619,6 +619,7 @@ Enabled with `METRICS_ENABLED=true`. The metric prefix is derived from `API_PREF
 | auth | `{prefix}auth_degraded_decision_total` | Counter | control: rate_limit \| refresh_validation \| session_write \| access_revocation; mode: fail_open \| fail_closed; reason: redis_unavailable \| revocation_failed |
 | auth | `{prefix}auth_redis_circuit_breaker_open` | Gauge | 1 = Redis unavailable (circuit open), 0 = Redis healthy (circuit closed) |
 | auth | `{prefix}auth_degradation_mode_active` | Gauge | control × mode label pair; value always 1 for active mode; set at startup |
+| auth | `{prefix}auth_session_integrity_denial_total` | Counter | trigger: reuse_detected |
 | auth | `{prefix}auth_api_key_validations_total` | Counter | result: success \| invalid \| revoked \| expired |
 | auth | `{prefix}auth_api_key_rate_limit_checks_total` | Counter | result: checked \| allowed \| blocked |
 | auth | `{prefix}auth_api_key_rate_limit_hits_total` | Counter | period: minute \| hour \| day \| month |

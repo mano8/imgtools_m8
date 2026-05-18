@@ -17,7 +17,11 @@ from auth_sdk_m8.models.shared import Token
 from auth_sdk_m8.schemas.auth import TokenSecret
 from auth_sdk_m8.schemas.base import ResponseMessage
 
-from auth_user_service.core.client import LoginRateLimiter, RedisRefreshStore, RefreshRateLimiter
+from auth_user_service.core.client import (
+    LoginRateLimiter,
+    RedisRefreshStore,
+    RefreshRateLimiter,
+)
 from auth_user_service.core.config import settings
 from auth_sdk_m8.observability.metrics import get as _get_metrics
 from auth_user_service.core.deps import (
@@ -249,8 +253,13 @@ def login_refresh_token(
             if not rotated:
                 if _m and _m.token_refresh_total:
                     _m.token_refresh_total.labels(result="revoked").inc()
-                logger.warning(
-                    "event=token.reuse user_id=%s old_jti=%s ip=%s ts=%s",
+                if _m and _m.session_integrity_denial_total:
+                    _m.session_integrity_denial_total.labels(
+                        trigger="reuse_detected"
+                    ).inc()
+                logger.critical(
+                    "event=session.integrity_denial trigger=reuse_detected "
+                    "user_id=%s old_jti=%s attacker_ip=%s ts=%s",
                     str(user_id),
                     old_jti,
                     ip,
@@ -331,7 +340,9 @@ def logout(
             except Exception:  # noqa: BLE001
                 logger.error("Could not revoke refresh JTI on logout.")
                 if _m and _m.revocation_failure_total:
-                    _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
+                    _m.revocation_failure_total.labels(
+                        operation="refresh_allowlist"
+                    ).inc()
                 _revocation_failed = True
         else:
             _mode = settings.effective_failure_mode("session_write")
@@ -340,9 +351,13 @@ def logout(
                     control="session_write", mode=_mode, reason="redis_unavailable"
                 ).inc()
             if _mode == "fail_closed":
-                logger.error("Could not revoke refresh JTI on logout: Redis unavailable.")
+                logger.error(
+                    "Could not revoke refresh JTI on logout: Redis unavailable."
+                )
                 if _m and _m.revocation_failure_total:
-                    _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
+                    _m.revocation_failure_total.labels(
+                        operation="refresh_allowlist"
+                    ).inc()
                 _revocation_failed = True
 
     # Remove the DB session record.

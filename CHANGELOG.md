@@ -31,6 +31,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **`auth_degradation_mode_active` Prometheus gauge** (auth metrics group) — set at startup from `CommonSettings` for each security control. Labels: `control`, `mode`. Value is always `1` for the active configured mode. Allows alert rules like `auth_degradation_mode_active{control="rate_limit", mode="fail_open"} == 1 and auth_redis_circuit_breaker_open == 1` to page on unprotected degraded paths.
 
+- **`auth_session_integrity_denial_total` Prometheus counter** (auth metrics group) — incremented whenever the Lua rotation script detects a consumed JTI (token reuse attack). Label: `trigger=reuse_detected`. Paired with `logger.critical` emission and immediate `revoke_all_user_sessions` chain invalidation, giving a Prometheus alert surface for any reuse event.
+
 - **`/health` circuit breaker and degradation mode fields** — health endpoint now includes `circuit_breaker` (`"open"` | `"closed"`) and `degradation_modes` object showing the effective mode per control. Operators can see the degradation posture without scraping Prometheus.
 
 - **Revocation failure log level upgraded** — all three logout revocation failures (`access_blacklist`, `refresh_allowlist`, `db_session`) now emit `ERROR` instead of `WARNING`, producing a structured log event that incident-response tooling can page on.

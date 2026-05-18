@@ -119,7 +119,9 @@ class TestGetRedisClientResilience:
         with (
             patch("auth_user_service.core.deps._redis_pool", MagicMock()),
             patch("auth_user_service.core.deps.Redis", return_value=mock_client),
-            patch("auth_user_service.core.deps._get_metrics", return_value=mock_metrics),
+            patch(
+                "auth_user_service.core.deps._get_metrics", return_value=mock_metrics
+            ),
         ):
             get_redis_client()
         mock_metrics.redis_circuit_breaker_open.set.assert_called_once_with(0)
@@ -133,7 +135,9 @@ class TestGetRedisClientResilience:
         with (
             patch("auth_user_service.core.deps._redis_pool", MagicMock()),
             patch("auth_user_service.core.deps.Redis", return_value=mock_client),
-            patch("auth_user_service.core.deps._get_metrics", return_value=mock_metrics),
+            patch(
+                "auth_user_service.core.deps._get_metrics", return_value=mock_metrics
+            ),
         ):
             get_redis_client()
         mock_metrics.redis_circuit_breaker_open.set.assert_called_once_with(1)

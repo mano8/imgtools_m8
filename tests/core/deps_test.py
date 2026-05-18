@@ -147,7 +147,9 @@ class TestGetCurrentUser:
         with (
             patch("auth_user_service.core.deps.settings") as mock_cfg,
             patch("auth_user_service.core.deps.get_redis_client", return_value=None),
-            patch("auth_user_service.core.deps._get_metrics", return_value=mock_metrics),
+            patch(
+                "auth_user_service.core.deps._get_metrics", return_value=mock_metrics
+            ),
         ):
             mock_cfg.is_stateful = True
             mock_cfg.effective_failure_mode.return_value = "fail_open"

@@ -106,7 +106,9 @@ class TestHealthCheck:
             mock_cfg.requires_redis = True
             mock_cfg.TOKEN_MODE = "stateful"
             mock_cfg.effective_failure_mode.side_effect = lambda c: (
-                "fail_closed" if c in ("refresh_validation", "session_write") else "fail_open"
+                "fail_closed"
+                if c in ("refresh_validation", "session_write")
+                else "fail_open"
             )
 
             result = health_check()
