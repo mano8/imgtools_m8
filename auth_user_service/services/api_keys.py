@@ -37,6 +37,24 @@ _PERIOD_ORDER: list[Period] = [
 ]
 
 
+def _emit_validation_metric(label: str) -> None:
+    m = _metrics.get()
+    if m and m.api_key_validations_total:
+        m.api_key_validations_total.labels(result=label).inc()
+
+
+def _emit_rate_check_metric(label: str) -> None:
+    m = _metrics.get()
+    if m and m.api_key_rate_limit_checks_total:
+        m.api_key_rate_limit_checks_total.labels(result=label).inc()
+
+
+def _emit_rate_hit_metric(exceeded_period: Optional[Period]) -> None:
+    m = _metrics.get()
+    if m and m.api_key_rate_limit_hits_total and exceeded_period:
+        m.api_key_rate_limit_hits_total.labels(period=exceeded_period.value).inc()
+
+
 class ApiKeyService:
     """Handles creation, validation, and revocation of API keys."""
 
@@ -67,30 +85,25 @@ class ApiKeyService:
         Increments the api_key_validations_total metric with the appropriate
         result label. Returns None for any non-success outcome.
         """
-        m = _metrics.get()
-
         key_hash = SecurityHelper.hash_token(plaintext)
-        stmt = select(ApiKey).where(ApiKey.key_hash == key_hash)
-        api_key = session.exec(stmt).first()
+        api_key = session.exec(
+            select(ApiKey).where(ApiKey.key_hash == key_hash)
+        ).first()
 
         if api_key is None:
-            if m and m.api_key_validations_total:
-                m.api_key_validations_total.labels(result="invalid").inc()
+            _emit_validation_metric("invalid")
             return None
 
         if api_key.revoked:
-            if m and m.api_key_validations_total:
-                m.api_key_validations_total.labels(result="revoked").inc()
+            _emit_validation_metric("revoked")
             return None
 
         now = datetime.now(timezone.utc)
         if api_key.expires_at and api_key.expires_at.replace(tzinfo=timezone.utc) < now:
-            if m and m.api_key_validations_total:
-                m.api_key_validations_total.labels(result="expired").inc()
+            _emit_validation_metric("expired")
             return None
 
-        if m and m.api_key_validations_total:
-            m.api_key_validations_total.labels(result="success").inc()
+        _emit_validation_metric("success")
         return api_key
 
     @staticmethod
@@ -148,29 +161,21 @@ class RateLimitEnforcer:
         Returns:
             RateLimitResult — callers raise 429 when result.allowed is False.
         """
-        m = _metrics.get()
-
         # Resolve effective limits (DB overrides → settings defaults)
         effective = limits or self._default_limits()
 
         # Increment checks_total before branching (invariant: checks >= allowed + blocked)
-        if m and m.api_key_rate_limit_checks_total:
-            m.api_key_rate_limit_checks_total.labels(result="checked").inc()
+        _emit_rate_check_metric("checked")
 
         result = self._limiter.check_all_limits(api_key.id, effective)
 
         if result.allowed:
-            if m and m.api_key_rate_limit_checks_total:
-                m.api_key_rate_limit_checks_total.labels(result="allowed").inc()
+            _emit_rate_check_metric("allowed")
         else:
-            if m and m.api_key_rate_limit_checks_total:
-                m.api_key_rate_limit_checks_total.labels(result="blocked").inc()
-            if m and m.api_key_rate_limit_hits_total and result.exceeded_period:
-                m.api_key_rate_limit_hits_total.labels(
-                    period=result.exceeded_period.value
-                ).inc()
+            _emit_rate_check_metric("blocked")
+            _emit_rate_hit_metric(result.exceeded_period)
             _logger.warning(
-                "api_key.rate_limited key_id=%s period=%s",
+                "api_key.rate_limited id=%s period=%s",
                 api_key.id,
                 result.exceeded_period,
             )
