@@ -261,7 +261,10 @@ def logout(
                 )
             SessionController.revoke_session_jti(payload.jti, expires_at, redis)
         except Exception:  # noqa: BLE001
-            logger.warning("Could not blacklist access token JTI on logout.")
+            logger.error("Could not blacklist access token JTI on logout.")
+            _m = _get_metrics()
+            if _m and _m.revocation_failure_total:
+                _m.revocation_failure_total.labels(operation="access_blacklist").inc()
 
     # Revoke the refresh JTI from the Redis allowlist.
     if redis is not None and not settings.is_stateless:
@@ -275,14 +278,20 @@ def logout(
             if jti is None:
                 jti = refresh_jti
         except Exception:  # noqa: BLE001
-            logger.warning("Could not revoke refresh JTI on logout.")
+            logger.error("Could not revoke refresh JTI on logout.")
+            _m = _get_metrics()
+            if _m and _m.revocation_failure_total:
+                _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
 
     # Remove the DB session record.
     if not settings.is_stateless and jti is not None:
         try:
             SessionController.delete_session_by_jti(session=session, jti=jti)
         except Exception:  # noqa: BLE001
-            logger.warning("Could not delete DB session on logout.")
+            logger.error("Could not delete DB session on logout.")
+            _m = _get_metrics()
+            if _m and _m.revocation_failure_total:
+                _m.revocation_failure_total.labels(operation="db_session").inc()
 
     _m = _get_metrics()
     if _m and _m.logout_total:
