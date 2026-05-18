@@ -41,6 +41,7 @@ The included example stacks use `_m8` in their names as a personal naming conven
 - Opt-in `iss`/`aud` JWT claim enforcement to prevent cross-service token reuse
 - Session tracking and JTI revocation via Redis
 - Login rate limiting per email (Redis-backed, namespace-hardened)
+- Refresh token rate limiting per user ID — 10 rotations / 5 min, prevents session integrity denial
 - **API key authentication** with per-key fixed-window rate limiting (MINUTE / HOUR / DAY / MONTH), `X-RateLimit-*` response headers, and write-behind `last_used_at` tracking
 - Role-based access control (`user`, `admin`, `superuser`)
 - User management CRUD (superuser only)
@@ -318,6 +319,20 @@ Or use `bash init.sh` in any asymmetric stack — it generates the correct key t
 | `GOOGLE_CLIENT_SECRET` | no | Google OAuth2 client secret |
 | `PRIVATE_API_SECRET` | yes | Shared secret for `X-Internal-Token` header |
 
+### Auth Degradation Policy
+
+Controls what happens to each security control when Redis is unavailable. All settings are optional; the defaults represent the recommended production posture.
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `AUTH_STRICT_MODE` | `false` | When `true`, overrides all per-control modes to `fail_closed` |
+| `REFRESH_VALIDATION_FAILURE_MODE` | `fail_closed` | Refresh allowlist check unavailable → `fail_closed`: 503 \| `fail_open`: skip check |
+| `SESSION_WRITE_FAILURE_MODE` | `fail_closed` | Token revocation on logout fails → `fail_closed`: 503 \| `fail_open`: silent skip |
+| `RATE_LIMIT_FAILURE_MODE` | `fail_open` | Rate limiter unavailable → `fail_closed`: 503 \| `fail_open`: skip check |
+| `ACCESS_REVOCATION_FAILURE_MODE` | `fail_open` | Access token blacklist check unavailable → `fail_closed`: 503 \| `fail_open`: skip |
+
+Default posture: refresh validation and session writes **fail closed** (logout is authoritative; unverifiable refresh tokens are rejected). Rate limiting and access revocation **fail open** (short token TTL bounds the exposure window; availability is preserved).
+
 ### API Key Rate Limiting
 
 | Variable | Required | Default | Description |
@@ -360,11 +375,15 @@ The service degrades gracefully when Redis or the database is temporarily unavai
 
 ### Redis unavailable
 
+Behaviour when Redis is down is controlled by the [Auth Degradation Policy](#auth-degradation-policy) settings. The table below shows the default posture (`fail_closed` for refresh + logout, `fail_open` for rate limiting + access revocation):
+
 | `TOKEN_MODE` | Login | Refresh | Logout | Google OAuth |
 | ------------ | ----- | ------- | ------ | ------------ |
 | `stateless` | ✅ unaffected | ✅ unaffected | ✅ unaffected | ❌ 503 (PKCE requires Redis) |
-| `hybrid` | ✅ works, rate limiting skipped | ✅ works, JTI check skipped | ✅ works | ❌ 503 |
-| `stateful` | ✅ works, rate limiting skipped | ✅ works, JTI allowlist check skipped | ✅ works | ❌ 503 |
+| `hybrid` | ✅ works, rate limiting skipped | ❌ 503 (`REFRESH_VALIDATION_FAILURE_MODE=fail_closed`) | ❌ 503 (`SESSION_WRITE_FAILURE_MODE=fail_closed`) | ❌ 503 |
+| `stateful` | ✅ works, rate limiting skipped | ❌ 503 (`REFRESH_VALIDATION_FAILURE_MODE=fail_closed`) | ❌ 503 (`SESSION_WRITE_FAILURE_MODE=fail_closed`) | ❌ 503 |
+
+Set `REFRESH_VALIDATION_FAILURE_MODE=fail_open` and `SESSION_WRITE_FAILURE_MODE=fail_open` to restore the previous fail-open behaviour (tokens accepted without allowlist check; logout silently skips revocation).
 
 In `stateful`/`hybrid` mode with Redis down, the `/health/` endpoint reflects `effective_mode: stateless_degraded` and a `CRITICAL` log is emitted at startup.
 
@@ -581,10 +600,11 @@ Enabled with `METRICS_ENABLED=true`. The metric prefix is derived from `API_PREF
 | reliability | `{prefix}http_errors_total` | Counter | method, endpoint, status_class |
 | health | `{prefix}http_status_total` | Counter | status_code |
 | auth | `{prefix}auth_login_attempts_total` | Counter | result: success \| wrong_credentials \| inactive_user \| rate_limited |
-| auth | `{prefix}auth_token_refresh_total` | Counter | result: success \| invalid \| revoked |
+| auth | `{prefix}auth_token_refresh_total` | Counter | result: success \| invalid \| revoked \| rate_limited |
 | auth | `{prefix}auth_logout_total` | Counter | — |
 | auth | `{prefix}auth_token_validation_failures_total` | Counter | reason: invalid \| revoked \| inactive |
 | auth | `{prefix}auth_oauth_attempts_total` | Counter | provider, result: success \| failed |
+| auth | `{prefix}auth_revocation_failure_total` | Counter | operation: access_blacklist \| refresh_allowlist \| db_session |
 | auth | `{prefix}auth_api_key_validations_total` | Counter | result: success \| invalid \| revoked \| expired |
 | auth | `{prefix}auth_api_key_rate_limit_checks_total` | Counter | result: checked \| allowed \| blocked |
 | auth | `{prefix}auth_api_key_rate_limit_hits_total` | Counter | period: minute \| hour \| day \| month |
