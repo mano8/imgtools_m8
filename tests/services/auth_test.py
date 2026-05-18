@@ -22,7 +22,9 @@ class TestResolveKid:
     def test_asymmetric_explicit_key_id_returned(self):
         with patch("auth_user_service.services.auth.settings") as mock_cfg:
             mock_cfg.ACCESS_KEY_ID = "my-key-id"
-            mock_cfg.ACCESS_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\nfake\n-----END PUBLIC KEY-----"
+            mock_cfg.ACCESS_PUBLIC_KEY = (
+                "-----BEGIN PUBLIC KEY-----\nfake\n-----END PUBLIC KEY-----"
+            )
             result = _resolve_kid("RS256")
         assert result == "my-key-id"
 

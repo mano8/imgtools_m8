@@ -37,9 +37,7 @@ def initial_user_db(session: Session) -> None:
         session (Session):
             The SQLModel database session used for executing queries.
     """
-    existing = session.exec(
-        select(User).where(User.is_superuser)
-    ).first()
+    existing = session.exec(select(User).where(User.is_superuser)).first()
     if existing:
         logger.info("Superuser already exists — skipping initial seed.")
         return

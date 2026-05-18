@@ -124,23 +124,33 @@ class TestGetActiveKey:
     def test_invalid_key_emits_metric(self, db_session):
         mock_m = MagicMock()
         mock_m.api_key_validations_total = MagicMock()
-        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_m):
+        with patch(
+            "auth_user_service.services.api_keys._metrics.get", return_value=mock_m
+        ):
             result = ApiKeyService.get_active_key(db_session, "ak_nonexistent")
         assert result is None
-        mock_m.api_key_validations_total.labels.assert_called_once_with(result="invalid")
+        mock_m.api_key_validations_total.labels.assert_called_once_with(
+            result="invalid"
+        )
 
     def test_revoked_key_emits_metric(self, db_session, sample_user):
         plaintext, key_hash = ApiKeyService.generate_key()
-        api_key = ApiKey(name="revoked-m", key_hash=key_hash, user_id=sample_user.id, revoked=True)
+        api_key = ApiKey(
+            name="revoked-m", key_hash=key_hash, user_id=sample_user.id, revoked=True
+        )
         db_session.add(api_key)
         db_session.commit()
 
         mock_m = MagicMock()
         mock_m.api_key_validations_total = MagicMock()
-        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_m):
+        with patch(
+            "auth_user_service.services.api_keys._metrics.get", return_value=mock_m
+        ):
             result = ApiKeyService.get_active_key(db_session, plaintext)
         assert result is None
-        mock_m.api_key_validations_total.labels.assert_called_once_with(result="revoked")
+        mock_m.api_key_validations_total.labels.assert_called_once_with(
+            result="revoked"
+        )
 
     def test_expired_key_emits_metric(self, db_session, sample_user):
         plaintext, key_hash = ApiKeyService.generate_key()
@@ -156,19 +166,27 @@ class TestGetActiveKey:
 
         mock_m = MagicMock()
         mock_m.api_key_validations_total = MagicMock()
-        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_m):
+        with patch(
+            "auth_user_service.services.api_keys._metrics.get", return_value=mock_m
+        ):
             result = ApiKeyService.get_active_key(db_session, plaintext)
         assert result is None
-        mock_m.api_key_validations_total.labels.assert_called_once_with(result="expired")
+        mock_m.api_key_validations_total.labels.assert_called_once_with(
+            result="expired"
+        )
 
     def test_valid_key_emits_success_metric(self, db_session, active_api_key):
         plaintext, _ = active_api_key
         mock_m = MagicMock()
         mock_m.api_key_validations_total = MagicMock()
-        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_m):
+        with patch(
+            "auth_user_service.services.api_keys._metrics.get", return_value=mock_m
+        ):
             result = ApiKeyService.get_active_key(db_session, plaintext)
         assert result is not None
-        mock_m.api_key_validations_total.labels.assert_called_once_with(result="success")
+        mock_m.api_key_validations_total.labels.assert_called_once_with(
+            result="success"
+        )
 
     def test_returns_key_when_no_expiry(self, db_session, sample_user):
         plaintext, key_hash = ApiKeyService.generate_key()
@@ -345,7 +363,10 @@ class TestRateLimitEnforcer:
         mock_metrics.api_key_rate_limit_checks_total = mock_counter
         mock_metrics.api_key_rate_limit_hits_total = None
 
-        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_metrics):
+        with patch(
+            "auth_user_service.services.api_keys._metrics.get",
+            return_value=mock_metrics,
+        ):
             result = enforcer.enforce(api_key, [(Period.MINUTE, 10)])
 
         assert result.allowed is True
@@ -365,7 +386,10 @@ class TestRateLimitEnforcer:
         mock_metrics.api_key_rate_limit_checks_total = mock_counter
         mock_metrics.api_key_rate_limit_hits_total = mock_hits
 
-        with patch("auth_user_service.services.api_keys._metrics.get", return_value=mock_metrics):
+        with patch(
+            "auth_user_service.services.api_keys._metrics.get",
+            return_value=mock_metrics,
+        ):
             result = enforcer.enforce(api_key, [(Period.MINUTE, 10)])
 
         assert result.allowed is False

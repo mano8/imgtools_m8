@@ -173,9 +173,7 @@ class TestP_HybridContract:
             headers={"Authorization": f"Bearer {forge_alg_none()}"},
             timeout=TIMEOUT,
         )
-        assert r.status_code == 403, (
-            "[CRITICAL-P07] alg=none accepted in hybrid mode!"
-        )
+        assert r.status_code == 403, "[CRITICAL-P07] alg=none accepted in hybrid mode!"
 
     def test_p08_missing_refresh_cookie_returns_401_or_422(self):
         r = requests.post(_REFRESH_URL, timeout=TIMEOUT)

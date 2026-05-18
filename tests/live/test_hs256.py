@@ -159,9 +159,7 @@ class TestW_WeakKeyWarnings:
     def test_w03_token_carries_jti_claim(self):
         """JTI must be present for revocation and replay detection."""
         sess = fresh_login()
-        payload = jwt.decode(
-            sess["token"], options={"verify_signature": False}
-        )
+        payload = jwt.decode(sess["token"], options={"verify_signature": False})
         assert "jti" in payload, (
             "[FINDING-W03] Token has no jti claim — revocation is impossible"
         )

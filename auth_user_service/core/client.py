@@ -69,11 +69,23 @@ class RedisRateLimiter:
         if period == Period.HOUR:
             return now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         if period == Period.DAY:
-            return now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            return now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+                days=1
+            )
         # MONTH: first second of next month
         if now.month == 12:
-            return now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        return now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            return now.replace(
+                year=now.year + 1,
+                month=1,
+                day=1,
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+        return now.replace(
+            month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0
+        )
 
     def _increment(self, api_key_id: uuid.UUID, period: Period) -> int:
         """Atomically increment the window counter and set TTL on first call.

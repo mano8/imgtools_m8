@@ -130,12 +130,8 @@ class RateLimit(SQLModel, table=True):
             "api_key_id IS NOT NULL OR user_id IS NOT NULL",
             name="ck_ratelimit_has_owner",
         ),
-        sa.UniqueConstraint(
-            "api_key_id", "period", name="uq_ratelimit_api_key_period"
-        ),
-        sa.UniqueConstraint(
-            "user_id", "period", name="uq_ratelimit_user_period"
-        ),
+        sa.UniqueConstraint("api_key_id", "period", name="uq_ratelimit_api_key_period"),
+        sa.UniqueConstraint("user_id", "period", name="uq_ratelimit_user_period"),
         get_table_args(),
     )
 

@@ -59,9 +59,7 @@ class TestJ_RefreshTokenLifecycle:
     def test_j01_refresh_rotates_access_token(self):
         """Each refresh call must return a new access token."""
         sess = fresh_login()
-        refresh = requests.post(
-            _REFRESH_URL, cookies=sess["cookies"], timeout=TIMEOUT
-        )
+        refresh = requests.post(_REFRESH_URL, cookies=sess["cookies"], timeout=TIMEOUT)
         assert refresh.status_code == 200
         assert refresh.json()["access_token"] != sess["token"]
 
@@ -74,14 +72,10 @@ class TestJ_RefreshTokenLifecycle:
         sess = fresh_login()
         original_cookies = sess["cookies"]
 
-        first = requests.post(
-            _REFRESH_URL, cookies=original_cookies, timeout=TIMEOUT
-        )
+        first = requests.post(_REFRESH_URL, cookies=original_cookies, timeout=TIMEOUT)
         assert first.status_code == 200
 
-        replay = requests.post(
-            _REFRESH_URL, cookies=original_cookies, timeout=TIMEOUT
-        )
+        replay = requests.post(_REFRESH_URL, cookies=original_cookies, timeout=TIMEOUT)
         assert replay.status_code == 401, (
             f"[FINDING-J02] Refresh token replay not detected: {replay.status_code}"
         )
@@ -171,8 +165,7 @@ class TestJ_RefreshTokenLifecycle:
             timeout=TIMEOUT,
         )
         assert r.status_code == 401, (
-            f"[FINDING-J07] Access token accepted at refresh endpoint: "
-            f"{r.status_code}"
+            f"[FINDING-J07] Access token accepted at refresh endpoint: {r.status_code}"
         )
 
 
@@ -199,9 +192,7 @@ class TestS_StatefulRevocation:
         """
         sess = fresh_login()
 
-        r_before = requests.get(
-            self._ME, headers=sess["headers"], timeout=TIMEOUT
-        )
+        r_before = requests.get(self._ME, headers=sess["headers"], timeout=TIMEOUT)
         assert r_before.status_code == 200
 
         requests.post(
@@ -211,9 +202,7 @@ class TestS_StatefulRevocation:
             timeout=TIMEOUT,
         )
 
-        r_after = requests.get(
-            self._ME, headers=sess["headers"], timeout=TIMEOUT
-        )
+        r_after = requests.get(self._ME, headers=sess["headers"], timeout=TIMEOUT)
         assert r_after.status_code in (401, 403), (
             f"[FINDING-S01] Access token still valid after logout in stateful mode: "
             f"{r_after.status_code}"

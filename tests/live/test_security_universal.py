@@ -112,9 +112,7 @@ class TestA_AuthenticationAttacks:
         )
         assert r.status_code in (400, 422)
         assert r.status_code != 500
-        assert "<script>" not in r.text, (
-            "[FINDING-A07] XSS payload reflected unescaped"
-        )
+        assert "<script>" not in r.text, "[FINDING-A07] XSS payload reflected unescaped"
 
     def test_a08_oversized_password_does_not_cause_bcrypt_dos(self):
         """Passwords >72 bytes fed to bcrypt can hang the process."""
@@ -172,9 +170,7 @@ class TestB_JWTStructural:
 
     def test_b04_alg_none_attack_rejected(self):
         """CRITICAL GUARD: unsigned token must never be accepted."""
-        r = requests.get(
-            self._ME, headers=_auth(forge_alg_none()), timeout=TIMEOUT
-        )
+        r = requests.get(self._ME, headers=_auth(forge_alg_none()), timeout=TIMEOUT)
         assert r.status_code == 403, (
             "[CRITICAL-B04] alg=none token ACCEPTED — full authentication bypass!"
         )
@@ -617,10 +613,7 @@ class TestG_FileUpload:
 
     def test_g04_svg_with_xss_rejected_or_sanitised(self, regular_user: dict):
         """SVG files can carry inline JavaScript."""
-        svg = (
-            b'<svg xmlns="http://www.w3.org/2000/svg">'
-            b"<script>alert(1)</script></svg>"
-        )
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
         r = requests.post(
             self._URL,
             files={"file": ("evil.svg", svg, "image/svg+xml")},
@@ -637,9 +630,7 @@ class TestG_FileUpload:
         """../../etc/passwd as filename must not escape the avatar directory."""
         r = requests.post(
             self._URL,
-            files={
-                "file": ("../../etc/passwd", b"\xff\xd8\xff\xe0", "image/jpeg")
-            },
+            files={"file": ("../../etc/passwd", b"\xff\xd8\xff\xe0", "image/jpeg")},
             headers=regular_user["headers"],
             timeout=TIMEOUT,
         )
@@ -708,9 +699,7 @@ class TestH_InformationDisclosure:
         """FINDING — /metrics may be accessible without authentication."""
         r = requests.get(f"{AUTH_BASE}/metrics", timeout=TIMEOUT)
         if r.status_code == 200:
-            print(
-                f"\n[FINDING-H04] Unauthenticated /metrics endpoint: {r.text[:300]}"
-            )
+            print(f"\n[FINDING-H04] Unauthenticated /metrics endpoint: {r.text[:300]}")
         assert r.status_code in (200, 401, 403, 404)
 
     def test_h05_health_endpoint_detail_level(self):
@@ -733,9 +722,7 @@ class TestH_InformationDisclosure:
         assert "host=" not in low
         assert "m8_db" not in low
 
-    def test_h07_response_does_not_expose_hashed_password(
-        self, admin_headers: dict
-    ):
+    def test_h07_response_does_not_expose_hashed_password(self, admin_headers: dict):
         """User API must never return hashed_password field."""
         r = requests.get(f"{AUTH_BASE}/users/", headers=admin_headers, timeout=TIMEOUT)
         assert r.status_code == 200
@@ -791,9 +778,7 @@ class TestK_SecurityHeaders:
     def test_k06_referrer_policy_set(self, resp_headers: dict):
         rp = resp_headers.get("referrer-policy", "")
         if not rp:
-            print(
-                "\n[FINDING-K06] Referrer-Policy absent — may leak URL parameters"
-            )
+            print("\n[FINDING-K06] Referrer-Policy absent — may leak URL parameters")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -825,9 +810,7 @@ class TestL_CookieSecurity:
             "[FINDING-L02] refresh_token missing HttpOnly — XSS can steal it"
         )
 
-    def test_l03_refresh_token_cookie_has_samesite(
-        self, login_resp: requests.Response
-    ):
+    def test_l03_refresh_token_cookie_has_samesite(self, login_resp: requests.Response):
         """SameSite mitigates CSRF attacks against the refresh endpoint."""
         raw = login_resp.headers.get("set-cookie", "")
         assert "samesite" in raw.lower(), (
@@ -853,9 +836,7 @@ class TestL_CookieSecurity:
             "[FINDING-L05] Access token set as cookie — vulnerable to CSRF"
         )
 
-    def test_l06_hashed_password_not_in_profile_response(
-        self, admin_headers: dict
-    ):
+    def test_l06_hashed_password_not_in_profile_response(self, admin_headers: dict):
         r = requests.get(
             f"{AUTH_BASE}/profile/get/me/", headers=admin_headers, timeout=TIMEOUT
         )
@@ -961,9 +942,7 @@ class TestM_ApiKeySecurity:
         assert int(h["x-ratelimit-remaining"]) >= 0
         assert int(h["x-ratelimit-reset"]) > 0
 
-    def test_m04_remaining_decrements_on_successive_calls(
-        self, admin_headers: dict
-    ):
+    def test_m04_remaining_decrements_on_successive_calls(self, admin_headers: dict):
         """Each request must decrement X-RateLimit-Remaining by 1."""
         r = requests.post(
             f"{self._BASE}/",
@@ -989,9 +968,7 @@ class TestM_ApiKeySecurity:
         requests.delete(
             f"{self._BASE}/{key_id}", headers=admin_headers, timeout=TIMEOUT
         )
-        assert r2 == r1 - 1, (
-            f"[FINDING-M04] Remaining did not decrement: {r1} → {r2}"
-        )
+        assert r2 == r1 - 1, f"[FINDING-M04] Remaining did not decrement: {r1} → {r2}"
 
     def test_m05_invalid_key_returns_401(self):
         r = requests.get(
@@ -1033,9 +1010,7 @@ class TestM_ApiKeySecurity:
         assert "plaintext" not in body, "[FINDING-M07b] plaintext exposed in get"
         assert "key_hash" not in body
 
-    def test_m08_list_returns_only_own_keys(
-        self, regular_user: dict, admin_key: dict
-    ):
+    def test_m08_list_returns_only_own_keys(self, regular_user: dict, admin_key: dict):
         """Regular user must not see admin's key in their list."""
         r = requests.get(
             f"{self._BASE}/", headers=regular_user["headers"], timeout=TIMEOUT
@@ -1070,9 +1045,7 @@ class TestM_ApiKeySecurity:
             f"[FINDING-M13] IDOR: regular user revoked admin key: {r.status_code}"
         )
 
-    def test_m10_revoke_own_key_succeeds(
-        self, regular_user: dict, user_key: dict
-    ):
+    def test_m10_revoke_own_key_succeeds(self, regular_user: dict, user_key: dict):
         r = requests.delete(
             f"{self._BASE}/{user_key['id']}",
             headers=regular_user["headers"],
@@ -1093,9 +1066,7 @@ class TestM_ApiKeySecurity:
             f"[FINDING-M11] Revoked key accepted: {r.status_code}"
         )
 
-    def test_m12_double_revoke_returns_409(
-        self, admin_headers: dict, user_key: dict
-    ):
+    def test_m12_double_revoke_returns_409(self, admin_headers: dict, user_key: dict):
         """Revoking an already-revoked key must return 409 Conflict."""
         r = requests.delete(
             f"{self._BASE}/{user_key['id']}",

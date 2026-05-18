@@ -245,9 +245,7 @@ class TestGetCurrentUserMetrics:
     def test_invalid_token_emits_invalid_metric(self):
         mock_m = self._mock_metrics()
         with (
-            patch(
-                "auth_user_service.core.deps._get_metrics", return_value=mock_m
-            ),
+            patch("auth_user_service.core.deps._get_metrics", return_value=mock_m),
             pytest.raises(HTTPException),
         ):
             get_current_user(token="not.a.valid.jwt")
@@ -261,7 +259,9 @@ class TestGetCurrentUserMetrics:
         mock_m = self._mock_metrics()
 
         with (
-            patch("auth_user_service.core.deps.get_redis_client", return_value=MagicMock()),
+            patch(
+                "auth_user_service.core.deps.get_redis_client", return_value=MagicMock()
+            ),
             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls,
             patch("auth_user_service.core.deps._get_metrics", return_value=mock_m),
             pytest.raises(HTTPException) as exc_info,
@@ -297,7 +297,9 @@ class TestGetCurrentUserMetrics:
 
         mock_m = self._mock_metrics()
         with (
-            patch("auth_user_service.core.deps.get_redis_client", return_value=MagicMock()),
+            patch(
+                "auth_user_service.core.deps.get_redis_client", return_value=MagicMock()
+            ),
             patch("auth_user_service.core.deps.RedisSessionManager") as mock_cls,
             patch("auth_user_service.core.deps._get_metrics", return_value=mock_m),
             pytest.raises(HTTPException) as exc_info,
@@ -401,9 +403,7 @@ class TestGetCurrentApiKey:
                 "auth_user_service.core.deps.ApiKeyService.get_limits",
                 return_value=[],
             ),
-            patch(
-                "auth_user_service.core.deps.RateLimitEnforcer"
-            ) as mock_enforcer_cls,
+            patch("auth_user_service.core.deps.RateLimitEnforcer") as mock_enforcer_cls,
             pytest.raises(HTTPException) as exc_info,
         ):
             mock_enforcer_cls.return_value.enforce.return_value = rate_result
@@ -433,9 +433,7 @@ class TestGetCurrentApiKey:
                 "auth_user_service.core.deps.ApiKeyService.get_limits",
                 return_value=[],
             ),
-            patch(
-                "auth_user_service.core.deps.RateLimitEnforcer"
-            ) as mock_enforcer_cls,
+            patch("auth_user_service.core.deps.RateLimitEnforcer") as mock_enforcer_cls,
             pytest.raises(HTTPException) as exc_info,
         ):
             mock_enforcer_cls.return_value.enforce.return_value = rate_result
@@ -470,9 +468,7 @@ class TestGetCurrentApiKey:
                 "auth_user_service.core.deps.ApiKeyService.get_limits",
                 return_value=[],
             ),
-            patch(
-                "auth_user_service.core.deps.RateLimitEnforcer"
-            ) as mock_enforcer_cls,
+            patch("auth_user_service.core.deps.RateLimitEnforcer") as mock_enforcer_cls,
         ):
             mock_enforcer_cls.return_value.enforce.return_value = rate_result
             result = get_current_api_key(
@@ -509,9 +505,7 @@ class TestGetCurrentApiKey:
                 "auth_user_service.core.deps.ApiKeyService.get_limits",
                 return_value=[],
             ),
-            patch(
-                "auth_user_service.core.deps.RateLimitEnforcer"
-            ) as mock_enforcer_cls,
+            patch("auth_user_service.core.deps.RateLimitEnforcer") as mock_enforcer_cls,
         ):
             mock_enforcer_cls.return_value.enforce.return_value = rate_result
             result = get_current_api_key(
