@@ -23,7 +23,7 @@ class OAuthController:
             raise HTTPException(
                 status_code=503, detail="Google OAuth is not configured."
             )
-        token_request_uri = "https://oauth2.googleapis.com/token"
+        token_request_uri = "https://oauth2.googleapis.com/token"  # nosec B105 - OAuth endpoint URL, not a credential
         data = {
             "code": code,
             "client_id": settings.GOOGLE_CLIENT_ID.get_secret_value(),
