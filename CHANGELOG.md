@@ -8,11 +8,24 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **`RefreshRateLimiter` on `/login/refresh-token/`** — fixed-window limiter keyed by `user_id` (10 rotations / 5 min). Closes the C2 session integrity denial path: an attacker holding a captured refresh token could previously spam rotations at zero cost to continuously trigger `revoke_all_user_sessions` against the victim, forcing indefinite re-authentication. Implemented in `core/client.py`; wired in `routes/login.py` immediately after token decode, before the allowlist check.
+
+- **Configurable per-control auth degradation policy** — five new settings in `CommonSettings` (auth-sdk-m8) define the service posture when Redis is unavailable for each security control:
+  - `AUTH_STRICT_MODE` (default `false`) — global override forcing all controls to `fail_closed`
+  - `REFRESH_VALIDATION_FAILURE_MODE` (default `fail_closed`) — refresh allowlist unavailable: reject with 503 rather than silently allowing rotation without JTI validation. Removes C1's primary enabling condition (persistent access after silent logout failure)
+  - `SESSION_WRITE_FAILURE_MODE` (default `fail_closed`) — revocation failure on logout: return 503 so the client knows the session was not fully revoked, rather than silently returning success
+  - `RATE_LIMIT_FAILURE_MODE` (default `fail_open`) — skip rate limit checks when Redis is down; availability tradeoff
+  - `ACCESS_REVOCATION_FAILURE_MODE` (default `fail_open`) — skip access token blacklist read when Redis is down; short TTL bounds the exposure window
+
 - **`SameSite=Strict` on refresh-token cookie** — upgraded from `SameSite=Lax`. The auth service has no legitimate cross-site POST use case, so `Strict` provides the maximum CSRF protection at no functional cost.
 - **`REFRESH_TOKEN_ALGORITHM` startup enforcement** — `CommonSettings._sync_token_algorithms` now raises `ValueError` at startup if `REFRESH_TOKEN_ALGORITHM` is configured to anything other than `HS256`. Refresh tokens are internal-only and must use symmetric signing; this converts a silent misconfiguration trap into a hard startup failure.
 - **`SecurityHelper.verify_password` exception narrowed** — `except Exception` tightened to `except ValueError`; removed the dead `# return pwd_context.verify(...)` comment. Previously, bcrypt internal errors (malformed stored hash, memory fault) silently returned `False` with no log or metric, masking legitimate failures and reducing anomaly-detection sensitivity.
 
 ### Added
+
+- **`auth_revocation_failure_total` Prometheus counter** (auth metrics group) — tracks token revocation failures per operation (`operation: access_blacklist | refresh_allowlist | db_session`). Emitted on every caught exception in the logout revocation path. Previously these failures were silent; they now surface in Prometheus and alert rules can be built against them.
+
+- **Revocation failure log level upgraded** — all three logout revocation failures (`access_blacklist`, `refresh_allowlist`, `db_session`) now emit `ERROR` instead of `WARNING`, producing a structured log event that incident-response tooling can page on.
 
 - **`vault_rs256_postgres_m8` production Vault examples** — three new files for deploying with an external Vault:
   - `.env.prod_example` — `.env` with `AUTH_DB_PASSWORD`, `REDIS_PASSWORD`, and `VAULT_DEV_TOKEN` removed; shows what CI/CD injects at deploy time.
