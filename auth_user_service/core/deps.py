@@ -152,7 +152,13 @@ def get_current_user(token: TokenDep) -> UserModel:
     if settings.is_stateful:
         redis = get_redis_client()
         if redis is None:
-            if settings.effective_failure_mode("access_revocation") == "fail_closed":
+            _mode = settings.effective_failure_mode("access_revocation")
+            _m = _get_metrics()
+            if _m and _m.degraded_decision_total:
+                _m.degraded_decision_total.labels(
+                    control="access_revocation", mode=_mode, reason="redis_unavailable"
+                ).inc()
+            if _mode == "fail_closed":
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                     detail="Authentication service temporarily unavailable",

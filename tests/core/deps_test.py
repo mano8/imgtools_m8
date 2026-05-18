@@ -138,6 +138,27 @@ class TestGetCurrentUser:
 
         assert isinstance(result, UserModel)
 
+    def test_redis_unavailable_emits_degraded_decision_counter(self):
+        """Redis down path increments degraded_decision_total with correct labels."""
+        token = _make_valid_token()
+        mock_metrics = MagicMock()
+        mock_metrics.degraded_decision_total = MagicMock()
+
+        with (
+            patch("auth_user_service.core.deps.settings") as mock_cfg,
+            patch("auth_user_service.core.deps.get_redis_client", return_value=None),
+            patch("auth_user_service.core.deps._get_metrics", return_value=mock_metrics),
+        ):
+            mock_cfg.is_stateful = True
+            mock_cfg.effective_failure_mode.return_value = "fail_open"
+            mock_cfg.is_active = True
+            get_current_user(token=token)
+
+        mock_metrics.degraded_decision_total.labels.assert_called_once_with(
+            control="access_revocation", mode="fail_open", reason="redis_unavailable"
+        )
+        mock_metrics.degraded_decision_total.labels.return_value.inc.assert_called_once()
+
     def test_inactive_user_raises_403(self):
         from auth_user_service.core.config import settings
 

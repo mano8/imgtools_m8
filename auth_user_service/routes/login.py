@@ -94,11 +94,17 @@ def login_access_token(
                 status_code=429,
                 detail="Too many login attempts. Try again in 15 minutes.",
             )
-    elif settings.effective_failure_mode("rate_limit") == "fail_closed":
-        raise HTTPException(
-            status_code=503,
-            detail="Rate limiting service temporarily unavailable",
-        )
+    else:
+        _mode = settings.effective_failure_mode("rate_limit")
+        if _m and _m.degraded_decision_total:
+            _m.degraded_decision_total.labels(
+                control="rate_limit", mode=_mode, reason="redis_unavailable"
+            ).inc()
+        if _mode == "fail_closed":
+            raise HTTPException(
+                status_code=503,
+                detail="Rate limiting service temporarily unavailable",
+            )
 
     user = AuthController.authenticate(
         session=session,
@@ -194,16 +200,27 @@ def login_refresh_token(
                 status_code=429,
                 detail="Too many refresh attempts. Try again later.",
             )
-    elif settings.effective_failure_mode("rate_limit") == "fail_closed":
-        raise HTTPException(
-            status_code=503,
-            detail="Rate limiting service temporarily unavailable",
-        )
+    else:
+        _mode = settings.effective_failure_mode("rate_limit")
+        if _m and _m.degraded_decision_total:
+            _m.degraded_decision_total.labels(
+                control="rate_limit", mode=_mode, reason="redis_unavailable"
+            ).inc()
+        if _mode == "fail_closed":
+            raise HTTPException(
+                status_code=503,
+                detail="Rate limiting service temporarily unavailable",
+            )
 
     # Allowlist check: stateful/hybrid modes require the JTI to be registered.
     if not settings.is_stateless:
         if redis is None:
-            if settings.effective_failure_mode("refresh_validation") == "fail_closed":
+            _mode = settings.effective_failure_mode("refresh_validation")
+            if _m and _m.degraded_decision_total:
+                _m.degraded_decision_total.labels(
+                    control="refresh_validation", mode=_mode, reason="redis_unavailable"
+                ).inc()
+            if _mode == "fail_closed":
                 raise HTTPException(
                     status_code=503,
                     detail="Authentication service temporarily unavailable",
@@ -316,11 +333,17 @@ def logout(
                 if _m and _m.revocation_failure_total:
                     _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
                 _revocation_failed = True
-        elif settings.effective_failure_mode("session_write") == "fail_closed":
-            logger.error("Could not revoke refresh JTI on logout: Redis unavailable.")
-            if _m and _m.revocation_failure_total:
-                _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
-            _revocation_failed = True
+        else:
+            _mode = settings.effective_failure_mode("session_write")
+            if _m and _m.degraded_decision_total:
+                _m.degraded_decision_total.labels(
+                    control="session_write", mode=_mode, reason="redis_unavailable"
+                ).inc()
+            if _mode == "fail_closed":
+                logger.error("Could not revoke refresh JTI on logout: Redis unavailable.")
+                if _m and _m.revocation_failure_total:
+                    _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
+                _revocation_failed = True
 
     # Remove the DB session record.
     if not settings.is_stateless and jti is not None:
@@ -332,11 +355,17 @@ def logout(
                 _m.revocation_failure_total.labels(operation="db_session").inc()
             _revocation_failed = True
 
-    if _revocation_failed and settings.effective_failure_mode("session_write") == "fail_closed":
-        raise HTTPException(
-            status_code=503,
-            detail="Logout failed: session could not be fully revoked. Please try again.",
-        )
+    if _revocation_failed:
+        _mode = settings.effective_failure_mode("session_write")
+        if _m and _m.degraded_decision_total:
+            _m.degraded_decision_total.labels(
+                control="session_write", mode=_mode, reason="revocation_failed"
+            ).inc()
+        if _mode == "fail_closed":
+            raise HTTPException(
+                status_code=503,
+                detail="Logout failed: session could not be fully revoked. Please try again.",
+            )
 
     if _m and _m.logout_total:
         _m.logout_total.inc()

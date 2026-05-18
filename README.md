@@ -333,6 +333,8 @@ Controls what happens to each security control when Redis is unavailable. All se
 
 Default posture: refresh validation and session writes **fail closed** (logout is authoritative; unverifiable refresh tokens are rejected). Rate limiting and access revocation **fail open** (short token TTL bounds the exposure window; availability is preserved).
 
+Every degraded-mode decision emits an `auth_degraded_decision_total` counter (labels: `control`, `mode`, `reason`) — see the [Prometheus metrics](#prometheus-metrics) table for full label values.
+
 ### API Key Rate Limiting
 
 | Variable | Required | Default | Description |
@@ -605,6 +607,7 @@ Enabled with `METRICS_ENABLED=true`. The metric prefix is derived from `API_PREF
 | auth | `{prefix}auth_token_validation_failures_total` | Counter | reason: invalid \| revoked \| inactive |
 | auth | `{prefix}auth_oauth_attempts_total` | Counter | provider, result: success \| failed |
 | auth | `{prefix}auth_revocation_failure_total` | Counter | operation: access_blacklist \| refresh_allowlist \| db_session |
+| auth | `{prefix}auth_degraded_decision_total` | Counter | control: rate_limit \| refresh_validation \| session_write \| access_revocation; mode: fail_open \| fail_closed; reason: redis_unavailable \| revocation_failed |
 | auth | `{prefix}auth_api_key_validations_total` | Counter | result: success \| invalid \| revoked \| expired |
 | auth | `{prefix}auth_api_key_rate_limit_checks_total` | Counter | result: checked \| allowed \| blocked |
 | auth | `{prefix}auth_api_key_rate_limit_hits_total` | Counter | period: minute \| hour \| day \| month |

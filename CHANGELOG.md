@@ -25,6 +25,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **`auth_revocation_failure_total` Prometheus counter** (auth metrics group) — tracks token revocation failures per operation (`operation: access_blacklist | refresh_allowlist | db_session`). Emitted on every caught exception in the logout revocation path. Previously these failures were silent; they now surface in Prometheus and alert rules can be built against them.
 
+- **`auth_degraded_decision_total` Prometheus counter** (auth metrics group) — emitted on every degraded-mode decision, i.e. each time a Redis-dependent control is consulted while Redis is unavailable. Labels: `control` (`rate_limit | refresh_validation | session_write | access_revocation`), `mode` (`fail_open | fail_closed`), `reason` (`redis_unavailable | revocation_failed`). Allows building Prometheus alerts on degraded-mode frequency and mode distribution before HTTP 503s appear in error rates.
+
 - **Revocation failure log level upgraded** — all three logout revocation failures (`access_blacklist`, `refresh_allowlist`, `db_session`) now emit `ERROR` instead of `WARNING`, producing a structured log event that incident-response tooling can page on.
 
 - **`vault_rs256_postgres_m8` production Vault examples** — three new files for deploying with an external Vault:
