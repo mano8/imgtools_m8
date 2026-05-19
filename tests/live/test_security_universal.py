@@ -34,6 +34,7 @@ from tests.live.suites.token_forge import forge_alg_none
 pytestmark = [pytest.mark.live, pytest.mark.live_security]
 
 _LOGIN_URL = f"{AUTH_BASE}/login/access-token"
+_REFRESH_URL = f"{AUTH_BASE}/login/refresh-token/"
 _ADMIN_EMAIL = "admin@example.com"
 _ADMIN_PASSWORD = "Ocoti123@#@"
 
@@ -345,7 +346,7 @@ class TestD_RateLimiting:
 
     @pytest.mark.require_redis
     def test_d01_six_bad_logins_trigger_429(self):
-        """5-attempt window: 6th request must be rate-limited."""
+        """Default 5-attempt window (LOGIN_RATE_LIMIT_REQUESTS): 6th request must be rate-limited."""
         target = f"bforce_{uuid.uuid4().hex[:8]}@redteam-test.com"
         statuses = [
             requests.post(
@@ -398,8 +399,9 @@ class TestD_RateLimiting:
     def test_d04_different_emails_each_get_own_limit(self):
         """Design note: rate limit is per-email not per-IP.
 
-        Each unique email gets its own 5-attempt bucket, which means
-        credential stuffing across many accounts avoids the per-account limit.
+        Each unique email gets its own default 5-attempt bucket
+        (LOGIN_RATE_LIMIT_REQUESTS), which means credential stuffing across
+        many accounts avoids the per-account limit.
         """
         results = []
         for _ in range(3):
@@ -422,6 +424,28 @@ class TestD_RateLimiting:
             timeout=TIMEOUT,
         )
         assert r.status_code == 200
+
+    @pytest.mark.require_redis
+    @pytest.mark.require_token_mode("stateful", "hybrid")
+    def test_d06_refresh_rotation_rate_limited(self, regular_user: dict):
+        """Default 10-rotation window (REFRESH_RATE_LIMIT_REQUESTS): 11th refresh must be rate-limited.
+
+        Uses regular_user (not admin) to avoid exhausting the shared admin
+        refresh rate-limit bucket relied on by TestJ_RefreshTokenLifecycle.
+        """
+        cookies = regular_user["cookies"]
+        statuses = []
+        for _ in range(12):  # > DEFAULT_MAX_REQUESTS=10
+            r = requests.post(_REFRESH_URL, cookies=cookies, timeout=TIMEOUT)
+            statuses.append(r.status_code)
+            if r.status_code == 200:
+                cookies = dict(r.cookies) or cookies
+            else:
+                break
+        assert 429 in statuses, (
+            f"[FINDING-D06] Refresh rate limiting not triggered after 11 rotations — "
+            f"statuses: {statuses}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

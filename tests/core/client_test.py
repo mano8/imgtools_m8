@@ -299,9 +299,24 @@ class TestLoginRateLimiter:
         )
 
     def test_constants(self):
-        assert LoginRateLimiter.MAX_ATTEMPTS == 5
-        assert LoginRateLimiter.WINDOW_SECONDS == 900
+        assert LoginRateLimiter.DEFAULT_MAX_REQUESTS == 5
+        assert LoginRateLimiter.DEFAULT_WINDOW_SECONDS == 900
         assert LoginRateLimiter.PREFIX == "login:attempts:"
+
+    def test_custom_params_used_for_expiry(self):
+        """Constructor max_requests/window_seconds override class defaults."""
+        limiter = LoginRateLimiter(self.mock_redis, max_requests=3, window_seconds=60)
+        self.mock_redis.incr.return_value = 1
+        limiter.is_allowed("user@example.com")
+        _, ttl = self.mock_redis.expire.call_args[0]
+        assert ttl == 60
+
+    def test_custom_max_requests_blocks_at_correct_count(self):
+        limiter = LoginRateLimiter(self.mock_redis, max_requests=3, window_seconds=60)
+        self.mock_redis.incr.return_value = 3
+        assert limiter.is_allowed("user@example.com") is True
+        self.mock_redis.incr.return_value = 4
+        assert limiter.is_allowed("user@example.com") is False
 
 
 class TestRefreshRateLimiter:
@@ -336,9 +351,24 @@ class TestRefreshRateLimiter:
         self.mock_redis.expire.assert_not_called()
 
     def test_constants(self):
-        assert RefreshRateLimiter.MAX_ATTEMPTS == 10
-        assert RefreshRateLimiter.WINDOW_SECONDS == 300
+        assert RefreshRateLimiter.DEFAULT_MAX_REQUESTS == 10
+        assert RefreshRateLimiter.DEFAULT_WINDOW_SECONDS == 300
         assert RefreshRateLimiter.PREFIX == "refresh:attempts:"
+
+    def test_custom_params_used_for_expiry(self):
+        """Constructor max_requests/window_seconds override class defaults."""
+        limiter = RefreshRateLimiter(self.mock_redis, max_requests=3, window_seconds=60)
+        self.mock_redis.incr.return_value = 1
+        limiter.is_allowed(self.user_id)
+        _, ttl = self.mock_redis.expire.call_args[0]
+        assert ttl == 60
+
+    def test_custom_max_requests_blocks_at_correct_count(self):
+        limiter = RefreshRateLimiter(self.mock_redis, max_requests=3, window_seconds=60)
+        self.mock_redis.incr.return_value = 3
+        assert limiter.is_allowed(self.user_id) is True
+        self.mock_redis.incr.return_value = 4
+        assert limiter.is_allowed(self.user_id) is False
 
 
 class TestRedisRefreshStore:

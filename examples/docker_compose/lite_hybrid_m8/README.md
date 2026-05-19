@@ -226,6 +226,10 @@ http://localhost:9000/user/.well-known/jwks.json
 | `ACCESS_KEY_ID` | — | Stable `kid` written by `init.sh` |
 | `REFRESH_SECRET_KEY` | — | HMAC secret for refresh tokens |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Keep short to limit post-logout window |
+| `LOGIN_RATE_LIMIT_REQUESTS` | `5` | Max login attempts per window per email |
+| `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | `15` | Login rate-limit window in minutes |
+| `REFRESH_RATE_LIMIT_REQUESTS` | `10` | Max refresh rotations per window per user |
+| `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | `5` | Refresh rate-limit window in minutes |
 | `AUTH_SERVICE_ROLE` | `issuer` | Signs tokens with the RSA private key |
 
 ### `api.env` — consumer service

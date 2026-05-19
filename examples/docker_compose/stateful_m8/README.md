@@ -230,6 +230,10 @@ histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
 | `TOKENS_ENCRYPTION_KEY` | Fernet key for encrypting refresh token payloads in Redis |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Default: 60 min |
 | `REFRESH_TOKEN_EXPIRE_MINUTES` | Default: 3600 min (60 h) |
+| `LOGIN_RATE_LIMIT_REQUESTS` | Default: 5 — max login attempts per window per email |
+| `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | Default: 15 — login rate-limit window in minutes |
+| `REFRESH_RATE_LIMIT_REQUESTS` | Default: 10 — max refresh rotations per window per user |
+| `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | Default: 5 — refresh rate-limit window in minutes |
 | `METRICS_ENABLED` | `true` — exposes `/user/metrics` for Prometheus to scrape |
 | `AUTH_SERVICE_ROLE` | `issuer` — this service signs tokens |
 

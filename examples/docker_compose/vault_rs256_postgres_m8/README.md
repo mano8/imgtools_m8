@@ -526,6 +526,10 @@ Dev-mode Vault UI. Log in with `VAULT_DEV_TOKEN` from `.env`. Use it to inspect 
 | `REFRESH_SECRET_KEY` | auth.env | HMAC secret for refresh tokens |
 | `PRIVATE_API_SECRET` | auth.env | Secret for `X-Internal-Token` headers |
 | `TOKENS_ENCRYPTION_KEY` | auth.env | Fernet key for encrypting refresh token payloads |
+| `LOGIN_RATE_LIMIT_REQUESTS` | auth.env | Max login attempts per window per email (default: 5) |
+| `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | auth.env | Login rate-limit window in minutes (default: 15) |
+| `REFRESH_RATE_LIMIT_REQUESTS` | auth.env | Max refresh rotations per window per user (default: 10) |
+| `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | auth.env | Refresh rate-limit window in minutes (default: 5) |
 
 ### `api.env` — consumer service
 

@@ -66,7 +66,7 @@ The auth service holds the **private EC key** and issues signed tokens. The fast
 - **No Prometheus / Grafana.** Use [stateful_m8](../stateful_m8/) or [env_rs256_m8](../env_rs256_m8/) if you need dashboards.
 - **No Vault.** The EC private key is stored as a file mounted into the container. Use [vault_rs256_postgres_m8](../vault_rs256_postgres_m8/) for secrets-manager integration (RS256 variant).
 - **MariaDB only.** No PostgreSQL variant of this stack is provided.
-- **`auth.env.example` contains RS256 defaults** — the example was not updated for ES256. When copying, you must change `ACCESS_TOKEN_ALGORITHM=ES256` and re-run `bash init.sh` to generate the correct EC key pair (not an RSA pair).
+- **`auth.env.example` is pre-configured for ES256** — `ACCESS_TOKEN_ALGORITHM=ES256` is already set. Run `bash init.sh` to generate the EC key pair.
 
 ---
 
@@ -115,7 +115,7 @@ TOKENS_ENCRYPTION_KEY="<generate>"
 
 Leave `ACCESS_KEY_ID=changethis_hex_kid` as-is — `init.sh` derives it automatically.
 
-> **Important:** `auth.env.example` still shows `ACCESS_TOKEN_ALGORITHM=RS256`. Change it to `ES256` before running `init.sh`, otherwise an RSA key pair is generated instead of an EC key pair.
+> **Note:** `auth.env.example` already has `ACCESS_TOKEN_ALGORITHM=ES256`. Run `init.sh` after copying to generate the EC key pair.
 
 Open `api.env` and set:
 
@@ -245,6 +245,10 @@ In `stateful` mode, logout immediately invalidates the access token via the Redi
 | `REFRESH_SECRET_KEY` | — | HMAC secret for refresh tokens |
 | `TOKEN_MODE` | `stateful` | `stateless` / `hybrid` / `stateful` |
 | `AUTH_SERVICE_ROLE` | `issuer` | Signs tokens with the EC private key |
+| `LOGIN_RATE_LIMIT_REQUESTS` | `5` | Max login attempts per window per email |
+| `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | `15` | Login rate-limit window in minutes |
+| `REFRESH_RATE_LIMIT_REQUESTS` | `10` | Max refresh rotations per window per user |
+| `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | `5` | Refresh rate-limit window in minutes |
 
 ### `api.env` — consumer service
 

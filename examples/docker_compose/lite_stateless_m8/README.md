@@ -201,6 +201,10 @@ docker compose up --build
 | `SELECTED_DB` | `Mysql` | `Mysql` or `Postgres` |
 | `DB_HOST` | `m8_db` | Docker service name — do not change |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Keep short to limit post-logout exposure |
+| `LOGIN_RATE_LIMIT_REQUESTS` | `5` | Max login attempts per window per email |
+| `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | `15` | Login rate-limit window in minutes |
+| `REFRESH_RATE_LIMIT_REQUESTS` | `10` | Unused in stateless mode |
+| `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | `5` | Unused in stateless mode |
 | `AUTH_SERVICE_ROLE` | `issuer` | Signs tokens |
 | `METRICS_ENABLED` | `false` | Set to `true` to expose `/user/metrics` |
 

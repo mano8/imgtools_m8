@@ -97,7 +97,11 @@ def login_access_token(
     _m = _get_metrics()
 
     if redis is not None:
-        rate_limiter = LoginRateLimiter(redis)
+        rate_limiter = LoginRateLimiter(
+            redis,
+            settings.LOGIN_RATE_LIMIT_REQUESTS,
+            settings.LOGIN_RATE_LIMIT_WINDOW_MINUTES * 60,
+        )
         if not rate_limiter.is_allowed(email):
             if _m and _m.login_attempts_total:
                 _m.login_attempts_total.labels(result="rate_limited").inc()
@@ -200,7 +204,11 @@ def login_refresh_token(
         raise HTTPException(status_code=401, detail=str(err)) from err
 
     if redis is not None:
-        if not RefreshRateLimiter(redis).is_allowed(str(user_id)):
+        if not RefreshRateLimiter(
+            redis,
+            settings.REFRESH_RATE_LIMIT_REQUESTS,
+            settings.REFRESH_RATE_LIMIT_WINDOW_MINUTES * 60,
+        ).is_allowed(str(user_id)):
             if _m and _m.token_refresh_total:
                 _m.token_refresh_total.labels(result="rate_limited").inc()
             logger.warning(

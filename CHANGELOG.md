@@ -12,6 +12,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **`RefreshRateLimiter` on `/login/refresh-token/`** — fixed-window limiter keyed by `user_id` (10 rotations / 5 min). Closes the C2 session integrity denial path: an attacker holding a captured refresh token could previously spam rotations at zero cost to continuously trigger `revoke_all_user_sessions` against the victim, forcing indefinite re-authentication. Implemented in `core/client.py`; wired in `routes/login.py` immediately after token decode, before the allowlist check.
 
+- **Configurable login and refresh rate limits** — `LoginRateLimiter` and `RefreshRateLimiter` limits are now operator-controlled via `CommonSettings` (auth-sdk-m8) instead of compile-time constants. Four new env vars with Pydantic bounds (`ge=1`):
+  - `LOGIN_RATE_LIMIT_REQUESTS` (default `5`, max `1000`) — max login attempts per window
+  - `LOGIN_RATE_LIMIT_WINDOW_MINUTES` (default `15`, max `1440`) — brute-force window
+  - `REFRESH_RATE_LIMIT_REQUESTS` (default `10`, max `1000`) — max refresh rotations per window
+  - `REFRESH_RATE_LIMIT_WINDOW_MINUTES` (default `5`, max `1440`) — churn-prevention window
+  Startup logs the active limits with computed effective rates (req/min) for each control. `config_health.py` warns at startup if the effective rate exceeds per-control thresholds (login > 5 req/min, refresh > 20 req/min) indicating a highly permissive configuration that may weaken abuse protection. All 10 `auth.env.example` files include the new vars as commented defaults.
+
 - **Configurable per-control auth degradation policy** — five new settings in `CommonSettings` (auth-sdk-m8) define the service posture when Redis is unavailable for each security control:
   - `AUTH_STRICT_MODE` (default `false`) — global override forcing all controls to `fail_closed`
   - `REFRESH_VALIDATION_FAILURE_MODE` (default `fail_closed`) — refresh allowlist unavailable: reject with 503 rather than silently allowing rotation without JTI validation. Removes C1's primary enabling condition (persistent access after silent logout failure)
@@ -38,6 +45,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`REDIS_SSL` connection pool TLS** — `ConnectionPool` now passes `ssl=settings.REDIS_SSL`. Defaults to `False`; set `REDIS_SSL=true` for Redis over TLS in staging/production. All 10 `auth.env.example` files include the option as a commented default.
 
 - **redis-py 7.x compatibility fix** — `ConnectionPool` construction now uses `**({"ssl": True} if settings.REDIS_SSL else {})` instead of `ssl=settings.REDIS_SSL`. redis-py 7.4.0 raises `TypeError` when `ssl=False` is forwarded to `AbstractConnection.__init__()`, which caused the circuit breaker to open silently at startup even with Redis healthy. The exception handler in `get_redis_client()` now logs the exception message (`error=%s`) so connection failures are diagnosable without container exec.
+
+- **`require_redis` live test marker** — new pytest marker that auto-skips tests requiring Redis when the running stack reports `redis=unavailable` in its health response. `conftest.py` extended: `_detect_stack()` now captures `redis_ok` from the `/health/` body; `pytest_collection_modifyitems` skips `require_redis`-marked tests and all `live_stateful` / `live_hybrid` tests when Redis is unavailable. Prevents false failures from rate-limit and JTI-store tests when Redis is down.
+
+- **Unit tests for `REFRESH_SECRET_KEY_OLD` key-rotation fallback** (`tests/security/test_refresh_key_rotation.py`) — five tests covering `SecurityHelper.decode_refresh_token` with `old_secrets`: current-key token accepted without `old_secrets`; old-key token accepted when `old_secrets` is set; old-key token rejected when `old_secrets` is absent; expired old-key token rejected regardless; unknown-key token rejected regardless. Closes the test gap on the zero-downtime rotation path introduced in this release.
 
 - **Degradation contract documented** — `README.md` Infrastructure Resilience section now explicitly documents the two stable states (Redis healthy / Redis fully down), the transient inconsistency regime, and why the asymmetric fail-open/fail-closed posture is intentional. Includes observable signals (`auth_redis_circuit_breaker_open`, `auth_degraded_decision_total`, `/health/` `circuit_breaker` field).
 
@@ -83,6 +94,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`create_auth_tokens` return type** corrected from `Union[str, str, str]` to `tuple[str, str, str]` (`services/auth.py`).
 - **`get_user_by_email` return type** corrected from `User` to `Optional[User]` (`services/users.py`) — `.first()` returns `None` when no row is found.
 - **`session.exec(delete(...))` type-ignore removed** — replaced with `session.execute()` in `routes/users.py`; `exec()` is the ORM-typed overload for `select`, `execute()` is correct for DML statements.
+
+- **Example env file inconsistencies** — four corrections to `auth.env.example` files that caused misconfigured stacks out-of-the-box:
+  - `stateful_m8`: `METRICS_ENABLED=false` → `true` (compose includes Prometheus + Grafana)
+  - `lite_stateless_m8`: `TOKEN_MODE=hybrid` → `stateless`
+  - `lite_hybrid_m8`: `TOKEN_MODE=stateful` → `hybrid`
+  - `lite_es256_m8`: header and `ACCESS_TOKEN_ALGORITHM` corrected from `RS256` → `ES256`
 
 - **`CommonSettings.settings_customise_sources` classmethod** (auth-sdk-m8): pydantic-settings 2.x calls sources with no positional arguments and uses a 5-arg classmethod calling convention (`settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings`). The standalone function passed via `model_config` was silently ignored. Vault injection is now wired as a proper `@classmethod` override on `CommonSettings`, so all subclasses inherit it without any `model_config` entry.
 - **Vault source callable signature**: pydantic-settings 2.x calls each source with no arguments (`source()`); the inner `_vault_source` function no longer declares a settings parameter.

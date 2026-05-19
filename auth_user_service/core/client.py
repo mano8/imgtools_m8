@@ -190,13 +190,20 @@ class LoginRateLimiter:
     Blocks credential-stuffing / brute-force on a per-account basis.
     """
 
-    MAX_ATTEMPTS: Final[int] = 5
-    WINDOW_SECONDS: Final[int] = 900  # 15 minutes
+    DEFAULT_MAX_REQUESTS: Final[int] = 5
+    DEFAULT_WINDOW_SECONDS: Final[int] = 900  # 15 minutes
     PREFIX: Final[str] = "login:attempts:"
     MAX_ID_LEN: Final[int] = 255
 
-    def __init__(self, client: Redis) -> None:
+    def __init__(
+        self,
+        client: Redis,
+        max_requests: int = DEFAULT_MAX_REQUESTS,
+        window_seconds: int = DEFAULT_WINDOW_SECONDS,
+    ) -> None:
         self.client = client
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
 
     def _key(self, identifier: str) -> str:
         # Strip control chars (including CRLF) and cap length to prevent
@@ -213,8 +220,8 @@ class LoginRateLimiter:
         key = self._key(identifier)
         count = self.client.incr(key)
         if count == 1:
-            self.client.expire(key, self.WINDOW_SECONDS)
-        return count <= self.MAX_ATTEMPTS
+            self.client.expire(key, self.window_seconds)
+        return count <= self.max_requests
 
     def reset(self, identifier: str) -> None:
         """Clear the counter after a successful login."""
@@ -229,12 +236,19 @@ class RefreshRateLimiter:
     force continuous session revocation for the victim.
     """
 
-    MAX_ATTEMPTS: Final[int] = 10
-    WINDOW_SECONDS: Final[int] = 300  # 5 minutes
+    DEFAULT_MAX_REQUESTS: Final[int] = 10
+    DEFAULT_WINDOW_SECONDS: Final[int] = 300  # 5 minutes
     PREFIX: Final[str] = "refresh:attempts:"
 
-    def __init__(self, client: Redis) -> None:
+    def __init__(
+        self,
+        client: Redis,
+        max_requests: int = DEFAULT_MAX_REQUESTS,
+        window_seconds: int = DEFAULT_WINDOW_SECONDS,
+    ) -> None:
         self.client = client
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
 
     def _key(self, user_id: str) -> str:
         return f"{self.PREFIX}{user_id}"
@@ -248,8 +262,8 @@ class RefreshRateLimiter:
         key = self._key(user_id)
         count = self.client.incr(key)
         if count == 1:
-            self.client.expire(key, self.WINDOW_SECONDS)
-        return count <= self.MAX_ATTEMPTS
+            self.client.expire(key, self.window_seconds)
+        return count <= self.max_requests
 
 
 _ROTATE_SCRIPT = """

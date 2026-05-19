@@ -183,6 +183,10 @@ All requests go through Traefik. Use port `9000` (HTTP) during development:
 | `TOKENS_ENCRYPTION_KEY` | — | Fernet key for encrypting refresh token payloads in Redis |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRE_MINUTES` | `3600` | Refresh token lifetime (60 h) |
+| `LOGIN_RATE_LIMIT_REQUESTS` | `5` | Max login attempts per window per email |
+| `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | `15` | Login rate-limit window in minutes |
+| `REFRESH_RATE_LIMIT_REQUESTS` | `10` | Max refresh rotations per window per user |
+| `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | `5` | Refresh rate-limit window in minutes |
 | `METRICS_ENABLED` | `false` | Set to `true` to expose `/user/metrics` |
 | `AUTH_SERVICE_ROLE` | `issuer` | This service signs tokens |
 
