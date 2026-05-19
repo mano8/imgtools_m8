@@ -80,7 +80,9 @@ _redis_pool: Optional[ConnectionPool] = ConnectionPool(
     decode_responses=True,
     socket_connect_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
     socket_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
-    ssl=settings.REDIS_SSL,
+    # Only pass ssl=True — redis-py 7.x raises TypeError when ssl=False is forwarded
+    # to AbstractConnection.__init__() which does not accept a False ssl kwarg.
+    **({"ssl": True} if settings.REDIS_SSL else {}),
 )
 
 
@@ -112,10 +114,10 @@ def get_redis_client() -> Optional[Redis]:
         if _m and _m.redis_circuit_breaker_open:
             _m.redis_circuit_breaker_open.set(0)
         return client
-    except Exception:
+    except Exception as exc:
         if _redis_degraded_since is None:
             _redis_degraded_since = datetime.now(timezone.utc)
-        _logger.warning("redis.unavailable degraded_mode=true")
+        _logger.warning("redis.unavailable degraded_mode=true error=%s", exc)
         _m = _get_metrics()
         if _m and _m.redis_circuit_breaker_open:
             _m.redis_circuit_breaker_open.set(1)
