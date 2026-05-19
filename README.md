@@ -337,6 +337,19 @@ Default posture: refresh validation and session writes **fail closed** (logout i
 
 Every degraded-mode decision emits an `auth_degraded_decision_total` counter (labels: `control`, `mode`, `reason`) — see the [Prometheus metrics](#prometheus-metrics) table for full label values.
 
+### Login & Refresh Rate Limiting
+
+Controls the fixed-window rate limits applied to the login and refresh-token endpoints (Redis-backed). All settings are optional; the defaults represent the recommended security posture.
+
+| Variable | Default | Description |
+| -------- | ------- | ----------- |
+| `LOGIN_RATE_LIMIT_REQUESTS` | `5` | Max login attempts per window per email before 429 |
+| `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | `15` | Brute-force window in minutes |
+| `REFRESH_RATE_LIMIT_REQUESTS` | `10` | Max refresh token rotations per window per user |
+| `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | `5` | Churn-prevention window in minutes |
+
+A startup warning is logged if the effective rate (requests ÷ window) exceeds 5 req/min for login or 20 req/min for refresh. When Redis is unavailable, behaviour falls back to `RATE_LIMIT_FAILURE_MODE`.
+
 ### API Key Rate Limiting
 
 | Variable | Required | Default | Description |
@@ -605,7 +618,7 @@ pytest -m live_hybrid --no-cov                          # TOKEN_MODE=hybrid
 pytest -m live_stateless --no-cov                       # TOKEN_MODE=stateless
 ```
 
-The live suite is modular — each file carries a `require_algorithm` / `require_token_mode` mark so tests are automatically skipped when the running stack does not match. `conftest.py` auto-detects the stack's algorithm and token mode at session start.
+The live suite is modular — each file carries a `require_algorithm` / `require_token_mode` mark so tests are automatically skipped when the running stack does not match. `conftest.py` auto-detects the stack's algorithm, token mode, and Redis availability at session start. Tests decorated with `require_redis`, as well as all `live_stateful` and `live_hybrid` tests, are automatically skipped when the `/health/` endpoint reports `redis=unavailable`.
 
 | Module | Mark | Covers |
 | ------ | ---- | ------- |
@@ -616,7 +629,7 @@ The live suite is modular — each file carries a `require_algorithm` / `require
 | `test_hybrid.py` | `live_hybrid` | Partial-Redis degraded mode behaviour |
 | `test_stateless.py` | `live_stateless` | No-Redis guarantees |
 
-The `tests/security/` unit suite (no live stack required) covers JWT security, Redis resilience, refresh lifecycle, input sanitisation, JWKS endpoint, OAuth adversarial, iss/aud validation, session-chain invalidation, exception handling, and client IP attribution.
+The `tests/security/` unit suite (no live stack required) covers JWT security, Redis resilience, refresh lifecycle, refresh key-rotation fallback (`REFRESH_SECRET_KEY_OLD`), input sanitisation, JWKS endpoint, OAuth adversarial, iss/aud validation, session-chain invalidation, exception handling, and client IP attribution.
 
 ---
 

@@ -144,6 +144,29 @@ def _startup_checks() -> None:
                 "STARTUP: Redis connected OK (TOKEN_MODE=%s)", settings.TOKEN_MODE
             )
 
+    if settings.is_stateless:
+        _logger.info(
+            "STARTUP: rate_limits login=%d/%dmin (%.2f req/min)"
+            " [refresh: inactive in stateless mode]",
+            settings.LOGIN_RATE_LIMIT_REQUESTS,
+            settings.LOGIN_RATE_LIMIT_WINDOW_MINUTES,
+            settings.LOGIN_RATE_LIMIT_REQUESTS
+            / float(settings.LOGIN_RATE_LIMIT_WINDOW_MINUTES),
+        )
+    else:
+        _logger.info(
+            "STARTUP: rate_limits login=%d/%dmin (%.2f req/min)"
+            " refresh=%d/%dmin (%.2f req/min)",
+            settings.LOGIN_RATE_LIMIT_REQUESTS,
+            settings.LOGIN_RATE_LIMIT_WINDOW_MINUTES,
+            settings.LOGIN_RATE_LIMIT_REQUESTS
+            / float(settings.LOGIN_RATE_LIMIT_WINDOW_MINUTES),
+            settings.REFRESH_RATE_LIMIT_REQUESTS,
+            settings.REFRESH_RATE_LIMIT_WINDOW_MINUTES,
+            settings.REFRESH_RATE_LIMIT_REQUESTS
+            / float(settings.REFRESH_RATE_LIMIT_WINDOW_MINUTES),
+        )
+
     if not (settings.AUTH_SERVICE_ROLE == "consumer" and settings.is_stateless):
         try:
             with engine.connect() as conn:
