@@ -36,6 +36,17 @@ from auth_sdk_m8.schemas.auth import (
 _DUMMY_HASH: str = SecurityHelper.get_password_hash(secrets.token_hex(32))
 
 
+def _resolve_access_secret(algo: str) -> TokenSecret:
+    """Return the signing secret for access tokens based on the configured algorithm."""
+    if algo in ASYMMETRIC_ALGORITHMS:
+        if not settings.ACCESS_PRIVATE_KEY:
+            raise ValueError(
+                f"ACCESS_PRIVATE_KEY (PEM) is required to sign {algo} tokens"
+            )
+        return TokenSecret(secret_key=settings.ACCESS_PRIVATE_KEY, algorithm=algo)
+    return TokenSecret(secret_key=settings.ACCESS_SECRET_KEY, algorithm=algo)
+
+
 def _resolve_kid(algo: str) -> Optional[str]:
     """Return the key ID to embed in the JWT ``kid`` header.
 
@@ -169,20 +180,7 @@ class AuthController:
         """
         access_token_expires, refresh_token_expires = AuthController.get_tokens_expire()
         algo = settings.ACCESS_TOKEN_ALGORITHM
-        if algo in ASYMMETRIC_ALGORITHMS:
-            if not settings.ACCESS_PRIVATE_KEY:
-                raise ValueError(
-                    f"ACCESS_PRIVATE_KEY (PEM) is required to sign {algo} tokens"
-                )
-            access_signing_secret = TokenSecret(
-                secret_key=settings.ACCESS_PRIVATE_KEY,
-                algorithm=algo,
-            )
-        else:
-            access_signing_secret = TokenSecret(
-                secret_key=settings.ACCESS_SECRET_KEY,
-                algorithm=algo,
-            )
+        access_signing_secret = _resolve_access_secret(algo)
 
         access_token, jti = SecurityHelper.create_access_token(
             data=TokenAccessData(
