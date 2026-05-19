@@ -188,7 +188,9 @@ Generate secrets with:
 python -c "import secrets; print(secrets.token_urlsafe(64))"
 ```
 
-### 3. Install mkcert (recommended — avoids browser TLS errors)
+### 3. Install mkcert (optional — for browser-trusted TLS)
+
+> **TLS works without this step.** Each stack includes a `cert-init` Docker service that generates a self-signed certificate automatically on the first `docker compose up`. Browsers will show a certificate warning in that case. Install mkcert only if you want a fully trusted cert with no browser warnings.
 
 `mkcert` creates a local CA trusted by your OS and browsers, eliminating the `ERR_CERT_AUTHORITY_INVALID` warning and silent `fetch()` failures in Chrome extensions.
 

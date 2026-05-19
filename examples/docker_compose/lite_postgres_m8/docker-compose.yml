@@ -1,4 +1,28 @@
 services:
+  # One-shot cert generator: creates local.crt/local.key if they don't exist.
+  # Traefik waits for this before starting. Skipped automatically when certs already exist.
+  # For browser-trusted certs: install mkcert, then run: bash init.sh --rotate-certs
+  cert-init:
+    image: alpine
+    volumes:
+      - ./traefik/certs:/certs
+    command:
+      - sh
+      - -c
+      - |
+        if [ -f /certs/local.crt ]; then
+          echo "==> cert-init: certs found, skipping"; exit 0
+        fi
+        apk add --no-cache --quiet openssl
+        openssl req -x509 -newkey rsa:2048 -nodes \
+          -keyout /certs/local.key -out /certs/local.crt \
+          -days 365 -subj "/CN=localhost" \
+          -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+        chmod 600 /certs/local.key && chmod 644 /certs/local.crt
+        echo "==> cert-init: self-signed cert ready (browsers will warn)"
+        echo "    For trusted certs: mkcert -install, then bash init.sh --rotate-certs"
+    restart: "no"
+
   traefik:
     image: traefik:v3.3
     ports:
@@ -12,6 +36,9 @@ services:
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic_conf.yml:/etc/traefik/dynamic_conf.yml:ro
       - ./traefik/certs:/etc/traefik/certs:ro
+    depends_on:
+      cert-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     networks:
       - m8_app_network

@@ -20,6 +20,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Dead `acme.json` mount removed** — `lite_mysql_m8/docker-compose.yml` mounted `./traefik/acme.json` with no configured `certificatesResolvers`. Mount removed.
 
+- **`cert-init` one-shot service added to all 10 compose stacks** — a Docker-native Alpine container generates `local.crt`/`local.key` inside the bind-mounted `traefik/certs/` directory on the first `docker compose up`, removing all host-side prerequisites (no bash, no openssl, no mkcert required to get HTTPS working). The `traefik` service depends on it via `condition: service_completed_successfully`; subsequent runs skip cert generation instantly when the files already exist. The host-side `init.sh --rotate-certs` (mkcert) path remains the upgrade route to browser-trusted certificates.
+
 ### Documentation
 
 - **`traefik/certs/README_DEV.md` rewritten for all 10 example stacks** — replaces the stale raw-openssl command snippets with: a port reference table (4430=HTTPS, 9000=HTTP-only, 8080=dashboard), a browser compatibility table (Chrome/Edge/Brave/Opera/Vivaldi/Safari trusted automatically with mkcert; Firefox requires manual NSS import), mkcert install instructions per OS, a step-by-step Firefox CA import walkthrough, and mkcert cleanup instructions. Explains why Firefox trust-store automation was intentionally not scripted (trust expansion concern).
