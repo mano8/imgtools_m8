@@ -48,6 +48,14 @@ _REFRESH_SECRETS = TokenSecret(
     secret_key=settings.REFRESH_SECRET_KEY,
     algorithm=settings.REFRESH_TOKEN_ALGORITHM,
 )
+_REFRESH_OLD_SECRETS: TokenSecret | None = (
+    TokenSecret(
+        secret_key=settings.REFRESH_SECRET_KEY_OLD,
+        algorithm=settings.REFRESH_TOKEN_ALGORITHM,
+    )
+    if settings.REFRESH_SECRET_KEY_OLD is not None
+    else None
+)
 
 
 def _get_refresh_cookie(
@@ -184,6 +192,7 @@ def login_refresh_token(
             refresh_token,
             secrets=_REFRESH_SECRETS,
             return_jti=True,
+            old_secrets=_REFRESH_OLD_SECRETS,
         )
     except InvalidToken as err:
         if _m and _m.token_refresh_total:
@@ -333,6 +342,7 @@ def logout(
                     refresh_token,
                     secrets=_REFRESH_SECRETS,
                     return_jti=True,
+                    old_secrets=_REFRESH_OLD_SECRETS,
                 )
                 RedisRefreshStore(redis).revoke(refresh_jti)
                 if jti is None:
