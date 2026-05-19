@@ -108,6 +108,59 @@ class TestGetCurrentUser:
         mock_get_redis.assert_not_called()
         assert isinstance(result, UserModel)
 
+    def test_redis_unavailable_fail_closed_access_revocation_raises_503(self):
+        """Redis down + ACCESS_REVOCATION_FAILURE_MODE=fail_closed must return 503."""
+        token = _make_valid_token()
+
+        with (
+            patch("auth_user_service.core.deps.settings") as mock_cfg,
+            patch("auth_user_service.core.deps.get_redis_client", return_value=None),
+        ):
+            mock_cfg.is_stateful = True
+            mock_cfg.effective_failure_mode.return_value = "fail_closed"
+            with pytest.raises(HTTPException) as exc_info:
+                get_current_user(token=token)
+
+        assert exc_info.value.status_code == 503
+
+    def test_redis_unavailable_fail_open_access_revocation_proceeds(self):
+        """Redis down + ACCESS_REVOCATION_FAILURE_MODE=fail_open must allow through."""
+        token = _make_valid_token()
+
+        with (
+            patch("auth_user_service.core.deps.settings") as mock_cfg,
+            patch("auth_user_service.core.deps.get_redis_client", return_value=None),
+        ):
+            mock_cfg.is_stateful = True
+            mock_cfg.effective_failure_mode.return_value = "fail_open"
+            mock_cfg.is_active = True
+            result = get_current_user(token=token)
+
+        assert isinstance(result, UserModel)
+
+    def test_redis_unavailable_emits_degraded_decision_counter(self):
+        """Redis down path increments degraded_decision_total with correct labels."""
+        token = _make_valid_token()
+        mock_metrics = MagicMock()
+        mock_metrics.degraded_decision_total = MagicMock()
+
+        with (
+            patch("auth_user_service.core.deps.settings") as mock_cfg,
+            patch("auth_user_service.core.deps.get_redis_client", return_value=None),
+            patch(
+                "auth_user_service.core.deps._get_metrics", return_value=mock_metrics
+            ),
+        ):
+            mock_cfg.is_stateful = True
+            mock_cfg.effective_failure_mode.return_value = "fail_open"
+            mock_cfg.is_active = True
+            get_current_user(token=token)
+
+        mock_metrics.degraded_decision_total.labels.assert_called_once_with(
+            control="access_revocation", mode="fail_open", reason="redis_unavailable"
+        )
+        mock_metrics.degraded_decision_total.labels.return_value.inc.assert_called_once()
+
     def test_inactive_user_raises_403(self):
         from auth_user_service.core.config import settings
 

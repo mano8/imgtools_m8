@@ -42,14 +42,24 @@ def health_check() -> dict[str, Any]:
     overall = "ok" if (redis_ok and db_ok) else "degraded"
 
     degraded_since = get_redis_degraded_since()
+    circuit_breaker_open = redis_required and not redis_ok
+
+    degradation_modes = {
+        "rate_limit": settings.effective_failure_mode("rate_limit"),
+        "refresh_validation": settings.effective_failure_mode("refresh_validation"),
+        "session_write": settings.effective_failure_mode("session_write"),
+        "access_revocation": settings.effective_failure_mode("access_revocation"),
+    }
 
     return {
         "status": overall,
         "token_mode": settings.TOKEN_MODE,
         "effective_mode": effective_mode,
         "redis": "ok" if redis_ok else "unavailable",
+        "circuit_breaker": "open" if circuit_breaker_open else "closed",
         "database": "ok" if db_ok else "unavailable",
         "revocation_available": redis_ok and redis_required,
         "rate_limiting_available": redis_ok and redis_required,
         "degraded_since": degraded_since.isoformat() if degraded_since else None,
+        "degradation_modes": degradation_modes,
     }

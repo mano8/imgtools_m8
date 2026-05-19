@@ -12,6 +12,7 @@ from auth_user_service.core.client import (
     RedisRateLimiter,
     RedisRefreshStore,
     RedisSessionManager,
+    RefreshRateLimiter,
 )
 from auth_sdk_m8.schemas.base import Period
 
@@ -301,6 +302,43 @@ class TestLoginRateLimiter:
         assert LoginRateLimiter.MAX_ATTEMPTS == 5
         assert LoginRateLimiter.WINDOW_SECONDS == 900
         assert LoginRateLimiter.PREFIX == "login:attempts:"
+
+
+class TestRefreshRateLimiter:
+    def setup_method(self):
+        self.mock_redis = MagicMock()
+        self.limiter = RefreshRateLimiter(self.mock_redis)
+        self.user_id = str(uuid.uuid4())
+
+    def test_key_format(self):
+        key = self.limiter._key(self.user_id)
+        assert key == f"refresh:attempts:{self.user_id}"
+
+    def test_is_allowed_first_attempt_sets_expiry(self):
+        self.mock_redis.incr.return_value = 1
+        result = self.limiter.is_allowed(self.user_id)
+        assert result is True
+        self.mock_redis.expire.assert_called_once_with(
+            f"refresh:attempts:{self.user_id}", 300
+        )
+
+    def test_is_allowed_within_max_attempts(self):
+        self.mock_redis.incr.return_value = 10
+        assert self.limiter.is_allowed(self.user_id) is True
+
+    def test_is_allowed_exceeds_max_attempts(self):
+        self.mock_redis.incr.return_value = 11
+        assert self.limiter.is_allowed(self.user_id) is False
+
+    def test_is_allowed_subsequent_no_expire(self):
+        self.mock_redis.incr.return_value = 3
+        self.limiter.is_allowed(self.user_id)
+        self.mock_redis.expire.assert_not_called()
+
+    def test_constants(self):
+        assert RefreshRateLimiter.MAX_ATTEMPTS == 10
+        assert RefreshRateLimiter.WINDOW_SECONDS == 300
+        assert RefreshRateLimiter.PREFIX == "refresh:attempts:"
 
 
 class TestRedisRefreshStore:

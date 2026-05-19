@@ -8,11 +8,38 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **`RefreshRateLimiter` on `/login/refresh-token/`** — fixed-window limiter keyed by `user_id` (10 rotations / 5 min). Closes the C2 session integrity denial path: an attacker holding a captured refresh token could previously spam rotations at zero cost to continuously trigger `revoke_all_user_sessions` against the victim, forcing indefinite re-authentication. Implemented in `core/client.py`; wired in `routes/login.py` immediately after token decode, before the allowlist check.
+
+- **Configurable per-control auth degradation policy** — five new settings in `CommonSettings` (auth-sdk-m8) define the service posture when Redis is unavailable for each security control:
+  - `AUTH_STRICT_MODE` (default `false`) — global override forcing all controls to `fail_closed`
+  - `REFRESH_VALIDATION_FAILURE_MODE` (default `fail_closed`) — refresh allowlist unavailable: reject with 503 rather than silently allowing rotation without JTI validation. Removes C1's primary enabling condition (persistent access after silent logout failure)
+  - `SESSION_WRITE_FAILURE_MODE` (default `fail_closed`) — revocation failure on logout: return 503 so the client knows the session was not fully revoked, rather than silently returning success
+  - `RATE_LIMIT_FAILURE_MODE` (default `fail_open`) — skip rate limit checks when Redis is down; availability tradeoff
+  - `ACCESS_REVOCATION_FAILURE_MODE` (default `fail_open`) — skip access token blacklist read when Redis is down; short TTL bounds the exposure window
+
 - **`SameSite=Strict` on refresh-token cookie** — upgraded from `SameSite=Lax`. The auth service has no legitimate cross-site POST use case, so `Strict` provides the maximum CSRF protection at no functional cost.
 - **`REFRESH_TOKEN_ALGORITHM` startup enforcement** — `CommonSettings._sync_token_algorithms` now raises `ValueError` at startup if `REFRESH_TOKEN_ALGORITHM` is configured to anything other than `HS256`. Refresh tokens are internal-only and must use symmetric signing; this converts a silent misconfiguration trap into a hard startup failure.
 - **`SecurityHelper.verify_password` exception narrowed** — `except Exception` tightened to `except ValueError`; removed the dead `# return pwd_context.verify(...)` comment. Previously, bcrypt internal errors (malformed stored hash, memory fault) silently returned `False` with no log or metric, masking legitimate failures and reducing anomaly-detection sensitivity.
 
 ### Added
+
+- **`auth_revocation_failure_total` Prometheus counter** (auth metrics group) — tracks token revocation failures per operation (`operation: access_blacklist | refresh_allowlist | db_session`). Emitted on every caught exception in the logout revocation path. Previously these failures were silent; they now surface in Prometheus and alert rules can be built against them.
+
+- **`auth_degraded_decision_total` Prometheus counter** (auth metrics group) — emitted on every degraded-mode decision, i.e. each time a Redis-dependent control is consulted while Redis is unavailable. Labels: `control` (`rate_limit | refresh_validation | session_write | access_revocation`), `mode` (`fail_open | fail_closed`), `reason` (`redis_unavailable | revocation_failed`). Allows building Prometheus alerts on degraded-mode frequency and mode distribution before HTTP 503s appear in error rates.
+
+- **`auth_redis_circuit_breaker_open` Prometheus gauge** (auth metrics group) — set to `1` when the Redis circuit breaker is open (Redis unavailable, requests short-circuited) and `0` when closed (Redis healthy). Updated on every successful or failed ping in `get_redis_client()`.
+
+- **`auth_degradation_mode_active` Prometheus gauge** (auth metrics group) — set at startup from `CommonSettings` for each security control. Labels: `control`, `mode`. Value is always `1` for the active configured mode. Allows alert rules like `auth_degradation_mode_active{control="rate_limit", mode="fail_open"} == 1 and auth_redis_circuit_breaker_open == 1` to page on unprotected degraded paths.
+
+- **`auth_session_integrity_denial_total` Prometheus counter** (auth metrics group) — incremented whenever the Lua rotation script detects a consumed JTI (token reuse attack). Label: `trigger=reuse_detected`. Paired with `logger.critical` emission and immediate `revoke_all_user_sessions` chain invalidation, giving a Prometheus alert surface for any reuse event.
+
+- **`REDIS_SSL` connection pool TLS** — `ConnectionPool` now passes `ssl=settings.REDIS_SSL`. Defaults to `False`; set `REDIS_SSL=true` for Redis over TLS in staging/production. All 10 `auth.env.example` files include the option as a commented default.
+
+- **Degradation contract documented** — `README.md` Infrastructure Resilience section now explicitly documents the two stable states (Redis healthy / Redis fully down), the transient inconsistency regime, and why the asymmetric fail-open/fail-closed posture is intentional. Includes observable signals (`auth_redis_circuit_breaker_open`, `auth_degraded_decision_total`, `/health/` `circuit_breaker` field).
+
+- **`/health` circuit breaker and degradation mode fields** — health endpoint now includes `circuit_breaker` (`"open"` | `"closed"`) and `degradation_modes` object showing the effective mode per control. Operators can see the degradation posture without scraping Prometheus.
+
+- **Revocation failure log level upgraded** — all three logout revocation failures (`access_blacklist`, `refresh_allowlist`, `db_session`) now emit `ERROR` instead of `WARNING`, producing a structured log event that incident-response tooling can page on.
 
 - **`vault_rs256_postgres_m8` production Vault examples** — three new files for deploying with an external Vault:
   - `.env.prod_example` — `.env` with `AUTH_DB_PASSWORD`, `REDIS_PASSWORD`, and `VAULT_DEV_TOKEN` removed; shows what CI/CD injects at deploy time.
@@ -49,6 +76,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`get_tokens_expire()` return type** corrected from `Union[timedelta, timedelta]` to `tuple[timedelta, timedelta]` (`services/auth.py`).
 - **`PKCEStore.pop` simplified** — `return result if result is not None else None` → `return result` (`core/client.py`).
 - Typo `expiarition` → `expiration` in `AuthController.get_tokens_expire` docstring.
+- **`create_auth_tokens` return type** corrected from `Union[str, str, str]` to `tuple[str, str, str]` (`services/auth.py`).
+- **`get_user_by_email` return type** corrected from `User` to `Optional[User]` (`services/users.py`) — `.first()` returns `None` when no row is found.
+- **`session.exec(delete(...))` type-ignore removed** — replaced with `session.execute()` in `routes/users.py`; `exec()` is the ORM-typed overload for `select`, `execute()` is correct for DML statements.
 
 - **`CommonSettings.settings_customise_sources` classmethod** (auth-sdk-m8): pydantic-settings 2.x calls sources with no positional arguments and uses a 5-arg classmethod calling convention (`settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings`). The standalone function passed via `model_config` was silently ignored. Vault injection is now wired as a proper `@classmethod` override on `CommonSettings`, so all subclasses inherit it without any `model_config` entry.
 - **Vault source callable signature**: pydantic-settings 2.x calls each source with no arguments (`source()`); the inner `_vault_source` function no longer declares a settings parameter.

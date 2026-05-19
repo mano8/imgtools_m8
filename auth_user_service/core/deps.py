@@ -80,6 +80,7 @@ _redis_pool: Optional[ConnectionPool] = ConnectionPool(
     decode_responses=True,
     socket_connect_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
     socket_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
+    ssl=settings.REDIS_SSL,
 )
 
 
@@ -107,11 +108,17 @@ def get_redis_client() -> Optional[Redis]:
         client = Redis(connection_pool=_redis_pool)
         client.ping()
         _redis_degraded_since = None
+        _m = _get_metrics()
+        if _m and _m.redis_circuit_breaker_open:
+            _m.redis_circuit_breaker_open.set(0)
         return client
     except Exception:
         if _redis_degraded_since is None:
             _redis_degraded_since = datetime.now(timezone.utc)
         _logger.warning("redis.unavailable degraded_mode=true")
+        _m = _get_metrics()
+        if _m and _m.redis_circuit_breaker_open:
+            _m.redis_circuit_breaker_open.set(1)
         return None
 
 
@@ -151,7 +158,19 @@ def get_current_user(token: TokenDep) -> UserModel:
     # In hybrid mode, access tokens are stateless; only refresh JTIs are tracked.
     if settings.is_stateful:
         redis = get_redis_client()
-        if redis is not None and RedisSessionManager(redis).is_blacklisted(payload.jti):
+        if redis is None:
+            _mode = settings.effective_failure_mode("access_revocation")
+            _m = _get_metrics()
+            if _m and _m.degraded_decision_total:
+                _m.degraded_decision_total.labels(
+                    control="access_revocation", mode=_mode, reason="redis_unavailable"
+                ).inc()
+            if _mode == "fail_closed":
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Authentication service temporarily unavailable",
+                )
+        elif RedisSessionManager(redis).is_blacklisted(payload.jti):
             _m = _get_metrics()
             if _m and _m.token_validation_failures_total:
                 _m.token_validation_failures_total.labels(reason="revoked").inc()

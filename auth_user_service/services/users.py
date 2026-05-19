@@ -99,7 +99,7 @@ class UserController:
         return session_user
 
     @staticmethod
-    def get_user_by_email(*, session: Session, email: str) -> User:
+    def get_user_by_email(*, session: Session, email: str) -> Optional[User]:
         """
         Retrieve a user from the database by their email address.
 

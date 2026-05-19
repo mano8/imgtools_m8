@@ -180,8 +180,7 @@ class PKCEStore:
         cannot retrieve the verifier after the first caller has taken it.
         Returns None if the state is unknown or already consumed.
         """
-        result = self.client.getdel(self.PREFIX + state)
-        return result
+        return self.client.getdel(self.PREFIX + state)
 
 
 class LoginRateLimiter:
@@ -220,6 +219,37 @@ class LoginRateLimiter:
     def reset(self, identifier: str) -> None:
         """Clear the counter after a successful login."""
         self.client.delete(self._key(identifier))
+
+
+class RefreshRateLimiter:
+    """Fixed-window refresh attempt limiter keyed by user ID.
+
+    Limits the rate of token rotation to prevent session integrity denial (C2):
+    an attacker holding a captured refresh token cannot spam rotations to
+    force continuous session revocation for the victim.
+    """
+
+    MAX_ATTEMPTS: Final[int] = 10
+    WINDOW_SECONDS: Final[int] = 300  # 5 minutes
+    PREFIX: Final[str] = "refresh:attempts:"
+
+    def __init__(self, client: Redis) -> None:
+        self.client = client
+
+    def _key(self, user_id: str) -> str:
+        return f"{self.PREFIX}{user_id}"
+
+    def is_allowed(self, user_id: str) -> bool:
+        """Increment the rotation counter and return True if still within limit.
+
+        Counts successful and failed rotations alike — the goal is to bound
+        the request rate, not just reject bad tokens.
+        """
+        key = self._key(user_id)
+        count = self.client.incr(key)
+        if count == 1:
+            self.client.expire(key, self.WINDOW_SECONDS)
+        return count <= self.MAX_ATTEMPTS
 
 
 _ROTATE_SCRIPT = """

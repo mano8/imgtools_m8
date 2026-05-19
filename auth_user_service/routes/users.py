@@ -181,7 +181,7 @@ def delete_user(
                 detail="Super users are not allowed to delete themselves",
             )
         statement = delete(ClientSession).where(col(ClientSession.user_id) == user_id)
-        session.exec(statement)  # type: ignore
+        session.execute(statement)
         session.delete(user)
         session.commit()
         return Message(message="User deleted successfully")

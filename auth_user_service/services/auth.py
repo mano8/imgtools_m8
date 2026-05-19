@@ -7,7 +7,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
-from typing import Optional, Union
+from typing import Optional
 from urllib.parse import quote_plus
 
 from sqlmodel import Session
@@ -34,6 +34,17 @@ from auth_sdk_m8.schemas.auth import (
 # Pre-computed hash used to run bcrypt for non-existent users, eliminating the
 # timing difference that would otherwise reveal valid email addresses.
 _DUMMY_HASH: str = SecurityHelper.get_password_hash(secrets.token_hex(32))
+
+
+def _resolve_access_secret(algo: str) -> TokenSecret:
+    """Return the signing secret for access tokens based on the configured algorithm."""
+    if algo in ASYMMETRIC_ALGORITHMS:
+        if not settings.ACCESS_PRIVATE_KEY:
+            raise ValueError(
+                f"ACCESS_PRIVATE_KEY (PEM) is required to sign {algo} tokens"
+            )
+        return TokenSecret(secret_key=settings.ACCESS_PRIVATE_KEY, algorithm=algo)
+    return TokenSecret(secret_key=settings.ACCESS_SECRET_KEY, algorithm=algo)
 
 
 def _resolve_kid(algo: str) -> Optional[str]:
@@ -149,15 +160,13 @@ class AuthController:
 
     @staticmethod
     def get_tokens_expire() -> tuple[timedelta, timedelta]:
-        """
-        Get tokens expiration timedelta.
-        """
+        """Get token expiration timedeltas for access and refresh tokens."""
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         refresh_token_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
         return access_token_expires, refresh_token_expires
 
     @staticmethod
-    def create_auth_tokens(user: User) -> Union[str, str, str]:
+    def create_auth_tokens(user: User) -> tuple[str, str, str]:
         """
         Create authentication tokens for a user.
 
@@ -171,20 +180,7 @@ class AuthController:
         """
         access_token_expires, refresh_token_expires = AuthController.get_tokens_expire()
         algo = settings.ACCESS_TOKEN_ALGORITHM
-        if algo in ASYMMETRIC_ALGORITHMS:
-            if not settings.ACCESS_PRIVATE_KEY:
-                raise ValueError(
-                    f"ACCESS_PRIVATE_KEY (PEM) is required to sign {algo} tokens"
-                )
-            access_signing_secret = TokenSecret(
-                secret_key=settings.ACCESS_PRIVATE_KEY,
-                algorithm=algo,
-            )
-        else:
-            access_signing_secret = TokenSecret(
-                secret_key=settings.ACCESS_SECRET_KEY,
-                algorithm=algo,
-            )
+        access_signing_secret = _resolve_access_secret(algo)
 
         access_token, jti = SecurityHelper.create_access_token(
             data=TokenAccessData(
