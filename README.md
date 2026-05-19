@@ -188,7 +188,41 @@ Generate secrets with:
 python -c "import secrets; print(secrets.token_urlsafe(64))"
 ```
 
-### 3. Generate keys and TLS certificate
+### 3. Install mkcert (recommended — avoids browser TLS errors)
+
+`mkcert` creates a local CA trusted by your OS and browsers, eliminating the `ERR_CERT_AUTHORITY_INVALID` warning and silent `fetch()` failures in Chrome extensions.
+
+```bash
+# Windows
+winget install FiloSottile.mkcert   # or: choco install mkcert
+
+# macOS
+brew install mkcert && brew install nss   # nss = Firefox support
+
+# Linux — see https://github.com/FiloSottile/mkcert#linux
+```
+
+After installing, run **once** to register the local CA system-wide:
+
+```bash
+mkcert -install
+```
+
+`init.sh` detects `mkcert` automatically and falls back to a self-signed OpenSSL certificate if it is not installed (browsers will still warn in that case).
+
+#### Browser TLS compatibility
+
+| Browser | With mkcert | Without mkcert |
+| ------- | ----------- | -------------- |
+| Chrome, Edge, Brave, Opera, Vivaldi | ✅ Trusted automatically | ⚠️ Cert warning |
+| Safari (macOS) | ✅ Trusted automatically | ⚠️ Cert warning |
+| Firefox | ⚠️ Manual CA import needed | ⚠️ Cert warning |
+
+Firefox uses its own NSS certificate store and does not inherit the OS trust store.
+See `traefik/certs/README_DEV.md` inside any example stack for the step-by-step
+Firefox CA import walkthrough.
+
+### 4. Generate keys and TLS certificate
 
 ```bash
 bash init.sh
@@ -197,7 +231,7 @@ bash init.sh
 
 > **Windows:** use **Git Bash** (included with Git for Windows) or **WSL**.
 
-### 4. Start the stack
+### 5. Start the stack
 
 ```bash
 docker compose up --build
@@ -205,13 +239,15 @@ docker compose up --build
 
 Alembic migrations run automatically. The first start seeds the superuser from `FIRST_SUPERUSER` / `FIRST_SUPERUSER_PASSWORD`.
 
-### 5. Verify
+### 6. Verify
 
 ```http
 GET http://localhost:9000/user/health/
 ```
 
-### 6. Adapt for your own project
+> Health and metrics routes (`/user/health`, `/user/metrics`) are only reachable on the internal `api` entryPoint (port 9000, localhost-bound). They are blocked on the public `websecure` entryPoint (port 4430/443).
+
+### 7. Adapt for your own project
 
 The example stacks are ready-to-copy templates. To use one as the base for a new project:
 
@@ -464,7 +500,7 @@ GET {API_PREFIX}/health/
 
 | Mode | `API_BIND_IP` | TLS | HSTS | Use when |
 | ---- | ------------- | --- | ---- | -------- |
-| **Development** | `0.0.0.0` | self-signed OK | off | local machine, Docker dev loop |
+| **Development** | `0.0.0.0` | mkcert (trusted) or self-signed | off | local machine, Docker dev loop |
 | **Private LAN / homelab** | `0.0.0.0` or `127.0.0.1` | local CA recommended | off | Raspberry Pi, NAS, private LAN |
 | **Public / production** | `127.0.0.1` | valid cert required | on (opt-in) | VPS, cloud, internet-facing |
 

@@ -6,6 +6,26 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **mkcert-based TLS for local development** — `init-certs.sh` now detects `mkcert` and uses it to generate locally-trusted certificates, eliminating `ERR_CERT_AUTHORITY_INVALID` browser errors and silent Chrome extension `fetch()` failures. Falls back to an OpenSSL self-signed cert with a clear install prompt when `mkcert` is absent. All `dynamic_conf.yml` files updated to load `local.crt` / `local.key` (the generated output) instead of the committed placeholder `m8_app_crt.pem` / `m8_app_key.pem`.
+
+- **`/user/health` and `/user/metrics` restricted to internal entryPoint** — these routes are no longer reachable via the public `websecure` entryPoint (port 443/4430). They remain accessible on the localhost-bound `api` entryPoint (port 9000) so Prometheus scraping and Docker-internal health probes are unaffected. Public auth routes now use `auth-public-router` (websecure, excludes health/metrics); internal routes use `auth-internal-router` (api, `internal-only` IP-allowlist middleware). Same split applied to `fastapi_service`.
+
+- **Traefik log level corrected** — `log.level` was set to `WARNING` (Python convention) instead of Traefik's `WARN`, causing Traefik to log `Unknown Level String: 'warning'` and crash-loop on startup. Fixed in all 10 `traefik.yml` files.
+
+- **Traefik: `http3` removed from `api` entryPoint** — QUIC is UDP-based; the `api` entryPoint at port 9000 handles TCP-only service-to-service traffic. The `http3: {}` directive there was a no-op misconfiguration. HTTP/3 is retained on `websecure` only. UDP port `4430/udp` is now explicitly mapped in all `docker-compose.yml` files so QUIC actually works on the public HTTPS entryPoint.
+
+- **Docker Compose service labels simplified** — `auth_user_service` and `fastapi_service` Traefik labels reduced to `traefik.enable=true`. All routing rules are now exclusively defined in `dynamic_conf.yml` (file provider), eliminating the implicit docker-provider router that competed with the file-provider router on both entryPoints.
+
+- **Dead `acme.json` mount removed** — `lite_mysql_m8/docker-compose.yml` mounted `./traefik/acme.json` with no configured `certificatesResolvers`. Mount removed.
+
+### Documentation
+
+- **`traefik/certs/README_DEV.md` rewritten for all 10 example stacks** — replaces the stale raw-openssl command snippets with: a port reference table (4430=HTTPS, 9000=HTTP-only, 8080=dashboard), a browser compatibility table (Chrome/Edge/Brave/Opera/Vivaldi/Safari trusted automatically with mkcert; Firefox requires manual NSS import), mkcert install instructions per OS, a step-by-step Firefox CA import walkthrough, and mkcert cleanup instructions. Explains why Firefox trust-store automation was intentionally not scripted (trust expansion concern).
+
+- **`README.md` Quick Start updated** — added a "Browser TLS compatibility" table under the mkcert install step, and a pointer to `traefik/certs/README_DEV.md` for the Firefox manual import walkthrough.
+
 ### Security
 
 - **Refresh key rotation support** — `REFRESH_SECRET_KEY_OLD` env var (optional, default unset). When configured, refresh tokens that fail validation against the current `REFRESH_SECRET_KEY` are automatically retried against the old key, providing a zero-downtime rotation window. Expired tokens are never retried. A `WARNING` is logged each time the old key is used. Remove the var once all pre-rotation refresh tokens have expired (after `REFRESH_TOKEN_EXPIRE_MINUTES`). Implemented in auth-sdk-m8 `SecurityHelper.decode_refresh_token` and `RefreshTokenPolicy`; wired in `routes/login.py` for both the refresh and logout decode paths.
