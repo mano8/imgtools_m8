@@ -260,6 +260,7 @@ Set `SELECTED_DB` in `.env` (or `auth.env`):
 | `REFRESH_TOKEN_ALGORITHM` | no | `HS256` | Signing algorithm for refresh tokens |
 | `ACCESS_SECRET_KEY` | HS256 only | — | Symmetric signing key for access tokens |
 | `REFRESH_SECRET_KEY` | yes | — | Signing key for refresh tokens (always HS256) |
+| `REFRESH_SECRET_KEY_OLD` | no | — | Previous refresh signing key. Set during key rotation to allow old-key tokens to remain valid for the duration of their TTL. Remove once all pre-rotation refresh tokens have expired. |
 | `ACCESS_PRIVATE_KEY_FILE` | RS256/ES256 only | — | Path to PEM private key file (mounted into container) |
 | `ACCESS_PUBLIC_KEY_FILE` | RS256/ES256 only | — | Path to PEM public key file (distributed to consumers) |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | no | `30` | Access token lifetime |

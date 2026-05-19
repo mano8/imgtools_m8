@@ -8,6 +8,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Refresh key rotation support** — `REFRESH_SECRET_KEY_OLD` env var (optional, default unset). When configured, refresh tokens that fail validation against the current `REFRESH_SECRET_KEY` are automatically retried against the old key, providing a zero-downtime rotation window. Expired tokens are never retried. A `WARNING` is logged each time the old key is used. Remove the var once all pre-rotation refresh tokens have expired (after `REFRESH_TOKEN_EXPIRE_MINUTES`). Implemented in auth-sdk-m8 `SecurityHelper.decode_refresh_token` and `RefreshTokenPolicy`; wired in `routes/login.py` for both the refresh and logout decode paths.
+
 - **`RefreshRateLimiter` on `/login/refresh-token/`** — fixed-window limiter keyed by `user_id` (10 rotations / 5 min). Closes the C2 session integrity denial path: an attacker holding a captured refresh token could previously spam rotations at zero cost to continuously trigger `revoke_all_user_sessions` against the victim, forcing indefinite re-authentication. Implemented in `core/client.py`; wired in `routes/login.py` immediately after token decode, before the allowlist check.
 
 - **Configurable per-control auth degradation policy** — five new settings in `CommonSettings` (auth-sdk-m8) define the service posture when Redis is unavailable for each security control:
