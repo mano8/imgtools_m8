@@ -80,6 +80,7 @@ _redis_pool: Optional[ConnectionPool] = ConnectionPool(
     decode_responses=True,
     socket_connect_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
     socket_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
+    ssl=settings.REDIS_SSL,
 )
 
 

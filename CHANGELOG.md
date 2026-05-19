@@ -33,6 +33,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **`auth_session_integrity_denial_total` Prometheus counter** (auth metrics group) — incremented whenever the Lua rotation script detects a consumed JTI (token reuse attack). Label: `trigger=reuse_detected`. Paired with `logger.critical` emission and immediate `revoke_all_user_sessions` chain invalidation, giving a Prometheus alert surface for any reuse event.
 
+- **`REDIS_SSL` connection pool TLS** — `ConnectionPool` now passes `ssl=settings.REDIS_SSL`. Defaults to `False`; set `REDIS_SSL=true` for Redis over TLS in staging/production. All 10 `auth.env.example` files include the option as a commented default.
+
+- **Degradation contract documented** — `README.md` Infrastructure Resilience section now explicitly documents the two stable states (Redis healthy / Redis fully down), the transient inconsistency regime, and why the asymmetric fail-open/fail-closed posture is intentional. Includes observable signals (`auth_redis_circuit_breaker_open`, `auth_degraded_decision_total`, `/health/` `circuit_breaker` field).
+
 - **`/health` circuit breaker and degradation mode fields** — health endpoint now includes `circuit_breaker` (`"open"` | `"closed"`) and `degradation_modes` object showing the effective mode per control. Operators can see the degradation posture without scraping Prometheus.
 
 - **Revocation failure log level upgraded** — all three logout revocation failures (`access_blacklist`, `refresh_allowlist`, `db_session`) now emit `ERROR` instead of `WARNING`, producing a structured log event that incident-response tooling can page on.
@@ -72,6 +76,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`get_tokens_expire()` return type** corrected from `Union[timedelta, timedelta]` to `tuple[timedelta, timedelta]` (`services/auth.py`).
 - **`PKCEStore.pop` simplified** — `return result if result is not None else None` → `return result` (`core/client.py`).
 - Typo `expiarition` → `expiration` in `AuthController.get_tokens_expire` docstring.
+- **`create_auth_tokens` return type** corrected from `Union[str, str, str]` to `tuple[str, str, str]` (`services/auth.py`).
+- **`get_user_by_email` return type** corrected from `User` to `Optional[User]` (`services/users.py`) — `.first()` returns `None` when no row is found.
+- **`session.exec(delete(...))` type-ignore removed** — replaced with `session.execute()` in `routes/users.py`; `exec()` is the ORM-typed overload for `select`, `execute()` is correct for DML statements.
 
 - **`CommonSettings.settings_customise_sources` classmethod** (auth-sdk-m8): pydantic-settings 2.x calls sources with no positional arguments and uses a 5-arg classmethod calling convention (`settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings`). The standalone function passed via `model_config` was silently ignored. Vault injection is now wired as a proper `@classmethod` override on `CommonSettings`, so all subclasses inherit it without any `model_config` entry.
 - **Vault source callable signature**: pydantic-settings 2.x calls each source with no arguments (`source()`); the inner `_vault_source` function no longer declares a settings parameter.

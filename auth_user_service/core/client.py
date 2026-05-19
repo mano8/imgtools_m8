@@ -180,8 +180,7 @@ class PKCEStore:
         cannot retrieve the verifier after the first caller has taken it.
         Returns None if the state is unknown or already consumed.
         """
-        result = self.client.getdel(self.PREFIX + state)
-        return result
+        return self.client.getdel(self.PREFIX + state)
 
 
 class LoginRateLimiter:

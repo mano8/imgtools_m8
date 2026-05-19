@@ -308,6 +308,7 @@ Or use `bash init.sh` in any asymmetric stack — it generates the correct key t
 | `REDIS_PORT` | yes | Redis port |
 | `REDIS_USER` | yes | Redis user |
 | `REDIS_PASSWORD` | yes | Redis password |
+| `REDIS_SSL` | no | Enable TLS for the Redis connection pool (default: `false`). Set `true` when Redis is reached over a network boundary in staging/production. |
 
 ### Auth & OAuth
 
@@ -388,6 +389,24 @@ Behaviour when Redis is down is controlled by the [Auth Degradation Policy](#aut
 Set `REFRESH_VALIDATION_FAILURE_MODE=fail_open` and `SESSION_WRITE_FAILURE_MODE=fail_open` to restore the previous fail-open behaviour (tokens accepted without allowlist check; logout silently skips revocation).
 
 In `stateful`/`hybrid` mode with Redis down, the `/health/` endpoint reflects `effective_mode: stateless_degraded` and a `CRITICAL` log is emitted at startup.
+
+#### Degradation contract
+
+The service operates under two stable states with a brief transient inconsistency regime between them:
+
+| State | Condition | Authorization correctness |
+| ----- | --------- | ------------------------- |
+| **Healthy** | Redis reachable | Full: JWT + allowlist + blacklist all consistent |
+| **Fully degraded** | Redis unreachable | Deterministic: each control follows its declared `fail_open` / `fail_closed` mode |
+| **Transient** | Partial Redis failure (some commands succeed, others fail within the same request) | Non-deterministic: rate-limit increment may fail while allowlist read succeeds; outcomes become request-order dependent |
+
+The transient regime is observable — it does not enable a specific exploit, but authorization consistency is weakened until Redis returns to a stable state. Observable via:
+
+- `auth_redis_circuit_breaker_open` gauge → `1` means the circuit is open (full degradation)
+- `auth_degraded_decision_total` counter → increments on every per-control degraded decision
+- `/health/` `circuit_breaker` field → `"open"` | `"closed"`
+
+The asymmetric posture (refresh + session writes fail-closed; rate limit + access revocation fail-open) is intentional: the highest-value targets for an attacker (token replay, unrevoked sessions) are hard-rejected; availability controls are preserved.
 
 API key rate limiting: when Redis is unavailable and `API_KEY_STRICT_RATE_LIMIT=false` (default), requests are allowed through. With `API_KEY_STRICT_RATE_LIMIT=true`, the endpoint returns 503.
 

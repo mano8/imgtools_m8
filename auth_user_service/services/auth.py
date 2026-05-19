@@ -7,7 +7,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
-from typing import Optional, Union
+from typing import Optional
 from urllib.parse import quote_plus
 
 from sqlmodel import Session
@@ -149,15 +149,13 @@ class AuthController:
 
     @staticmethod
     def get_tokens_expire() -> tuple[timedelta, timedelta]:
-        """
-        Get tokens expiration timedelta.
-        """
+        """Get token expiration timedeltas for access and refresh tokens."""
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         refresh_token_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
         return access_token_expires, refresh_token_expires
 
     @staticmethod
-    def create_auth_tokens(user: User) -> Union[str, str, str]:
+    def create_auth_tokens(user: User) -> tuple[str, str, str]:
         """
         Create authentication tokens for a user.
 

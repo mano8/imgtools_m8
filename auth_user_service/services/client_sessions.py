@@ -92,11 +92,9 @@ class SessionController:
             # assume UTC if naïve
             expires_at = expires_at.replace(tzinfo=timezone.utc)
         raw_ttl = int((expires_at - now).total_seconds())
-        if raw_ttl >= 0:
+        if raw_ttl >= 0 and redis is not None:
             safe_ttl = max(raw_ttl, 0)
-            RedisSessionManager(
-                redis if redis is not None else get_redis_client()
-            ).blacklist_jti(jti, safe_ttl)
+            RedisSessionManager(redis).blacklist_jti(jti, safe_ttl)
         else:
             logger.warning(
                 "Not blacklisting JTI %s because TTL was %d seconds", jti, raw_ttl
