@@ -1,8 +1,13 @@
 # dynamic_conf.yml — Development
 tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: "/etc/traefik/certs/local.crt"
+        keyFile:  "/etc/traefik/certs/local.key"
   certificates:
-    - certFile: "/etc/traefik/certs/m8_app_crt.pem"
-      keyFile:  "/etc/traefik/certs/m8_app_key.pem"
+    - certFile: "/etc/traefik/certs/local.crt"
+      keyFile:  "/etc/traefik/certs/local.key"
 http:
 
   routers:
@@ -16,23 +21,46 @@ http:
         - ip-allowlist
       tls: {}
 
-    # Auth-User-Service router
-    auth-router:
+    # Auth-User-Service: public routes on HTTPS (health and metrics are internal-only)
+    auth-public-router:
+      entryPoints:
+        - websecure
+      rule: "Host(`localhost`) && PathPrefix(`/user`) && !(PathPrefix(`/user/health`) || PathPrefix(`/user/metrics`))"
+      service: auth-service
+      middlewares:
+        - security-headers
+      tls: {}
+      priority: 2
+
+    # Auth-User-Service: all routes on the localhost-bound api entryPoint (port 9000)
+    auth-internal-router:
       entryPoints:
         - api
       rule: "PathPrefix(`/user`)"
       service: auth-service
       middlewares:
         - security-headers
+        - internal-only
 
-    # fastapi-Service router
-    fastapi-router:
+    # FastAPI-Service: public routes on HTTPS
+    fastapi-public-router:
+      entryPoints:
+        - websecure
+      rule: "Host(`localhost`) && PathPrefix(`/fastapi`)"
+      service: fastapi-service
+      middlewares:
+        - security-headers
+      tls: {}
+
+    # FastAPI-Service: all routes on the localhost-bound api entryPoint (port 9000)
+    fastapi-internal-router:
       entryPoints:
         - api
       rule: "PathPrefix(`/fastapi`)"
       service: fastapi-service
       middlewares:
         - security-headers
+        - internal-only
 
   services:
     auth-service:
@@ -48,6 +76,14 @@ http:
     ip-allowlist:
       IPAllowList:
         # Only allow dashboard from the Docker host itself
+        sourceRange:
+          - "127.0.0.1/32"
+          - "172.16.0.0/12"   # Docker bridge networks
+          - "::1/128"
+
+    internal-only:
+      IPAllowList:
+        # Restrict health/metrics to localhost and Docker bridge networks
         sourceRange:
           - "127.0.0.1/32"
           - "172.16.0.0/12"   # Docker bridge networks

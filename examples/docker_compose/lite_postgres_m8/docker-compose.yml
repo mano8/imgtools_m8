@@ -3,7 +3,8 @@ services:
     image: traefik:v3.3
     ports:
       - "8000:80"
-      - "4430:443"
+      - "4430:443/tcp"
+      - "4430:443/udp"  # HTTP/3 / QUIC
       - "127.0.0.1:8080:8080"   # Dashboard — localhost only
       - "${API_BIND_IP:-127.0.0.1}:9000:9000"   # services entryPoint — override API_BIND_IP for LAN/public exposure
     volumes:
@@ -76,8 +77,6 @@ services:
       - ./auth_user/static:/opt/auth_user_service/app/static
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth-router.entrypoints=api,websecure"
-      - "traefik.http.services.auth-router.loadbalancer.server.port=8000"
     depends_on:
       m8_db:
         condition: service_healthy
@@ -99,8 +98,6 @@ services:
       - ./fastapi_service/static:/opt/fastapi_service/app/static
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.fastapi-service.entrypoints=api,websecure"
-      - "traefik.http.services.fastapi-service.loadbalancer.server.port=8000"
     depends_on:
       m8_db:
         condition: service_healthy
