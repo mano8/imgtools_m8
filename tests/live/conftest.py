@@ -58,12 +58,15 @@ def _detect_stack() -> dict:
         "algorithm": "HS256",
         "token_mode": "stateful",
         "has_jwks": False,
+        "redis_ok": True,
     }
 
     try:
         body = r.json()
         if "token_mode" in body:
             cfg["token_mode"] = body["token_mode"]
+        if "redis" in body:
+            cfg["redis_ok"] = body["redis"] == "ok"
     except (ValueError, KeyError):
         pass
 
@@ -443,6 +446,12 @@ def pytest_collection_modifyitems(config, items: list) -> None:  # noqa: ARG001
 
     alg = detected.get("algorithm", "HS256")
     mode = detected.get("token_mode", "stateful")
+    redis_ok = detected.get("redis_ok", True)
+
+    _redis_skip = pytest.mark.skip(
+        reason="Redis unavailable (health reports redis=unavailable) — "
+        "rate-limiting and stateful JTI store require Redis"
+    )
 
     for item in items:
         alg_marker = item.get_closest_marker("require_algorithm")
@@ -466,3 +475,14 @@ def pytest_collection_modifyitems(config, items: list) -> None:  # noqa: ARG001
                     )
                 )
             )
+            continue
+
+        if not redis_ok:
+            if item.get_closest_marker("require_redis"):
+                item.add_marker(_redis_skip)
+                continue
+            # Stateful/hybrid mode relies on the Redis JTI allowlist; skip the
+            # entire sub-suite when Redis is unavailable so failures report as
+            # SKIPPED rather than misfiring CRITICAL findings.
+            if "live_stateful" in item.keywords or "live_hybrid" in item.keywords:
+                item.add_marker(_redis_skip)

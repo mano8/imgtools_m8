@@ -130,8 +130,9 @@ class TestJ_RefreshTokenLifecycle:
             f"\n[FINDING-J04] Forged HS256 refresh (valid sig, unknown sub): "
             f"status={r.status_code}"
         )
-        # Must fail: JTI not in Redis allowlist and/or user not found
-        assert r.status_code in (401, 404), (
+        # 401/404 = correctly rejected (JTI not in allowlist or user not found)
+        # 503 = Redis unavailable (fail_closed) — token still not accepted
+        assert r.status_code in (401, 404, 503), (
             f"[CRITICAL-J04] Forged refresh token ACCEPTED: {r.status_code}"
         )
 

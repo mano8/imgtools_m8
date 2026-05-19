@@ -37,6 +37,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **`REDIS_SSL` connection pool TLS** — `ConnectionPool` now passes `ssl=settings.REDIS_SSL`. Defaults to `False`; set `REDIS_SSL=true` for Redis over TLS in staging/production. All 10 `auth.env.example` files include the option as a commented default.
 
+- **redis-py 7.x compatibility fix** — `ConnectionPool` construction now uses `**({"ssl": True} if settings.REDIS_SSL else {})` instead of `ssl=settings.REDIS_SSL`. redis-py 7.4.0 raises `TypeError` when `ssl=False` is forwarded to `AbstractConnection.__init__()`, which caused the circuit breaker to open silently at startup even with Redis healthy. The exception handler in `get_redis_client()` now logs the exception message (`error=%s`) so connection failures are diagnosable without container exec.
+
 - **Degradation contract documented** — `README.md` Infrastructure Resilience section now explicitly documents the two stable states (Redis healthy / Redis fully down), the transient inconsistency regime, and why the asymmetric fail-open/fail-closed posture is intentional. Includes observable signals (`auth_redis_circuit_breaker_open`, `auth_degraded_decision_total`, `/health/` `circuit_breaker` field).
 
 - **`/health` circuit breaker and degradation mode fields** — health endpoint now includes `circuit_breaker` (`"open"` | `"closed"`) and `degradation_modes` object showing the effective mode per control. Operators can see the degradation posture without scraping Prometheus.

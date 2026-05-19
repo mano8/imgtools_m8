@@ -343,6 +343,7 @@ class TestD_RateLimiting:
 
     pytestmark = pytest.mark.destructive
 
+    @pytest.mark.require_redis
     def test_d01_six_bad_logins_trigger_429(self):
         """5-attempt window: 6th request must be rate-limited."""
         target = f"bforce_{uuid.uuid4().hex[:8]}@redteam-test.com"
@@ -377,6 +378,7 @@ class TestD_RateLimiting:
                 return
         pytest.skip("Rate limit not hit — Redis may have been flushed")
 
+    @pytest.mark.require_redis
     def test_d03_xff_header_does_not_bypass_email_rate_limit(self):
         """Rate limit is keyed by email; X-Forwarded-For rotation must not help."""
         target = f"xffrl_{uuid.uuid4().hex[:8]}@redteam-test.com"
@@ -810,14 +812,17 @@ class TestL_CookieSecurity:
             "[FINDING-L02] refresh_token missing HttpOnly — XSS can steal it"
         )
 
-    def test_l03_refresh_token_cookie_has_samesite(self, login_resp: requests.Response):
-        """SameSite mitigates CSRF attacks against the refresh endpoint."""
+    def test_l03_refresh_token_cookie_has_samesite_strict(
+        self, login_resp: requests.Response
+    ):
+        """SameSite=Strict gives the strongest CSRF protection for a pure auth cookie."""
         raw = login_resp.headers.get("set-cookie", "")
         assert "samesite" in raw.lower(), (
             "[FINDING-L03] refresh_token missing SameSite attribute"
         )
-        assert "samesite=none" not in raw.lower(), (
-            "[FINDING-L03] SameSite=None enables cross-site refresh — needs Secure too"
+        assert "samesite=strict" in raw.lower(), (
+            "[FINDING-L03] SameSite is not Strict — cookie is weaker than required; "
+            "ensure samesite='strict' in both cookie writes in login.py"
         )
 
     def test_l04_refresh_token_not_exposed_in_response_body(
@@ -925,6 +930,7 @@ class TestM_ApiKeySecurity:
         assert body["id"] == admin_key["id"]
         assert body["name"] == admin_key["name"]
 
+    @pytest.mark.require_redis
     def test_m03_verify_returns_ratelimit_headers(self, admin_key: dict):
         r = requests.get(
             f"{self._BASE}/verify",
@@ -942,6 +948,7 @@ class TestM_ApiKeySecurity:
         assert int(h["x-ratelimit-remaining"]) >= 0
         assert int(h["x-ratelimit-reset"]) > 0
 
+    @pytest.mark.require_redis
     def test_m04_remaining_decrements_on_successive_calls(self, admin_headers: dict):
         """Each request must decrement X-RateLimit-Remaining by 1."""
         r = requests.post(
