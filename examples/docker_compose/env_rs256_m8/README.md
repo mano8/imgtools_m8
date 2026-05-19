@@ -258,6 +258,10 @@ Alert rules in `prometheus/alerts.yml` watch for API key rate-limit anomalies, h
 | `ACCESS_PUBLIC_KEY_FILE` | `/opt/keys/public.pem` — path inside the container |
 | `PRIVATE_API_SECRET` | Secret for `X-Internal-Token` header |
 | `TOKENS_ENCRYPTION_KEY` | Fernet key for encrypting refresh token payloads in Redis |
+| `LOGIN_RATE_LIMIT_REQUESTS` | Default: 5 — max login attempts per window per email |
+| `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | Default: 15 — login rate-limit window in minutes |
+| `REFRESH_RATE_LIMIT_REQUESTS` | Default: 10 — max refresh rotations per window per user |
+| `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | Default: 5 — refresh rate-limit window in minutes |
 | `METRICS_ENABLED` | `true` — exposes `/user/metrics` for Prometheus to scrape |
 
 ### `api.env` — consumer service
