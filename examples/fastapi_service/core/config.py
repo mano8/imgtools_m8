@@ -36,7 +36,7 @@ class Settings(ObservabilitySettingsMixin, CommonSettings):
     AUTH_PREFIX: str = Field(
         ..., pattern=ValidationConstants.URL_PATH_STR_REGEX.pattern
     )
-    TABLES_PREFIX: str = "dcnt"
+    TABLES_PREFIX: str = "app"
 
 
 try:
