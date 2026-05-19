@@ -28,7 +28,7 @@ import uuid
 import pytest
 import requests
 
-from tests.live.suites.auth_flows import AUTH_BASE, SVC_BASE, TIMEOUT, fresh_login
+from tests.live.suites.auth_flows import AUTH_BASE, SVC_BASE, TIMEOUT
 from tests.live.suites.token_forge import forge_alg_none
 
 pytestmark = [pytest.mark.live, pytest.mark.live_security]
@@ -427,10 +427,13 @@ class TestD_RateLimiting:
 
     @pytest.mark.require_redis
     @pytest.mark.require_token_mode("stateful", "hybrid")
-    def test_d06_refresh_rotation_rate_limited(self):
-        """Default 10-rotation window (REFRESH_RATE_LIMIT_REQUESTS): 11th refresh must be rate-limited."""
-        sess = fresh_login()
-        cookies = sess["cookies"]
+    def test_d06_refresh_rotation_rate_limited(self, regular_user: dict):
+        """Default 10-rotation window (REFRESH_RATE_LIMIT_REQUESTS): 11th refresh must be rate-limited.
+
+        Uses regular_user (not admin) to avoid exhausting the shared admin
+        refresh rate-limit bucket relied on by TestJ_RefreshTokenLifecycle.
+        """
+        cookies = regular_user["cookies"]
         statuses = []
         for _ in range(12):  # > DEFAULT_MAX_REQUESTS=10
             r = requests.post(_REFRESH_URL, cookies=cookies, timeout=TIMEOUT)
