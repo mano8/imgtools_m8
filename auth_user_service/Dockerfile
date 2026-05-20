@@ -1,5 +1,5 @@
 # ---------- BUILD STAGE ----------
-FROM python:3.11-slim AS builder
+FROM dhi.io/python:3.14-dev AS builder
 
 WORKDIR /install
 
@@ -23,7 +23,7 @@ RUN pip install --upgrade pip && \
 
 
 # ---------- RUNTIME STAGE ----------
-FROM python:3.11-slim
+FROM dhi.io/python:3.14
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
