@@ -348,6 +348,9 @@ Or use `bash init.sh` in any asymmetric stack — it generates the correct key t
 | `REDIS_USER` | yes | Redis user |
 | `REDIS_PASSWORD` | yes | Redis password |
 | `REDIS_SSL` | no | Enable TLS for the Redis connection pool (default: `false`). Set `true` when Redis is reached over a network boundary in staging/production. |
+| `REDIS_SSL_CA` | no | Path to CA certificate file. **Required when `REDIS_SSL=true`** — without it the connection pool cannot verify the server cert and will raise `CERTIFICATE_VERIFY_FAILED`. |
+| `REDIS_SSL_CERT` | no | Path to client certificate for mTLS. Must be set together with `REDIS_SSL_KEY`; cannot be set without it. |
+| `REDIS_SSL_KEY` | no | Path to client private key for mTLS. Must be set together with `REDIS_SSL_CERT`; cannot be set without it. |
 
 ### Auth & OAuth
 

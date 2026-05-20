@@ -1,9 +1,10 @@
 # ---------- BUILD STAGE ----------
-FROM python:3.11-slim AS builder
+FROM dhi.io/python:3.14-dev AS builder
 
 WORKDIR /install
 
 ARG ENVIRONMENT=prod
+ENV PIP_ROOT_USER_ACTION=ignore
 
 COPY ./fastapi_service/requirements_base.txt .
 COPY ./fastapi_service/requirements_dev.txt .
@@ -19,7 +20,7 @@ RUN pip install --upgrade pip && \
     fi
 
 # ---------- RUNTIME STAGE ----------
-FROM python:3.11-slim
+FROM dhi.io/python:3.14
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
