@@ -1,6 +1,6 @@
 # traefik.yml — Development
 log:
-  level: WARNING
+  level: WARN
 
 api:
   dashboard: true
@@ -33,15 +33,14 @@ entryPoints:
           permanent: true
   websecure:
     address: ":443"
-    http3: {}            # Enable HTTP/3
+    http3: {}            # HTTP/3 / QUIC — requires UDP port mapping (see docker-compose.yml)
     forwardedHeaders:
       trustedIPs:
         - "127.0.0.1/32"
         - "172.16.0.0/12"   # Docker bridge networks
         - "::1/128"
   api:
-    address: ":9000"
-    http3: {}
+    address: ":9000"     # Internal service-to-service entryPoint — TCP only, no HTTP/3
     forwardedHeaders:
       trustedIPs:
         - "127.0.0.1/32"

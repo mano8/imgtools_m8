@@ -4,7 +4,7 @@ Dashboard Controller
 
 from datetime import datetime, timedelta
 from sqlalchemy import case, and_
-from sqlmodel import Session, literal_column, select, func, union_all
+from sqlmodel import Session, select, func
 from auth_sdk_m8.controllers.base import BaseController
 from fastapi_service.core.deps import CurrentUser
 from fastapi_service.schemas.dashboard import RangeActivityType, UsersActivity
@@ -60,67 +60,6 @@ class DashboardController:
                 "Invalid time_range provided. Use 'hour', 'day', 'month', or 'year'."
             )
         return start, end
-
-    @staticmethod
-    def get_updates_count_by_model(
-        *, session: Session, current_user: CurrentUser, time_range: RangeActivityType
-    ) -> dict[str, int]:
-        """
-        Count the number of updates (rows with updated_at
-        within the given time range) per model.
-        If current_user.is_superuser is True, count across all rows;
-        otherwise, only count rows where the model's
-        user_id equals current_user.id. This data can be used to display
-        a bar graph on the frontend.
-
-        Args:
-            session (Session): The database session.
-            current_user (CurrentUser):
-                The current user, with an is_superuser property.
-            time_range (RangeActivityType): The time range to filter by.
-
-        Returns:
-            dict[str, int]:
-                A dictionary mapping model names (as strings)
-                to the number of updates.
-        """
-        start, end = DashboardController.get_range_activity(time_range)
-
-        # list of tuples: (model, literal model name)
-        models: list[tuple[type, str]] = [
-            (Category, "Category"),
-        ]
-
-        subqueries = []
-        for model, model_name in models:
-            # Build a subquery for each model
-            # filtering on updated_at in the range.
-            query = (
-                select(literal_column(f"'{model_name}'").label("model"))
-                .select_from(model)
-                .where(model.updated_at >= start, model.updated_at < end)
-            )
-            # If the user is not a superuser,
-            # add a filter to restrict to current user's rows.
-            if not current_user.is_superuser:
-                if model_name == "User":
-                    query = query.where(model.id == current_user.id)
-                else:
-                    query = query.where(model.owner_id == current_user.id)
-            subqueries.append(query)
-
-        # Combine all subqueries via UNION ALL.
-        union_subq = union_all(*subqueries).subquery()
-
-        # Group by model and count the number of rows per model.
-        stmt = select(
-            union_subq.c.model,
-            func.count().label("updates"),  # pylint: disable=not-callable
-        ).group_by(union_subq.c.model)
-
-        results = session.exec(stmt).all()
-        # Convert the list of tuples into a dictionary.
-        return [{"model": item[0], "value": item[1]} for item in results]
 
     @staticmethod
     def get_activity_count_by_model(
