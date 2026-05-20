@@ -76,7 +76,9 @@ _ssl_kwargs: dict[str, object] = (
     {
         "ssl": True,
         **({"ssl_ca_certs": settings.REDIS_SSL_CA} if settings.REDIS_SSL_CA else {}),
-        **({"ssl_certfile": settings.REDIS_SSL_CERT} if settings.REDIS_SSL_CERT else {}),
+        **(
+            {"ssl_certfile": settings.REDIS_SSL_CERT} if settings.REDIS_SSL_CERT else {}
+        ),
         **({"ssl_keyfile": settings.REDIS_SSL_KEY} if settings.REDIS_SSL_KEY else {}),
     }
     if settings.REDIS_SSL
