@@ -5,6 +5,7 @@ WORKDIR /install
 
 # Build arg to select environment
 ARG ENVIRONMENT=production
+ENV PIP_ROOT_USER_ACTION=ignore
 
 # Copy requirements
 COPY auth_user_service/requirements_base.txt .

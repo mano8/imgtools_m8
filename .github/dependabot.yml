@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  # GitHub Actions — keep workflow action SHAs current
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "ci"
+
+  # Python — auth_user_service dependencies
+  - package-ecosystem: "pip"
+    directory: "/auth_user_service"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "deps"
+
+  # Docker — base image (python:3.11-slim) in auth_user_service
+  - package-ecosystem: "docker"
+    directory: "/auth_user_service"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "deps"
