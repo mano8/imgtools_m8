@@ -15,7 +15,7 @@ email-validator>=2.3.0
 PyJWT>=2.12.1
 bcrypt>=5.0.0
 
-python-multipart>=0.0.28
+python-multipart>=0.0.29
 itsdangerous>=2.2.0
 
 redis>=7.4.0
