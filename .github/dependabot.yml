@@ -17,5 +17,10 @@ updates:
     commit-message:
       prefix: "deps"
 
-  # Docker — dhi.io is not tracked by Dependabot; update manually when a new
-  # dhi.io/python:3.14 patch is released or pin to a digest for reproducibility.
+  # Docker — both stages use python:3.14-slim (Docker official, Dependabot-supported)
+  - package-ecosystem: "docker"
+    directory: "/auth_user_service"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "deps"
