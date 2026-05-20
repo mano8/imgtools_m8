@@ -4,7 +4,33 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.8.0] — 2026-05-20
+
+### CI / Infrastructure
+
+- **Python 3.11–3.14 CI matrix** — GitHub Actions test job now runs against all four interpreter versions (`3.11`, `3.12`, `3.13`, `3.14`) with `fail-fast: false`, exposing version-specific regressions before they reach production.
+
+- **Bandit security job** — standalone CI job runs `bandit -r auth_user_service examples/fastapi_service --severity-level medium` on every push/PR; report uploaded as a workflow artifact. Enforces grade A (no MEDIUM/HIGH issues) as a gate.
+
+- **`FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`** — opt-in env var eliminates Node 20 deprecation warnings across all GitHub Actions workflow runs.
+
+- **`workflow_dispatch` on docker-publish** — enables manual workflow triggers without a release tag; uses a `dev` fallback tag on `workflow_dispatch` runs so the metadata action always produces a non-empty tag list. Build-and-push is skipped on manual runs (`push: false`), preventing accidental publishes.
+
+- **Docker Hub `IMAGE_NAME` corrected** — was using the default (`${{ github.repository }}`) which resolves to `mano8/fa-auth-m8`; now uses `${{ secrets.DOCKERHUB_USERNAME }}/fa-auth-m8` so the image lands in the correct Docker Hub namespace regardless of GitHub org name.
+
+- **`PIP_ROOT_USER_ACTION=ignore`** in Dockerfile builder stage — eliminates the `WARNING: Running pip as the 'root' user` noise line from every Docker build log.
+
+- **Dependabot expanded to pip** — monthly updates for `auth_user_service/requirements_*.txt`, in addition to the existing GitHub Actions SHA updates. The Docker ecosystem entry is omitted because `dhi.io` is not a Dependabot-supported registry; DHI image updates must be applied manually or via digest pinning.
+
+- **Both Dockerfiles migrated to Docker Hardened Images (DHI)** — `auth_user_service/Dockerfile` and `examples/fastapi_service/Dockerfile` now use `dhi.io/python:3.14-dev` as the builder stage and `dhi.io/python:3.14` as the runtime stage (pip-free, zero known CVEs, signed SBOM). Replaces `python:3.11-slim` in both stages across both services. `PIP_ROOT_USER_ACTION=ignore` added to `fastapi_service` builder stage to match `auth_user_service`.
+
+### Added
+
+- **Redis TLS/mTLS cert configuration** (`auth_user_service/core/deps.py`): the Redis `ConnectionPool` now passes `ssl_ca_certs`, `ssl_certfile`, and `ssl_keyfile` when the corresponding settings are provided, enabling CA verification (preventing `CERTIFICATE_VERIFY_FAILED` with self-signed Redis CAs) and optional mTLS client auth. All three kwargs are only forwarded when `REDIS_SSL=true`.
+
+- **`REDIS_SSL_CA`, `REDIS_SSL_CERT`, `REDIS_SSL_KEY` env vars in all 10 `auth.env.example` files**: the three new TLS path fields are documented as commented defaults under `REDIS_SSL`, matching the new `CommonSettings` fields added in `auth-sdk-m8`.
+
+- **Addon env files updated to HTTPS**: `examples/addon/.env.development` and `.env.production` now point to `https://localhost:4430` (matching `.env`) instead of the stale `http://localhost:8000`, ensuring the browser extension's `fetch()` calls go to the correct TLS endpoint.
 
 ### Changed
 
@@ -51,8 +77,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **`SameSite=Strict` on refresh-token cookie** — upgraded from `SameSite=Lax`. The auth service has no legitimate cross-site POST use case, so `Strict` provides the maximum CSRF protection at no functional cost.
 - **`REFRESH_TOKEN_ALGORITHM` startup enforcement** — `CommonSettings._sync_token_algorithms` now raises `ValueError` at startup if `REFRESH_TOKEN_ALGORITHM` is configured to anything other than `HS256`. Refresh tokens are internal-only and must use symmetric signing; this converts a silent misconfiguration trap into a hard startup failure.
 - **`SecurityHelper.verify_password` exception narrowed** — `except Exception` tightened to `except ValueError`; removed the dead `# return pwd_context.verify(...)` comment. Previously, bcrypt internal errors (malformed stored hash, memory fault) silently returned `False` with no log or metric, masking legitimate failures and reducing anomaly-detection sensitivity.
-
-### Added
 
 - **`auth_revocation_failure_total` Prometheus counter** (auth metrics group) — tracks token revocation failures per operation (`operation: access_blacklist | refresh_allowlist | db_session`). Emitted on every caught exception in the logout revocation path. Previously these failures were silent; they now surface in Prometheus and alert rules can be built against them.
 

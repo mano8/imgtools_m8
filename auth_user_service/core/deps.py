@@ -72,6 +72,18 @@ _redis_degraded_since: Optional[datetime] = None
 _REDIS_CIRCUIT_BREAKER_SECS = 30
 _REDIS_CONNECT_TIMEOUT_SECS = 2
 
+_ssl_kwargs: dict[str, object] = (
+    {
+        "ssl": True,
+        **({"ssl_ca_certs": settings.REDIS_SSL_CA} if settings.REDIS_SSL_CA else {}),
+        **(
+            {"ssl_certfile": settings.REDIS_SSL_CERT} if settings.REDIS_SSL_CERT else {}
+        ),
+        **({"ssl_keyfile": settings.REDIS_SSL_KEY} if settings.REDIS_SSL_KEY else {}),
+    }
+    if settings.REDIS_SSL
+    else {}
+)
 _redis_pool: Optional[ConnectionPool] = ConnectionPool(
     host=settings.REDIS_HOST,
     port=settings.REDIS_PORT,
@@ -80,9 +92,7 @@ _redis_pool: Optional[ConnectionPool] = ConnectionPool(
     decode_responses=True,
     socket_connect_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
     socket_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
-    # Only pass ssl=True — redis-py 7.x raises TypeError when ssl=False is forwarded
-    # to AbstractConnection.__init__() which does not accept a False ssl kwarg.
-    **({"ssl": True} if settings.REDIS_SSL else {}),
+    **_ssl_kwargs,
 )
 
 
