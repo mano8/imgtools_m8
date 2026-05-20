@@ -13,8 +13,8 @@ ruff>=0.15.13
 bandit>=1.9.0
 
 # Async testing
-anyio>=4.9.0
-anyio[trio]>=4.9.0
+anyio>=4.13.0
+anyio[trio]>=4.13.0
 
 # Build tools (optional but OK in dev)
 setuptools>=82.0.1
