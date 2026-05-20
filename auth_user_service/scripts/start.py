@@ -1,8 +1,10 @@
 """Container entrypoint: migrate DB, seed data, then start the server."""
 
 import os
+import signal
 import sys
 from pathlib import Path
+from subprocess import Popen
 from subprocess import run as _sp_run
 
 
@@ -13,25 +15,30 @@ def _run(cmd: list[str]) -> None:
         sys.exit(result.returncode)
 
 
+def _serve(cmd: list[str]) -> None:
+    """Start the server and forward SIGTERM/SIGINT for graceful shutdown."""
+    proc = Popen(cmd)
+
+    def _forward(signum: int, _frame: object) -> None:
+        proc.send_signal(signum)
+
+    signal.signal(signal.SIGTERM, _forward)
+    signal.signal(signal.SIGINT, _forward)
+    sys.exit(proc.wait())
+
+
 def main() -> None:
     """Prepare the database and start the ASGI server."""
     alembic_ini = "/opt/auth_user_service/alembic.ini"
     versions_dir = Path("/opt/shared_migrations/auth_user/versions")
 
-    # Generate the initial migration when the versions directory is empty.
     if not any(versions_dir.glob("*.py")):
         print("Generating initial Alembic migration...")
         _run(
             [
-                sys.executable,
-                "-m",
-                "alembic",
-                "-c",
-                alembic_ini,
-                "revision",
-                "--autogenerate",
-                "-m",
-                "Initial auth migration",
+                sys.executable, "-m", "alembic",
+                "-c", alembic_ini,
+                "revision", "--autogenerate", "-m", "Initial auth migration",
             ]
         )
     else:
@@ -46,44 +53,30 @@ def main() -> None:
     print("Creating initial data...")
     _run([sys.executable, "-m", "auth_user_service.scripts.initial_data"])
 
-    # Replace the current process so the server receives signals directly.
     trusted_ips = os.environ.get("TRUSTED_PROXY_IPS", "172.16.0.0/12")
     if os.environ.get("VSCODE_DEBUG") == "true":
         print("Starting auth_user_service under VS Code debugpy...")
-        os.execvp(
-            sys.executable,
+        _serve(
             [
-                sys.executable,
-                "-m",
-                "debugpy",
-                "--listen",
-                "0.0.0.0:5678",
+                sys.executable, "-m", "debugpy",
+                "--listen", "0.0.0.0:5678",
                 "--wait-for-client",
-                "-m",
-                "uvicorn",
-                "auth_user_service.main:app",
-                "--host",
-                "0.0.0.0",
-                "--port",
-                "8000",
-                "--reload",
+                "-m", "uvicorn", "auth_user_service.main:app",
+                "--host", "0.0.0.0",  # nosec B104
+                "--port", "8000", "--reload",
                 "--proxy-headers",
                 f"--forwarded-allow-ips={trusted_ips}",
-            ],
+            ]
         )
     else:
-        os.execvp(
-            "uvicorn",
+        _serve(
             [
-                "uvicorn",
-                "auth_user_service.main:app",
-                "--host",
-                "0.0.0.0",
-                "--port",
-                "8000",
+                "uvicorn", "auth_user_service.main:app",
+                "--host", "0.0.0.0",  # nosec B104
+                "--port", "8000",
                 "--proxy-headers",
                 f"--forwarded-allow-ips={trusted_ips}",
-            ],
+            ]
         )
 
 
