@@ -22,7 +22,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Dependabot expanded to pip** — monthly updates for `auth_user_service/requirements_*.txt`, in addition to the existing GitHub Actions SHA updates. The Docker ecosystem entry is omitted because `dhi.io` is not a Dependabot-supported registry; DHI image updates must be applied manually or via digest pinning.
 
-- **Both Dockerfiles upgraded to Python 3.14** — both builder and runtime stages now use `python:3.14-slim` (Docker official image, Dependabot-tracked, no registry authentication required). Shell startup scripts (`docker_start.sh`, `pre_start.sh`) are replaced by `scripts/start.py` in each service — a pure-Python entrypoint that handles Alembic migration checks, DB initialisation, and `os.execvp` into uvicorn, eliminating the `/bin/sh` dependency in the execution path. Numeric UID `1000:1000` via `USER 1000:1000` and `COPY --chown=1000:1000` replaces the `groupadd`/`useradd` `RUN` commands. `PIP_ROOT_USER_ACTION=ignore` added to `fastapi_service` builder to match `auth_user_service`.
+- **Both Dockerfiles upgraded to Python 3.14** — builder and runtime stages both use `python:3.14-slim` (Docker official image, Dependabot-tracked, no registry authentication required). `PIP_ROOT_USER_ACTION=ignore` added to `fastapi_service` builder to match `auth_user_service`.
+
+- **Graceful shutdown fix in both startup scripts** — `docker_start.sh` now uses `exec` before the uvicorn (and debugpy) invocation. Without `exec`, sh is PID 1 and uvicorn never receives `SIGTERM` from `docker stop`, forcing Docker to wait for the stop timeout before sending `SIGKILL`. With `exec`, uvicorn replaces sh as PID 1 and handles the signal directly.
 
 ### Added
 

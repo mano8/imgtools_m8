@@ -24,15 +24,22 @@ FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV PATH="/home/appuser/.local/bin:$PATH"
 ENV PYTHONPATH=/opt/auth_user_service
+
+RUN groupadd --gid 1000 appuser && \
+    useradd --uid 1000 --gid appuser --create-home appuser
 
 WORKDIR /opt
 
 COPY --from=builder /install /usr/local
-COPY --chown=1000:1000 ./auth_user_service ./auth_user_service
+COPY --chown=appuser:appuser ./auth_user_service ./auth_user_service
 
-USER 1000:1000
+RUN find /opt/auth_user_service/scripts -name "*.sh" -exec sed -i 's/\r$//' {} + && \
+    chmod +x /opt/auth_user_service/scripts/*.sh
+
+USER appuser
 
 EXPOSE 8000
 
-CMD ["python", "/opt/auth_user_service/scripts/start.py"]
+CMD ["./auth_user_service/scripts/docker_start.sh"]

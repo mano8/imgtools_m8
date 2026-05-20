@@ -24,19 +24,12 @@ fi
 
 # Start the FastAPI server
 if [ "$VSCODE_DEBUG" = "true" ]; then
-  echo "🔍 Starting under vscode debugpy…"
-  # Wait for VS Code to attach before running Uvicorn
-  if ! python -m debugpy \
+  echo "Starting fastapi_service under VS Code debugpy..."
+  exec python -m debugpy \
     --listen 0.0.0.0:5678 \
     --wait-for-client \
     -m uvicorn fastapi_service.main:app \
-      --host 0.0.0.0 --port 8000 --reload; then
-        echo "Uvicorn failed to start. Dropping to a shell for debugging."
-        exit 1  # Ensure the script exits if needed
-    fi
+      --host 0.0.0.0 --port 8000 --reload
 else
-    if ! uvicorn fastapi_service.main:app --host 0.0.0.0 --port 8000; then
-        echo "Uvicorn failed to start. Dropping to a shell for debugging."
-        exit 1  # Ensure the script exits if needed
-    fi
+  exec uvicorn fastapi_service.main:app --host 0.0.0.0 --port 8000
 fi
