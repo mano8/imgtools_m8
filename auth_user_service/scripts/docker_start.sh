@@ -35,24 +35,17 @@ fi
 TRUSTED_PROXY_IPS="${TRUSTED_PROXY_IPS:-172.16.0.0/12}"
 
 if [ "$VSCODE_DEBUG" = "true" ]; then
-  echo "🔍 Starting auth_user_service under vscode debugpy…"
-  # Wait for VS Code to attach before running Uvicorn
-  if ! python -m debugpy \
+  echo "Starting auth_user_service under VS Code debugpy..."
+  exec python -m debugpy \
     --listen 0.0.0.0:5678 \
     --wait-for-client \
     -m uvicorn auth_user_service.main:app \
       --host 0.0.0.0 --port 8000 --reload \
       --proxy-headers \
-      --forwarded-allow-ips="${TRUSTED_PROXY_IPS}"; then
-        echo "Uvicorn failed to start auth_user_service. Dropping to a shell for debugging."
-        exit 1  # Ensure the script exits if needed
-    fi
+      --forwarded-allow-ips="${TRUSTED_PROXY_IPS}"
 else
-    if ! uvicorn auth_user_service.main:app \
-        --host 0.0.0.0 --port 8000 \
-        --proxy-headers \
-        --forwarded-allow-ips="${TRUSTED_PROXY_IPS}"; then
-        echo "Uvicorn failed to start. Dropping to a shell for debugging."
-        exit 1  # Ensure the script exits if needed
-    fi
+  exec uvicorn auth_user_service.main:app \
+      --host 0.0.0.0 --port 8000 \
+      --proxy-headers \
+      --forwarded-allow-ips="${TRUSTED_PROXY_IPS}"
 fi

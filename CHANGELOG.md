@@ -4,7 +4,7 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
-## [0.8.0] — 2026-05-20
+## [0.8.1] — 2026-05-20
 
 ### CI / Infrastructure
 
@@ -22,7 +22,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Dependabot expanded to pip** — monthly updates for `auth_user_service/requirements_*.txt`, in addition to the existing GitHub Actions SHA updates. The Docker ecosystem entry is omitted because `dhi.io` is not a Dependabot-supported registry; DHI image updates must be applied manually or via digest pinning.
 
-- **Both Dockerfiles migrated to Docker Hardened Images (DHI)** — `auth_user_service/Dockerfile` and `examples/fastapi_service/Dockerfile` now use `dhi.io/python:3.14-dev` as the builder stage and `dhi.io/python:3.14` as the runtime stage (pip-free, zero known CVEs, signed SBOM). Replaces `python:3.11-slim` in both stages across both services. `PIP_ROOT_USER_ACTION=ignore` added to `fastapi_service` builder stage to match `auth_user_service`.
+- **Both Dockerfiles upgraded to Python 3.14** — builder and runtime stages both use `python:3.14-slim` (Docker official image, Dependabot-tracked, no registry authentication required). `PIP_ROOT_USER_ACTION=ignore` added to `fastapi_service` builder to match `auth_user_service`.
+
+- **Graceful shutdown fix in both startup scripts** — `docker_start.sh` now uses `exec` before the uvicorn (and debugpy) invocation. Without `exec`, sh is PID 1 and uvicorn never receives `SIGTERM` from `docker stop`, forcing Docker to wait for the stop timeout before sending `SIGKILL`. With `exec`, uvicorn replaces sh as PID 1 and handles the signal directly.
 
 ### Added
 
