@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/auth-user-service
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/fa-auth-m8
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
