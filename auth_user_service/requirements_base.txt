@@ -1,5 +1,5 @@
 fastapi>=0.136.1
-uvicorn>=0.46.0
+uvicorn>=0.47.0
 
 sqlmodel>=0.0.38
 sqlalchemy>=2.0.49
