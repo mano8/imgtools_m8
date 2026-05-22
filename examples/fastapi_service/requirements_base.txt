@@ -27,7 +27,7 @@ python-slugify>=8.0.4
 jinja2>=3.1.6
 
 google-auth>=2.52.0
-auth-sdk-m8>=0.6.12
+auth-sdk-m8>=0.6.13
 
 # Optional observability (required when METRICS_ENABLED=true)
 prometheus-client>=0.25.0

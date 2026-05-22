@@ -4,6 +4,127 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.8.2] — 2026-05-22 · Chrome extension auth template
+
+### Added
+
+- **`examples/addon` — Chrome extension auth template**: fully rewritten from a
+  project-specific copy into a minimal, reusable, security-reviewed template.
+  Supports three auth flows (Google OAuth, email/password, API keys) against any
+  `fa-auth-m8` backend instance.
+
+- **`GET /google-api/login-url/`** (`routes/oauth_login.py`): pure JSON endpoint
+  replacing the old Jinja2-backed `/google-api/login/` HTML page.  Accepts
+  `redirect_target` + `code_challenge` (extension PKCE), validates URI scheme
+  against `OAUTH_ALLOWED_REDIRECT_SCHEMES`, stores a unified
+  `OAuthSessionStore` session, and returns the Google OAuth URL.  Hard-rejects
+  `http://` and `https://` schemes regardless of configuration.
+
+- **`POST /google-api/exchange/`** (`routes/oauth_login.py`): one-time auth
+  code exchange endpoint.  Atomically pops the code from Redis (`GETDEL`),
+  verifies the extension PKCE `code_verifier` against the stored
+  `code_challenge` using `hmac.compare_digest`, and returns tokens.
+  Rate-limited to 10 requests/minute per client IP to prevent Redis
+  amplification.
+
+- **`ExchangeRateLimiter`** (`core/client.py`): fixed-window rate limiter keyed
+  by client IP for the `/exchange/` endpoint (10 req/60 s window).
+
+- **`CORS_ALLOWED_ORIGIN_SCHEMES` support** (`main.py`): `_build_cors_origin_regex`
+  builds a `CORSMiddleware`-compatible `allow_origin_regex` from the new SDK
+  setting, enabling scheme-level CORS for Chrome extensions.  Chrome extension
+  IDs are constrained to exactly 32 lowercase letters — fails fast at startup
+  for unsupported schemes.
+
+- **`GOOGLE_OAUTH_REDIRECT_URI`** (`core/config.py`): explicit fixed callback
+  URI for the Google OAuth callback.  Never auto-generated from the HTTP
+  request host to prevent host-spoofing.
+
+- **New OAuth settings documented in all 10 `auth.env.example` files**:
+  `GOOGLE_OAUTH_REDIRECT_URI`, `OAUTH_ALLOWED_REDIRECT_SCHEMES`,
+  `OAUTH_ALLOWED_REDIRECT_PREFIXES`, `CORS_ALLOWED_ORIGIN_SCHEMES`.
+
+### Changed
+
+- **`routes/google_auth.py`** — callback rewritten to use unified
+  `OAuthSessionStore.get()+delete()` pattern (not `GETDEL`), deliver
+  `auth_code` via URL fragment (`#auth_code=`), and accept client-supplied
+  `redirect_target` from the session payload.  Fixed `max_age` cookie bug
+  (`timedelta.seconds` → `int(timedelta.total_seconds())`).
+
+- **`core/client.py`** — `PKCEStore` replaced by `OAuthSessionStore` (unified
+  session store with `get()+delete()` semantics, 10-min TTL) and `AuthCodeStore`
+  (GETDEL single-use, 60 s TTL).  `ExchangeRateLimiter` added.
+
+- **`services/auth.py`** — `get_google_login_url` now returns
+  `tuple[str, str, str]` (OAuth URL, state, PKCE verifier).  Callers assemble
+  the `OAuthSessionStore` payload; the method no longer touches Redis directly.
+
+### Tests
+
+- **100% branch coverage** across all modified modules (983 statements, 198
+  branches, 0 missing).  488 tests pass.
+
+- **`tests/routes/test_oauth_login.py`** — new test file with full branch
+  coverage of the two new `oauth_login.py` endpoints, including PKCE
+  validation, scheme rejection, CORS origin checks, Redis unavailability,
+  rate-limit paths, and metric emission.
+
+- **`tests/core/client_test.py`** — replaced `TestPKCEStore` with
+  `TestOAuthSessionStore`, `TestAuthCodeStore`, and `TestExchangeRateLimiter`
+  covering all new store and rate-limiter behaviour.
+
+- **`tests/security/test_oauth_adversarial.py`** — rewritten to use
+  `OAuthSessionStore` patches; removed tests that patched deleted symbols.
+
+- **`tests/services/auth_test.py`** and
+  **`tests/security/test_redis_resilience.py`** — updated to unpack the new
+  `tuple[str, str, str]` return from `get_google_login_url` and remove
+  patches for symbols no longer present in `services.auth`.
+
+- **Bandit clean** — `bandit -r auth_user_service/` reports no issues
+  (Low: 0, Medium: 0, High: 0).
+
+### Removed
+
+- **`routes/oauth_login.py` (old)** — Jinja2-based `/google-api/login/` and
+  `/google-api/login_success/` HTML routes deleted.  Replaced with two clean
+  JSON endpoints.  Auth templates (`login.html`, `login_success.html`) are now
+  dead files in the deployment; operators can remove them.
+
+---
+
+## [0.8.3] — 2026-05-22 · Code quality — cyclomatic complexity
+
+### Changed
+
+- **`routes/google_auth.py`** — `google_auth_callback` refactored: extracted
+  `_inc_oauth_metric`, `_build_auth_code_payload`, and `_perform_oauth_exchange`
+  helpers to bring CCN from 14 down to 8 (Lizard limit).
+
+- **`examples/addon/src/oauth-callback.tsx`** — extracted `buildAuthStorage`
+  helper to decouple storage-object construction from the exchange flow; removes
+  a Lizard JSX-parser confusion with inline `?.`/`??` in `chrome.storage.local.set`.
+
+- **`examples/addon/src/layout/Home.tsx`** — extracted `UserInfo` sub-component
+  (avatar + name + email conditionals) to reduce `Home` CCN from 11 to 5.
+
+- **`examples/addon/src/types/shared_types.ts`** — `isValidAuthState` rewritten
+  with `.every(Boolean)` array check; replaces a chained `&&`/`||` return (CCN 11)
+  with a flat array evaluation (CCN 4) that is also easier to extend.
+
+- **`examples/addon/src/dev/chromePolyfill.ts`** — extracted
+  `getLocalStorageValues` helper from `createLocalStorageBackend`; simplified
+  `get` method to a one-liner delegate call; removed explicit `: void` return
+  type annotation (Lizard's JSX parser misidentifies function boundaries when
+  TypeScript-only return-type syntax follows `)`).
+
+### Tests
+
+- 488 tests pass.  100% branch coverage maintained (983 statements, 198 branches).
+
+---
+
 ## [0.8.1] — 2026-05-20
 
 ### CI / Infrastructure

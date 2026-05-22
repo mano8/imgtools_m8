@@ -115,45 +115,40 @@ class TestCreateState:
 
 
 class TestGetGoogleLoginUrl:
+    """AuthController.get_google_login_url returns (url, state, pkce_verifier).
+
+    Redis storage is the caller's responsibility (routes/oauth_login.py).
+    """
+
     def test_returns_google_oauth_url(self):
-        with (
-            patch("auth_user_service.services.auth.get_redis_client"),
-            patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls,
-        ):
-            mock_pkce = MagicMock()
-            mock_pkce_cls.return_value = mock_pkce
-
-            url = AuthController.get_google_login_url("http://localhost/callback")
-
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.GOOGLE_CLIENT_ID = MagicMock()
+            mock_cfg.GOOGLE_CLIENT_ID.get_secret_value.return_value = "test-client-id"
+            url, state, verifier = AuthController.get_google_login_url(
+                "http://localhost/callback"
+            )
         assert url.startswith("https://accounts.google.com/o/oauth2/v2/auth?")
         assert "response_type=code" in url
         assert "code_challenge_method=S256" in url
         assert "access_type=offline" in url
         assert "prompt=consent" in url
 
-    def test_stores_pkce_verifier(self):
-        with (
-            patch("auth_user_service.services.auth.get_redis_client"),
-            patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls,
-        ):
-            mock_pkce = MagicMock()
-            mock_pkce_cls.return_value = mock_pkce
-
-            AuthController.get_google_login_url("http://localhost/callback")
-
-        mock_pkce.store.assert_called_once()
-        state_arg, verifier_arg = mock_pkce.store.call_args[0]
-        assert isinstance(state_arg, str)
-        assert isinstance(verifier_arg, str)
+    def test_returns_state_and_pkce_verifier(self):
+        """Caller receives state and verifier to store in OAuthSessionStore."""
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.GOOGLE_CLIENT_ID = MagicMock()
+            mock_cfg.GOOGLE_CLIENT_ID.get_secret_value.return_value = "test-id"
+            url, state, verifier = AuthController.get_google_login_url(
+                "http://localhost/callback"
+            )
+        assert isinstance(state, str) and state
+        assert isinstance(verifier, str) and len(verifier) == 43
 
     def test_url_without_redirect_uri(self):
-        with (
-            patch("auth_user_service.services.auth.get_redis_client"),
-            patch("auth_user_service.services.auth.PKCEStore") as mock_pkce_cls,
-        ):
-            mock_pkce_cls.return_value = MagicMock()
-            url = AuthController.get_google_login_url()
-
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.GOOGLE_CLIENT_ID = MagicMock()
+            mock_cfg.GOOGLE_CLIENT_ID.get_secret_value.return_value = "test-id"
+            url, state, verifier = AuthController.get_google_login_url()
         assert "https://accounts.google.com/o/oauth2/v2/auth?" in url
 
 

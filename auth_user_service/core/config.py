@@ -58,6 +58,9 @@ class Settings(ObservabilitySettingsMixin, CommonSettings):
     FIRST_SUPERUSER_PASSWORD: SecretStr
     GOOGLE_CLIENT_ID: Optional[SecretStr] = None
     GOOGLE_CLIENT_SECRET: Optional[SecretStr] = None
+    # Fixed backend callback URI — must match Google Console exactly.
+    # Never auto-generated from request host to prevent host-spoofing.
+    GOOGLE_OAUTH_REDIRECT_URI: str = ""
     PRIVATE_API_SECRET: SecretStr
     TOKENS_ENCRYPTION_KEY: SecretStr
 

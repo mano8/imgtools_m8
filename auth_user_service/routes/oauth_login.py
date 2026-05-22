@@ -1,96 +1,264 @@
-"""Google Views routes."""
+"""Google OAuth2 native-app bridge — JSON-only endpoints.
 
+Two endpoints:
+  GET  /google-api/login-url/  — initiate OAuth, returns Google auth URL
+  POST /google-api/exchange/   — one-time auth code exchange for tokens
+"""
+
+import base64
+import hashlib
+import hmac
+import json
+import logging
+import re
+import uuid as _uuid
 from datetime import datetime, timezone
-import uuid
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from sqlmodel import select
 
-from auth_user_service.services.client_sessions import SessionController
-from auth_user_service.core.security import SecurityHelper
-from auth_user_service.services.auth import AuthController
-from auth_user_service.db_models.sessions import ClientSession
-from auth_user_service.core.deps import SessionDep, get_templates
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
+from urllib.parse import urlparse
+
+from auth_user_service.core.client import (
+    AuthCodeStore,
+    ExchangeRateLimiter,
+    OAuthSessionStore,
+)
 from auth_user_service.core.config import settings
+from auth_user_service.core.deps import get_redis_client
+from auth_user_service.services.auth import AuthController
+from auth_sdk_m8.observability.metrics import get as _get_metrics
 
-from auth_sdk_m8.core.exceptions import InvalidToken
-from auth_sdk_m8.schemas.auth import TokenDecodeProps
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/google-api", tags=["google-api"])
-# pylint: disable=broad-exception-caught, not-callable
+
+# RFC 7636 §4.1 code_challenge (S256, base64url, 43-128 chars).
+_CHALLENGE_RE = re.compile(r"[A-Za-z0-9\-_]{43,128}")
+# RFC 7636 §4.1 code_verifier (unreserved chars, 43-128 chars).
+_VERIFIER_RE = re.compile(r"[A-Za-z0-9\-._~]{43,128}")
+# Hard-rejected web origin schemes — auth_code must never reach a server-logged URL.
+_WEB_SCHEMES = {"http://", "https://"}
+# Maximum sizes for defensive payload caps.
+_SESSION_PAYLOAD_MAX = 4096
+_AUTH_CODE_PAYLOAD_MAX = 8192
 
 
-@router.get("/login/", response_class=HTMLResponse)
-async def google_auth_login(
-    request: Request, templates: Jinja2Templates = Depends(get_templates)
-) -> dict:
-    """Render the Google login page with the appropriate login URL."""
-    google_login_url = AuthController.get_google_login_url(
-        redirect_uri=str(request.url_for("google_auth_callback")),
-    )
-    context = {
-        "request": request,
-        "base_url": str(request.base_url),
-        "google_login_url": google_login_url,
-    }
-    return templates.TemplateResponse("auth/login.html", context)
+def _build_cors_origin_regex(schemes: list[str]) -> str | None:
+    """Build a CORSMiddleware-compatible regex from scheme list (chrome-extension only)."""
+    if not schemes:
+        return None
+    parts = []
+    for s in schemes:
+        if s == "chrome-extension://":
+            parts.append(r"chrome-extension://[a-z]{32}")
+        else:
+            return None
+    return f"^(?:{'|'.join(parts)})$"
 
 
-@router.get("/login_success/{session_id}/", response_class=HTMLResponse)
-async def google_auth_success_login(
-    response: Response,
-    request: Request,
-    session: SessionDep,
-    session_id: uuid.UUID,
-    access_token: str = Depends(SecurityHelper.get_access_token_from_cookie),
-    templates: Jinja2Templates = Depends(get_templates),
-) -> dict:
-    """Render the Google login success page."""
-    try:
-        token_data = SecurityHelper.decode_access_token(
-            token_data=TokenDecodeProps(
-                access_token=access_token,
-                secret_key=settings.ACCESS_SECRET_KEY,
-                algorithm=settings.TOKEN_ALGORITHM,
-            )
+def _verify_pkce(verifier: str, challenge: str) -> bool:
+    """Return True if S256 PKCE verifier matches challenge.
+
+    Uses hmac.compare_digest for constant-time comparison so timing cannot
+    distinguish a wrong verifier from other failure modes.
+    """
+    digest = hashlib.sha256(verifier.encode()).digest()
+    computed = base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+    return hmac.compare_digest(computed, challenge)
+
+
+def _validate_redirect_target(redirect_target: str) -> None:
+    """Validate redirect_target string, scheme, and prefix restrictions."""
+    if not redirect_target:
+        raise HTTPException(status_code=400, detail="redirect_target is required.")
+    if len(redirect_target) > 2048:
+        raise HTTPException(status_code=400, detail="redirect_target too long.")
+
+    parsed = urlparse(redirect_target)
+    scheme = f"{parsed.scheme}://"
+
+    if scheme in _WEB_SCHEMES:
+        raise HTTPException(
+            status_code=400,
+            detail="redirect_target scheme not allowed: web origins are not permitted.",
         )
-    except InvalidToken as err:
-        raise HTTPException(status_code=401, detail=str(err)) from err
+    if scheme not in settings.OAUTH_ALLOWED_REDIRECT_SCHEMES:
+        raise HTTPException(
+            status_code=400, detail="redirect_target scheme not allowed."
+        )
+    if not parsed.netloc:
+        raise HTTPException(
+            status_code=400, detail="redirect_target must include a host."
+        )
+    if settings.OAUTH_ALLOWED_REDIRECT_PREFIXES and not _uri_prefix_match_any(
+        redirect_target, settings.OAUTH_ALLOWED_REDIRECT_PREFIXES
+    ):
+        raise HTTPException(
+            status_code=400, detail="redirect_target not in allowed prefixes."
+        )
 
-    if SessionController.is_session_revoked(token_data.jti):
-        response.delete_cookie(key="access_token")
-        raise HTTPException(status_code=401, detail="Token revoked")
 
-    statement = (
-        select(ClientSession)
-        .where(token_data.sub == ClientSession.user_id)
-        .where(session_id == ClientSession.id)
+def _build_session_payload(
+    pkce_verifier: str, redirect_target: str, code_challenge: str
+) -> str:
+    """Serialise OAuth session payload and guard against oversized values."""
+    payload = json.dumps(
+        {
+            "pkce_verifier": pkce_verifier,
+            "redirect_target": redirect_target,
+            "code_challenge": code_challenge,
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+            "flow": "google",
+        }
     )
-    current_session = session.exec(statement).first()
+    if len(payload) > _SESSION_PAYLOAD_MAX:
+        raise HTTPException(status_code=400, detail="Session payload too large.")
+    return payload
 
-    if not current_session or current_session.refresh_expires_at < datetime.now(
-        timezone.utc
-    ).replace(tzinfo=None):
-        raise HTTPException(status_code=403, detail="Session expired or invalid.")
-    access_delta, refresh_delta = AuthController.get_tokens_expire()
-    access_token, refresh_token, jti = AuthController.create_auth_tokens(
-        user=current_session.user
+
+@router.get("/login-url/")
+async def get_google_login_url(
+    redirect_target: str = "",
+    code_challenge: str = "",
+) -> dict[str, str]:
+    """Return a Google OAuth2 authorization URL for the native-app flow.
+
+    The caller must supply a ``redirect_target`` (URI where the browser will be
+    redirected after Google consent) and a ``code_challenge`` (extension-side
+    S256 PKCE challenge).  The backend stores a unified session payload under
+    the OAuth ``state`` key and returns the Google auth URL.
+
+    Security:
+    - ``redirect_target`` scheme must be in ``OAUTH_ALLOWED_REDIRECT_SCHEMES``
+      (default ``chrome-extension://``).
+    - ``http://`` and ``https://`` are hard-rejected regardless of config.
+    - The extension is a public OAuth client; scheme-only validation is
+      intentional.  Set ``OAUTH_ALLOWED_REDIRECT_PREFIXES`` to restrict to
+      specific extension IDs.
+    """
+    _validate_redirect_target(redirect_target)
+    if not code_challenge:
+        raise HTTPException(status_code=400, detail="code_challenge is required.")
+    if not _CHALLENGE_RE.fullmatch(code_challenge):
+        raise HTTPException(status_code=400, detail="code_challenge format invalid.")
+
+    redis = get_redis_client()
+    if redis is None:
+        raise HTTPException(status_code=503, detail="Cache service unavailable.")
+
+    callback_uri = settings.GOOGLE_OAUTH_REDIRECT_URI or None
+    url, state, pkce_verifier = AuthController.get_google_login_url(
+        redirect_uri=callback_uri
     )
 
-    current_session.jwt_expires_at = datetime.now(timezone.utc) + access_delta
-    current_session.refresh_expires_at = datetime.now(timezone.utc) + refresh_delta
-    current_session.jwt_jti = jti
-    current_session.refresh_token_hash = SecurityHelper.hash_token(refresh_token)
-    session.add(current_session)
-    session.commit()
-    context = {
-        "request": request,
-        "base_url": str(request.base_url),
-        "session_id": str(session_id),
-        "jwt": access_token,
-        "jwt_expires": access_delta.seconds * 1000,
-        "name": current_session.user.full_name or "User",
-        "extension_id": settings.EXTENSION_ID,
-    }
-    return templates.TemplateResponse("auth/login_success.html", context)
+    session_payload = _build_session_payload(
+        pkce_verifier, redirect_target, code_challenge
+    )
+    OAuthSessionStore(redis).store(state, session_payload)
+    return {"url": url}
+
+
+def _uri_prefix_match_any(target: str, prefixes: list[str]) -> bool:
+    """Return True if *target* is under any of the given URI prefixes.
+
+    Uses netloc equality (not startswith) to prevent crafted netloc bypass
+    e.g. ``chrome-extension://abc123.evil.com/`` passing a raw-string prefix
+    check against ``chrome-extension://abc123``.
+    """
+    t = urlparse(target)
+    t_path = t.path if t.path.endswith("/") else t.path + "/"
+    for prefix in prefixes:
+        p = urlparse(prefix)
+        p_path = p.path.rstrip("/") + "/"
+        if t.scheme == p.scheme and t.netloc == p.netloc and t_path.startswith(p_path):
+            return True
+    return False
+
+
+class ExchangeRequest(BaseModel):
+    code: str
+    code_verifier: str
+    client_hint: str | None = Field(default=None, max_length=128)
+
+
+def _check_exchange_origin(request: Request) -> None:
+    """Opportunistic Origin check — not a security gate (PKCE is the control).
+
+    Rejects unexpected origins when CORS scheme allowlist is explicitly
+    configured.
+    """
+    origin = request.headers.get("origin", "")
+    if not origin or not settings.CORS_ALLOWED_ORIGIN_SCHEMES:
+        return
+    cors_regex = _build_cors_origin_regex(settings.CORS_ALLOWED_ORIGIN_SCHEMES)
+    if cors_regex and not re.fullmatch(cors_regex, origin):
+        logger.warning("exchange: unexpected Origin header: %s", origin)
+        raise HTTPException(status_code=400, detail="Origin not allowed.")
+
+
+def _pop_auth_code_payload(redis: object, code: str) -> dict:
+    """Pop auth code from store, validate size, parse JSON and return payload."""
+    raw = AuthCodeStore(redis).pop(code)  # type: ignore[arg-type]
+    if not raw:
+        _inc_exchange_metric("expired_or_invalid")
+        raise HTTPException(status_code=400, detail="Invalid or expired auth code.")
+    if len(raw) > _AUTH_CODE_PAYLOAD_MAX:
+        _inc_exchange_metric("expired_or_invalid")
+        raise HTTPException(status_code=400, detail="Invalid or expired auth code.")
+    return json.loads(raw)
+
+
+@router.post("/exchange/")
+async def exchange_auth_code(
+    request: Request,
+    body: ExchangeRequest,
+) -> dict:
+    """Exchange a one-time auth code for tokens.
+
+    The ``code`` was delivered via URL fragment to the extension's
+    ``redirect_target`` after a successful Google OAuth callback.  This
+    endpoint atomically pops the code from Redis (GETDEL) and verifies the
+    extension-supplied PKCE ``code_verifier`` against the challenge that was
+    bound to the code at login-initiation time.
+
+    Rate-limited to 10 requests/minute per client IP to prevent Redis
+    amplification from probe traffic.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+
+    redis = get_redis_client()
+    if redis is None:
+        _inc_exchange_metric("redis_unavailable")
+        raise HTTPException(status_code=503, detail="Cache service unavailable.")
+
+    if not ExchangeRateLimiter(redis).is_allowed(client_ip):
+        raise HTTPException(status_code=429, detail="Too many requests.")
+
+    if not _VERIFIER_RE.fullmatch(body.code_verifier):
+        raise HTTPException(status_code=400, detail="code_verifier format invalid.")
+
+    try:
+        _uuid.UUID(body.code)
+    except ValueError:
+        _inc_exchange_metric("expired_or_invalid")
+        raise HTTPException(status_code=400, detail="Invalid or expired auth code.")
+
+    _check_exchange_origin(request)
+
+    payload = _pop_auth_code_payload(redis, body.code)
+
+    if not _verify_pkce(body.code_verifier, payload.get("code_challenge", "")):
+        _inc_exchange_metric("pkce_failed")
+        raise HTTPException(status_code=400, detail="PKCE verification failed.")
+
+    if body.client_hint:
+        logger.debug("exchange: client_hint=%s", body.client_hint)
+
+    _inc_exchange_metric("success")
+    return {k: v for k, v in payload.items() if k != "code_challenge"}
+
+
+def _inc_exchange_metric(result: str) -> None:
+    m = _get_metrics()
+    if m and m.auth_code_exchange_total:
+        m.auth_code_exchange_total.labels(result=result).inc()
