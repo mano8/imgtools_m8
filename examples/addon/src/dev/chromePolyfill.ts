@@ -1,4 +1,23 @@
 // src/dev/chromePolyfill.ts
+
+// biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
+function getLocalStorageValues(keys: any, result: any) {
+  if (Array.isArray(keys)) {
+    for (const k of keys) {
+      const v = localStorage.getItem(k);
+      result[k] = v != null ? JSON.parse(v) : undefined;
+    }
+  } else if (typeof keys === "string") {
+    const v = localStorage.getItem(keys);
+    result[keys] = v != null ? JSON.parse(v) : undefined;
+  } else {
+    for (const k in keys) {
+      const v = localStorage.getItem(k);
+      result[k] = v != null ? JSON.parse(v) : keys[k];
+    }
+  }
+}
+
 function createLocalStorageBackend() {
     const defaultValues = {
         jwt: "test-jwt",
@@ -15,31 +34,14 @@ function createLocalStorageBackend() {
       }
   return {
     // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
-    get(
-      keys: string | string[] | Record<string, any>,
+    get(keys: any, cb: (items: any) => void) {
       // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
-      cb: (items: Record<string, any>) => void
-    ) {
-      // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
-      const result: Record<string, any> = {};
-      if (Array.isArray(keys)) {
-        for (const k of keys) {
-          const v = localStorage.getItem(k);
-          result[k] = v != null ? JSON.parse(v) : undefined;
-        }
-      } else if (typeof keys === "string") {
-        const v = localStorage.getItem(keys);
-        result[keys] = v != null ? JSON.parse(v) : undefined;
-      } else {
-        for (const k in keys) {
-          const v = localStorage.getItem(k);
-          result[k] = v != null ? JSON.parse(v) : keys[k];
-        }
-      }
+      const result: any = {};
+      getLocalStorageValues(keys, result);
       cb(result);
     },
     // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
-    set(items: Record<string, any>, cb?: () => void) {
+    set(items: any, cb?: () => void) {
       for (const [k, v] of Object.entries(items)) {
         localStorage.setItem(k, JSON.stringify(v));
       }
@@ -101,7 +103,7 @@ chrome.storage.local = createLocalStorageBackend();
 
 const changeListeners: Array<
   // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
-  (changes: Record<string, any>, areaName: string) => void
+  (changes: { [k: string]: any }, areaName: string) => void
 > = [];
 
 chrome.storage.onChanged = {
@@ -118,7 +120,7 @@ chrome.storage.onChanged = {
 const originalSet = chrome.storage.local.set;
 chrome.storage.local.set = (items, cb) => {
   // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
-  const changes: Record<string, any> = {};
+  const changes: { [k: string]: any } = {};
 
   for (const [key, newValue] of Object.entries(items)) {
     const oldRaw = localStorage.getItem(key);

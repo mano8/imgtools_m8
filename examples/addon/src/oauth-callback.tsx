@@ -18,10 +18,58 @@ import { getApiUrl } from './utils/utils';
 
 const EXCHANGE_URL = getApiUrl('/google-api/exchange/');
 
+async function getCodeVerifier(flowId: string) {
+  const session = await chrome.storage.session.get('oauth_flows');
+  const flows = (session.oauth_flows ?? {}) as Record<string, string>;
+  const verifier = flows[flowId] ?? '';
+  // Remove only this flow's verifier — concurrent flows are unaffected.
+  const remaining = { ...flows };
+  delete remaining[flowId];
+  await chrome.storage.session.set({ oauth_flows: remaining });
+  return verifier;
+}
+
+function buildAuthStorage(data: Record<string, unknown>) {
+  const u = (data.user ?? {}) as Record<string, unknown>;
+  return {
+    auth: {
+      accessToken: data.access_token as string,
+      expiresAt: data.expires_at as number,
+      sessionId: crypto.randomUUID(),
+      tokenType: 'bearer' as const,
+      loginTimestamp: Date.now(),
+    },
+    user: {
+      name: typeof u.name === 'string' ? u.name : '',
+      email: typeof u.email === 'string' ? u.email : '',
+      avatar: typeof u.avatar === 'string' ? u.avatar : '',
+    },
+  };
+}
+
+async function exchangeAndStore(authCode: string, codeVerifier: string) {
+  const res = await fetch(EXCHANGE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: authCode, code_verifier: codeVerifier }),
+  });
+  if (!res.ok) return false;
+
+  const data = (await res.json()) as Record<string, unknown>;
+  if (
+    typeof data.access_token !== 'string' ||
+    (data.access_token as string).split('.').length !== 3
+  ) {
+    return false;
+  }
+
+  await chrome.storage.local.set(buildAuthStorage(data));
+  return true;
+}
+
 async function handleCallback(): Promise<void> {
   const hashParams = new URLSearchParams(location.hash.slice(1));
   const authCode = hashParams.get('auth_code');
-
   const queryParams = new URLSearchParams(location.search);
   const flowId = queryParams.get('flow_id');
 
@@ -33,14 +81,9 @@ async function handleCallback(): Promise<void> {
     return;
   }
 
-  // Retrieve per-flow PKCE verifier then clean up only this flow's entry.
   let codeVerifier = '';
   try {
-    const session = await chrome.storage.session.get('oauth_flows');
-    const flows = (session.oauth_flows ?? {}) as Record<string, string>;
-    codeVerifier = flows[flowId] ?? '';
-    const { [flowId]: _removed, ...remaining } = flows;
-    await chrome.storage.session.set({ oauth_flows: remaining });
+    codeVerifier = await getCodeVerifier(flowId);
   } catch {
     window.close();
     return;
@@ -52,42 +95,7 @@ async function handleCallback(): Promise<void> {
   }
 
   try {
-    const res = await fetch(EXCHANGE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: authCode, code_verifier: codeVerifier }),
-    });
-
-    if (!res.ok) {
-      window.close();
-      return;
-    }
-
-    const data = await res.json();
-
-    // Reject structurally invalid JWTs before storing.
-    if (
-      typeof data.access_token !== 'string' ||
-      data.access_token.split('.').length !== 3
-    ) {
-      window.close();
-      return;
-    }
-
-    await chrome.storage.local.set({
-      auth: {
-        accessToken: data.access_token,
-        expiresAt: data.expires_at,
-        sessionId: crypto.randomUUID(),
-        tokenType: 'bearer',
-        loginTimestamp: Date.now(),
-      },
-      user: {
-        name: data.user?.name ?? '',
-        email: data.user?.email ?? '',
-        avatar: data.user?.avatar ?? '',
-      },
-    });
+    await exchangeAndStore(authCode, codeVerifier);
   } finally {
     try {
       window.close();

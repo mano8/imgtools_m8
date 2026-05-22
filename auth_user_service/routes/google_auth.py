@@ -92,6 +92,84 @@ def _build_redirect_response(
     return response
 
 
+def _inc_oauth_metric(result: str) -> None:
+    """Increment oauth_attempts_total counter for the Google provider."""
+    _m = _get_metrics()
+    if _m and _m.oauth_attempts_total:
+        _m.oauth_attempts_total.labels(provider="google", result=result).inc()
+
+
+def _build_auth_code_payload(
+    user: object,
+    access_token: str,
+    access_delta: timedelta,
+    code_challenge: str,
+) -> tuple[str, str]:
+    """Return (auth_code UUID, JSON payload) for the one-time auth code bridge."""
+    expires_at_ms = int((datetime.now(timezone.utc) + access_delta).timestamp() * 1000)
+    auth_code = str(_uuid.uuid4())
+    auth_payload = json.dumps(
+        {
+            "version": 1,
+            "auth_provider": "google",
+            "access_token": access_token,
+            "expires_at": expires_at_ms,
+            "user": {
+                # Bounded to prevent oversized Redis payloads / UI rendering issues.
+                "name": (user.full_name or "")[:128],  # type: ignore[attr-defined]
+                "email": (user.email or "")[:254],  # type: ignore[attr-defined]
+                "avatar": (user.avatar or "")[:512],  # type: ignore[attr-defined]
+            },
+            "code_challenge": code_challenge,
+        }
+    )
+    return auth_code, auth_payload
+
+
+async def _perform_oauth_exchange(
+    session: SessionDep,
+    redis: object,
+    code: str,
+    code_verifier: str,
+    callback_uri: str,
+    redirect_target: str,
+    code_challenge: str,
+    state: str,
+) -> RedirectResponse:
+    """Exchange Google auth code for tokens, store auth_code, return redirect."""
+    oauth_token = await OAuthController.get_google_access_token(
+        code=code,
+        code_verifier=code_verifier,
+        redirect_uri=callback_uri,
+    )
+    user = _get_or_create_user(session, oauth_token)
+    access_token, refresh_token, jti = AuthController.create_auth_tokens(user=user)
+    access_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    AuthController.create_auth_session(
+        session=session,
+        user=user,
+        jti=jti,
+        refresh_token=refresh_token,
+        external_token=ExternalTokensData(
+            expires=oauth_token.expires_in,  # type: ignore[attr-defined]
+            access=SecretStr(oauth_token.access_token),  # type: ignore[attr-defined]
+            refresh=SecretStr(oauth_token.refresh_token),  # type: ignore[attr-defined]
+        ),
+    )
+    if not settings.is_stateless:
+        RedisRefreshStore(redis).register(jti, _REFRESH_TTL_SECONDS)  # type: ignore[arg-type]
+    SessionController.purge_expired_sessions(session=session, current_user=user)
+    auth_code, auth_payload = _build_auth_code_payload(
+        user, access_token, access_delta, code_challenge
+    )
+    AuthCodeStore(redis).store(auth_code, auth_payload)  # type: ignore[arg-type]
+    # Consume session only after auth_code is safely stored.
+    OAuthSessionStore(redis).delete(state)  # type: ignore[arg-type]
+    return _build_redirect_response(
+        redirect_target, auth_code, access_token, refresh_token, access_delta
+    )
+
+
 @router.get("/oauth-callback/")
 async def google_auth_callback(
     request: Request,
@@ -112,7 +190,6 @@ async def google_auth_callback(
                 status_code=503,
                 detail="Cache service unavailable. Cannot complete OAuth flow.",
             )
-        # CSRF check: get() without consuming. If state is unknown/expired → 400.
         oauth_session = _get_oauth_session(redis, state)
         code_verifier: str = oauth_session.get("pkce_verifier", "")
         redirect_target: str = oauth_session.get("redirect_target", "")
@@ -129,78 +206,21 @@ async def google_auth_callback(
     )
 
     try:
-        oauth_token = await OAuthController.get_google_access_token(
-            code=code,
-            code_verifier=code_verifier,
-            redirect_uri=callback_uri,
+        response = await _perform_oauth_exchange(
+            session,
+            redis,
+            code,
+            code_verifier,
+            callback_uri,
+            redirect_target,
+            code_challenge,
+            state,
         )
-
-        user = _get_or_create_user(session, oauth_token)
-        access_token, refresh_token, jti = AuthController.create_auth_tokens(user=user)
-        access_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-
-        AuthController.create_auth_session(
-            session=session,
-            user=user,
-            jti=jti,
-            refresh_token=refresh_token,
-            external_token=ExternalTokensData(
-                expires=oauth_token.expires_in,
-                access=SecretStr(oauth_token.access_token),
-                refresh=SecretStr(oauth_token.refresh_token),
-            ),
-        )
-
-        if not settings.is_stateless:
-            RedisRefreshStore(redis).register(jti, _REFRESH_TTL_SECONDS)
-
-        SessionController.purge_expired_sessions(session=session, current_user=user)
-
-        # expires_at = absolute epoch ms (not duration) — extension stores this directly.
-        expires_at_ms = int(
-            (datetime.now(timezone.utc) + access_delta).timestamp() * 1000
-        )
-        auth_code = str(_uuid.uuid4())
-        auth_payload = json.dumps(
-            {
-                "version": 1,
-                "auth_provider": "google",
-                "access_token": access_token,
-                "expires_at": expires_at_ms,
-                "user": {
-                    # Bounded to prevent oversized Redis payloads / UI rendering issues.
-                    "name": (user.full_name or "")[:128],
-                    "email": (user.email or "")[:254],
-                    "avatar": (user.avatar or "")[:512],
-                },
-                "code_challenge": code_challenge,
-            }
-        )
-        AuthCodeStore(redis).store(auth_code, auth_payload)
-
-        # Consume session only after auth_code is safely stored.
-        # If any earlier step failed we never reach this line — session stays valid for retry.
-        OAuthSessionStore(redis).delete(state)
-
-        # auth_code delivered via fragment — never appears in server/proxy logs.
-        # SameSite note: cookies set on a chrome-extension:// redirect may be dropped
-        # by the browser. This is harmless — the extension uses the auth_code, not cookies.
-        # Cookies remain for SPA clients that share this backend.
-        response = _build_redirect_response(
-            redirect_target, auth_code, access_token, refresh_token, access_delta
-        )
-
-        _m = _get_metrics()
-        if _m and _m.oauth_attempts_total:
-            _m.oauth_attempts_total.labels(provider="google", result="success").inc()
-
+        _inc_oauth_metric("success")
         return response
-
     except HTTPXError as ex:
         logger.error("Google token exchange failed: %s", ex)
-        _m = _get_metrics()
-        if _m and _m.oauth_attempts_total:
-            _m.oauth_attempts_total.labels(provider="google", result="failed").inc()
+        _inc_oauth_metric("failed")
         raise HTTPException(
             status_code=400, detail="Token exchange with Google failed."
         ) from ex
@@ -208,7 +228,5 @@ async def google_auth_callback(
         raise
     except Exception as ex:
         logger.exception("Unexpected error during Google OAuth callback")
-        _m = _get_metrics()
-        if _m and _m.oauth_attempts_total:
-            _m.oauth_attempts_total.labels(provider="google", result="failed").inc()
+        _inc_oauth_metric("failed")
         raise HTTPException(status_code=500, detail="Authentication error.") from ex

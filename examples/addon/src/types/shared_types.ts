@@ -20,16 +20,17 @@ export interface AuthStorage {
 export function isValidAuthState(v: unknown): v is AuthStorage {
   if (typeof v !== 'object' || v === null) return false;
   const s = v as Record<string, unknown>;
-  const auth = s.auth as Record<string, unknown> | undefined;
-  const user = s.user as Record<string, unknown> | undefined;
-  return (
-    typeof auth?.accessToken === 'string' &&
-    typeof auth?.expiresAt === 'number' &&
-    typeof auth?.sessionId === 'string' &&
-    (auth?.tokenType === 'bearer' || auth?.tokenType === 'apikey') &&
-    typeof auth?.loginTimestamp === 'number' &&
-    typeof user?.name === 'string' &&
-    typeof user?.email === 'string' &&
-    typeof user?.avatar === 'string'
-  );
+  const a = s.auth as Record<string, unknown> | undefined;
+  const u = s.user as Record<string, unknown> | undefined;
+  const tokenTypeOk = a?.tokenType === 'bearer' || a?.tokenType === 'apikey';
+  return [
+    typeof a?.accessToken === 'string',
+    typeof a?.expiresAt === 'number',
+    typeof a?.sessionId === 'string',
+    tokenTypeOk,
+    typeof a?.loginTimestamp === 'number',
+    typeof u?.name === 'string',
+    typeof u?.email === 'string',
+    typeof u?.avatar === 'string',
+  ].every(Boolean);
 }
