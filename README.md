@@ -773,4 +773,4 @@ Alert rules for `stateful_m8`, `env_rs256_m8`, and `vault_rs256_postgres_m8` sta
 
 ## License
 
-MIT © Eli Serra
+Apache2 © Eli Serra
