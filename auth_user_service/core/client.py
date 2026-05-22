@@ -149,38 +149,60 @@ class RedisRateLimiter:
         return first_result or RateLimitResult(allowed=True)
 
 
-class PKCEStore:
+class OAuthSessionStore:
+    """Unified OAuth session store per state token.
+
+    Replaces the old PKCEStore. Stores a JSON payload per OAuth state key:
+    {pkce_verifier, redirect_target, code_challenge, created_at, flow}.
+
+    Uses get()+delete() — NOT GETDEL — so that transient Google exchange
+    failures do not permanently destroy the session. The 10-minute TTL acts
+    as the automatic expiry; explicit delete() is called only on success.
+
+    Requires Redis >= 6.2 (existing project-wide hard dependency).
     """
-    Persistent store for PKCE code_verifiers, using Redis with TTL.
-    """
+
+    PREFIX: Final[str] = "oauth_session:"
+    TTL: Final[timedelta] = timedelta(minutes=10)
 
     def __init__(self, client: Redis) -> None:
-        """
-        Initialize the RedisRateLimiter.
-
-        Args:
-            client (Redis, optional): Redis client. If None, use default from core.deps.
-        """
         self.client = client
 
-    PREFIX = "pkce:"
-    TTL = timedelta(minutes=10)
+    def store(self, state: str, payload: str) -> None:
+        """Store the session JSON payload for *state* with a 10-min TTL."""
+        self.client.setex(self.PREFIX + state, self.TTL, payload)
 
-    def store(self, state: str, code_verifier: str) -> None:
-        """
-        Store the code_verifier in Redis with a TTL.
-        """
-        key = self.PREFIX + state
-        self.client.setex(key, self.TTL, code_verifier)
+    def get(self, state: str) -> Optional[str]:
+        """Read session without consuming — used for CSRF validation."""
+        return self.client.get(self.PREFIX + state)
 
-    def pop(self, state: str) -> Optional[str]:
-        """Atomically retrieve and delete the code_verifier for *state*.
+    def delete(self, state: str) -> None:
+        """Consume session after successful exchange — called only on auth success."""
+        self.client.delete(self.PREFIX + state)
 
-        Uses GETDEL so a concurrent second callback with the same state
-        cannot retrieve the verifier after the first caller has taken it.
-        Returns None if the state is unknown or already consumed.
-        """
-        return self.client.getdel(self.PREFIX + state)
+
+class AuthCodeStore:
+    """One-time auth code bridge for the native-app OAuth flow.
+
+    Stores a versioned JSON payload under a UUID key with a 60s TTL.
+    Uses GETDEL for atomic single-use replay protection — requires Redis >= 6.2.
+    The code_challenge from OAuthSessionStore is carried in this payload so that
+    /exchange/ can verify the extension's code_verifier without an extra lookup.
+    """
+
+    PREFIX: Final[str] = "auth_code:"
+    TTL: Final[timedelta] = timedelta(seconds=60)
+
+    def __init__(self, client: Redis) -> None:
+        self.client = client
+
+    def store(self, code: str, payload: str) -> None:
+        """Store the auth code payload with a 60s TTL."""
+        self.client.setex(self.PREFIX + code, self.TTL, payload)
+
+    def pop(self, code: str) -> Optional[str]:
+        """Atomically retrieve and delete — prevents replay under concurrent requests."""
+        return self.client.getdel(self.PREFIX + code)
 
 
 class LoginRateLimiter:
@@ -260,6 +282,40 @@ class RefreshRateLimiter:
         the request rate, not just reject bad tokens.
         """
         key = self._key(user_id)
+        count = self.client.incr(key)
+        if count == 1:
+            self.client.expire(key, self.window_seconds)
+        return count <= self.max_requests
+
+
+class ExchangeRateLimiter:
+    """Fixed-window rate limiter for the /exchange/ endpoint, keyed by client IP.
+
+    Prevents Redis amplification from spammed invalid-code probing requests.
+    """
+
+    DEFAULT_MAX_REQUESTS: Final[int] = 10
+    DEFAULT_WINDOW_SECONDS: Final[int] = 60
+    PREFIX: Final[str] = "exchange:attempts:"
+    MAX_ID_LEN: Final[int] = 45  # covers IPv4 + IPv6 + port
+
+    def __init__(
+        self,
+        client: Redis,
+        max_requests: int = DEFAULT_MAX_REQUESTS,
+        window_seconds: int = DEFAULT_WINDOW_SECONDS,
+    ) -> None:
+        self.client = client
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+
+    def _key(self, ip: str) -> str:
+        safe = "".join(c for c in ip if c.isprintable())
+        return f"{self.PREFIX}{safe[: self.MAX_ID_LEN]}"
+
+    def is_allowed(self, ip: str) -> bool:
+        """Increment attempt counter and return True if still within limit."""
+        key = self._key(ip)
         count = self.client.incr(key)
         if count == 1:
             self.client.expire(key, self.window_seconds)

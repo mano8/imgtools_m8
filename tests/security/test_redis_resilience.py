@@ -144,24 +144,12 @@ class TestGetRedisClientResilience:
 
 
 class TestGoogleOAuthRedisRequirement:
-    """PKCE requires Redis — must fail closed with 503 when Redis is down."""
+    """Google OAuth URL generation; Redis resilience is enforced in the route layer.
 
-    def test_raises_503_when_redis_unavailable(self):
-        with patch(
-            "auth_user_service.services.auth.get_redis_client", return_value=None
-        ):
-            with pytest.raises(HTTPException) as exc_info:
-                AuthController.get_google_login_url("http://localhost/callback")
-        assert exc_info.value.status_code == 503
-
-    def test_503_detail_mentions_redis(self):
-        with patch(
-            "auth_user_service.services.auth.get_redis_client", return_value=None
-        ):
-            with pytest.raises(HTTPException) as exc_info:
-                AuthController.get_google_login_url("http://localhost/callback")
-        detail = exc_info.value.detail.lower()
-        assert "redis" in detail or "unavailable" in detail
+    The service (AuthController.get_google_login_url) returns (url, state, verifier)
+    without touching Redis.  Redis-level 503 behaviour is tested in
+    tests/routes/test_oauth_login.py::TestGetGoogleLoginUrl::test_redis_unavailable_raises_503.
+    """
 
     def test_raises_503_when_google_not_configured(self):
         with patch("auth_user_service.services.auth.settings") as mock_cfg:
@@ -170,19 +158,25 @@ class TestGoogleOAuthRedisRequirement:
                 AuthController.get_google_login_url("http://localhost/callback")
         assert exc_info.value.status_code == 503
 
-    def test_succeeds_and_calls_pkce_store_when_redis_available(self):
-        mock_redis = MagicMock()
-        mock_pkce = MagicMock()
-        with (
-            patch(
-                "auth_user_service.services.auth.get_redis_client",
-                return_value=mock_redis,
-            ),
-            patch("auth_user_service.services.auth.PKCEStore", return_value=mock_pkce),
-        ):
-            url = AuthController.get_google_login_url("http://localhost/callback")
+    def test_503_detail_mentions_google_when_not_configured(self):
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.GOOGLE_CLIENT_ID = None
+            with pytest.raises(HTTPException) as exc_info:
+                AuthController.get_google_login_url("http://localhost/callback")
+        detail = exc_info.value.detail.lower()
+        assert "google" in detail or "configured" in detail or "unavailable" in detail
+
+    def test_returns_url_state_verifier_triple(self):
+        """Service returns all three values; caller stores verifier in OAuthSessionStore."""
+        with patch("auth_user_service.services.auth.settings") as mock_cfg:
+            mock_cfg.GOOGLE_CLIENT_ID = MagicMock()
+            mock_cfg.GOOGLE_CLIENT_ID.get_secret_value.return_value = "test-id"
+            result = AuthController.get_google_login_url("http://localhost/callback")
+        assert isinstance(result, tuple) and len(result) == 3
+        url, state, verifier = result
         assert url.startswith("https://accounts.google.com")
-        mock_pkce.store.assert_called_once()
+        assert isinstance(state, str) and state
+        assert isinstance(verifier, str) and verifier
 
 
 class TestLoginFailOpen:

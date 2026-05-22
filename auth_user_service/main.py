@@ -217,9 +217,36 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+def _build_cors_origin_regex(schemes: list) -> str | None:
+    """Build a CORSMiddleware allow_origin_regex from a list of URI schemes.
+
+    Only chrome-extension:// is supported. Chrome extension IDs are exactly
+    32 lowercase letters. Fails fast at startup for unsupported schemes so
+    operators are not silently given an over-permissive CORS policy.
+    Returns None when the scheme list is empty (no extension CORS needed).
+    """
+    if not schemes:
+        return None
+    parts = []
+    for s in schemes:
+        if s == "chrome-extension://":
+            parts.append(r"chrome-extension://[a-z]{32}")
+        else:
+            raise ValueError(
+                f"CORS_ALLOWED_ORIGIN_SCHEMES: unsupported scheme '{s}'. "
+                "Only 'chrome-extension://' is supported in this template."
+            )
+    # Single anchored group — prevents partial-match bypass.
+    return f"^(?:{'|'.join(parts)})$"
+
+
+_cors_origin_regex = _build_cors_origin_regex(settings.CORS_ALLOWED_ORIGIN_SCHEMES)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origin_regex=_cors_origin_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],

@@ -3,6 +3,8 @@
 ![CI/CD](https://github.com/mano8/fa-auth-m8/actions/workflows/CI.yaml/badge.svg?branch=main)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/edab51cc8805468fb3884e1d9e57ccdc)](https://app.codacy.com/gh/mano8/fa-auth-m8/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![codecov](https://codecov.io/gh/mano8/fa-auth-m8/graph/badge.svg?token=LH7GTT2JZY)](https://codecov.io/gh/mano8/fa-auth-m8)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tepochtli/fa-auth-m8)](https://hub.docker.com/r/tepochtli/fa-auth-m8)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/mano8/fa-auth-m8/blob/main/LICENSE)
 
 A self-contained FastAPI authentication microservice designed to run as a Docker container via Docker Compose. It provides JWT-based authentication, Google OAuth2 with PKCE, session management, user management, API key management, and private inter-service endpoints — ready to integrate with any Docker-based microservice project.
 
@@ -19,6 +21,7 @@ The included example stacks use `_m8` in their names as a personal naming conven
 - [Docker Compose Stacks](#docker-compose-stacks)
 - [API Endpoints](#api-endpoints)
 - [Quick Start](#quick-start)
+- [Docker Hub image](#docker-hub-image)
 - [Choosing a Database](#choosing-a-database)
 - [Environment Variables](#environment-variables)
 - [Infrastructure Resilience](#infrastructure-resilience)
@@ -126,8 +129,8 @@ All routes are prefixed with `API_PREFIX` (default `/user`).
 | login | POST | `/login/refresh-token/` | — | Refresh access token from HttpOnly cookie |
 | login | POST | `/login/logout/` | JWT | Revoke session, blacklist JTI, clear cookie |
 | login | POST | `/login/test-token/` | JWT | Validate access token, return current user |
-| google-api | GET | `/google-api/login/` | — | Render Google login page |
-| google-api | GET | `/google-api/login_success/{session_id}/` | JWT cookie | Render OAuth success page |
+| google-api | GET | `/google-api/login-url/` | — | Return Google OAuth2 authorization URL (native-app PKCE flow) |
+| google-api | POST | `/google-api/exchange/` | — | One-time auth code exchange for tokens (PKCE verified, GETDEL atomic) |
 | google-auth | GET | `/google-auth/oauth-callback/` | — | Google OAuth2 PKCE callback — exchange code, create/update user |
 | profile | GET | `/profile/get/me/` | JWT | Read own profile |
 | profile | PATCH | `/profile/update/me/` | JWT | Update own profile |
@@ -257,6 +260,54 @@ The example stacks are ready-to-copy templates. To use one as the base for a new
 - In `docker-compose.yml`, rename the Docker services and internal network to match your project.
 - Update all `changethis` values in the env files.
 - Add your own microservices to `docker-compose.yml` on the same internal network.
+
+---
+
+## Docker Hub image
+
+The published image is available at:
+
+```bash
+docker pull tepochtli/fa-auth-m8:latest
+```
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/tepochtli/fa-auth-m8)](https://hub.docker.com/r/tepochtli/fa-auth-m8)
+
+### Tags
+
+| Tag | Description |
+| --- | ----------- |
+| `latest` | Latest release from the `main` branch |
+| `x.y.z` (e.g. `0.8.2`) | Pinned release — recommended for production |
+
+### Using the published image in a Compose stack
+
+The example stacks under `examples/docker_compose/` use `build:` to build the
+service image locally from source. To use the published image instead, replace
+the `build:` block in the `auth_user_service` service with an `image:` line:
+
+```yaml
+# Replace this:
+auth_user_service:
+  build:
+    context: ../../../
+    dockerfile: ./auth_user_service/Dockerfile
+
+# With this:
+auth_user_service:
+  image: tepochtli/fa-auth-m8:0.8.2   # pin to a specific release for production
+```
+
+All env files, volumes, labels, and `depends_on` entries remain unchanged —
+only the `build:` block is replaced.
+
+### When to build locally vs. use the published image
+
+| Scenario | Recommendation |
+| -------- | -------------- |
+| Production deployment | `image: tepochtli/fa-auth-m8:x.y.z` — pinned, reproducible |
+| Evaluating or quick start | `image: tepochtli/fa-auth-m8:latest` — always current |
+| Active development / custom changes | `build:` (default in example stacks) — local source |
 
 ---
 

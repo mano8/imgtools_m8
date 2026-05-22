@@ -16,9 +16,7 @@ from auth_user_service.services.client_sessions import SessionController
 from auth_user_service.services.users import UserController
 from auth_user_service.db_models.users import User
 from auth_user_service.db_models.sessions import ClientSessionCreate, ClientSession
-from auth_user_service.core.client import PKCEStore
 from auth_user_service.core.config import settings
-from auth_user_service.core.deps import get_redis_client
 from auth_user_service.core.security import SecurityHelper
 
 from fastapi import HTTPException
@@ -94,37 +92,31 @@ class AuthController:
         return secrets.token_urlsafe(16)
 
     @classmethod
-    def get_google_login_url(cls, redirect_uri: Optional[str] = None) -> str:
-        """
-        Generates the Google OAuth2 login URL with PKCE parameters.
+    def get_google_login_url(
+        cls, redirect_uri: Optional[str] = None
+    ) -> tuple[str, str, str]:
+        """Return (oauth_url, state, pkce_verifier) for Google OAuth2 with PKCE.
+
+        The caller is responsible for assembling the OAuthSessionStore payload
+        (which combines pkce_verifier with the client-supplied redirect_target
+        and code_challenge) and storing it before redirecting the user.
 
         Args:
-            redirect_uri: The OAuth2 callback URI registered in Google API Console.
-
-        Returns:
-            A redirect URL string for initiating Google OAuth2 with PKCE.
+            redirect_uri: Fixed backend callback URI (from GOOGLE_OAUTH_REDIRECT_URI).
         """
         if not settings.GOOGLE_CLIENT_ID:
             raise HTTPException(
                 status_code=503, detail="Google OAuth is not configured."
             )
-        redis = get_redis_client()
-        if redis is None:
-            raise HTTPException(
-                status_code=503,
-                detail="Google OAuth requires Redis which is currently unavailable.",
-            )
         state = cls.create_state()
         code_verifier = cls.generate_code_verifier()
         code_challenge = cls.generate_code_challenge(code_verifier)
-        pkce_store = PKCEStore(redis)
-        pkce_store.store(state, code_verifier)
 
         params = {
             "response_type": "code",
             "client_id": settings.GOOGLE_CLIENT_ID.get_secret_value(),
             "redirect_uri": redirect_uri,
-            "scope": "openid email profile https://www.googleapis.com/auth/forms.body.readonly",
+            "scope": "openid email profile",
             "state": state,
             "access_type": "offline",
             "prompt": "consent",
@@ -134,7 +126,11 @@ class AuthController:
         query = "&".join(
             f"{k}={quote_plus(v)}" for k, v in params.items() if v is not None
         )
-        return f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
+        return (
+            f"https://accounts.google.com/o/oauth2/v2/auth?{query}",
+            state,
+            code_verifier,
+        )
 
     @staticmethod
     def authenticate(*, session: Session, email: str, password: str) -> Optional[User]:

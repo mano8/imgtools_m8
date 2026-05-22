@@ -1,7 +1,9 @@
-"""AddOn extension auth."""
+"""Google OAuth2 callback — native-app auth code bridge."""
 
+import json
 import logging
-from datetime import timedelta
+import uuid as _uuid
+from datetime import datetime, timedelta, timezone
 from httpx import HTTPError as HTTPXError
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -13,7 +15,11 @@ from auth_user_service.core.deps import SessionDep
 from auth_user_service.services.client_sessions import SessionController
 from auth_user_service.services.users import UserController
 from auth_user_service.services.oauth import OAuthController
-from auth_user_service.core.client import PKCEStore, RedisRefreshStore
+from auth_user_service.core.client import (
+    AuthCodeStore,
+    OAuthSessionStore,
+    RedisRefreshStore,
+)
 from auth_user_service.core.deps import get_redis_client
 from auth_user_service.core.config import settings
 from auth_sdk_m8.observability.metrics import get as _get_metrics
@@ -36,15 +42,11 @@ async def google_auth_callback(
     code: str,
     state: str,
 ):
-    """
-    Handle Google OAuth2 callback: exchange code for tokens,
-    create or retrieve user, generate internal JWTs,
-    persist session (internal + external tokens), and redirect.
+    """Handle Google OAuth2 callback: exchange code → issue auth_code → redirect extension.
 
-    Args:
-        code: OAuth2 authorization code from Google.
-        session: DB session dependency.
-        state: Anti-CSRF / PKCE state parameter.
+    CSRF check: OAuthSessionStore.get(state) returning None is the CSRF guard.
+    Uses get()+delete() NOT GETDEL — transient failures don't destroy the session.
+    Delivers auth_code via URL fragment (#auth_code=) to avoid server/proxy logging.
     """
     try:
         redis = get_redis_client()
@@ -53,23 +55,33 @@ async def google_auth_callback(
                 status_code=503,
                 detail="Cache service unavailable. Cannot complete OAuth flow.",
             )
-        code_verifier = PKCEStore(redis).pop(state)
-        if not code_verifier:
+        # CSRF check: get() without consuming. If state is unknown/expired → 400.
+        raw_session = OAuthSessionStore(redis).get(state)
+        if not raw_session:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid or expired state parameter",
             )
+        oauth_session = json.loads(raw_session)
+        code_verifier: str = oauth_session.get("pkce_verifier", "")
+        redirect_target: str = oauth_session.get("redirect_target", "")
+        code_challenge: str = oauth_session.get("code_challenge", "")
     except HTTPException:
         raise
     except Exception as ex:
-        logger.error("PKCE state lookup failed: %s", ex)
+        logger.error("OAuth session lookup failed: %s", ex)
         raise HTTPException(400, "Invalid state parameter") from ex
+
+    # Use fixed config URI — never derived from request to prevent host-spoofing.
+    callback_uri = settings.GOOGLE_OAUTH_REDIRECT_URI or str(
+        request.url_for("google_auth_callback")
+    )
 
     try:
         oauth_token = await OAuthController.get_google_access_token(
             code=code,
             code_verifier=code_verifier,
-            redirect_uri=str(request.url_for("google_auth_callback")),
+            redirect_uri=callback_uri,
         )
 
         user = UserController.get_user_by_email(
@@ -87,8 +99,9 @@ async def google_auth_callback(
             user = UserController.create_user(session=session, user_create=user_in)
 
         access_token, refresh_token, jti = AuthController.create_auth_tokens(user=user)
+        access_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-        session_data = AuthController.create_auth_session(
+        AuthController.create_auth_session(
             session=session,
             user=user,
             jti=jti,
@@ -100,28 +113,49 @@ async def google_auth_callback(
             ),
         )
 
-        # Register the refresh JTI in the Redis allowlist so rotation can
-        # validate it — mirrors the login flow (login.py line 129-130).
         if not settings.is_stateless:
             RedisRefreshStore(redis).register(jti, _REFRESH_TTL_SECONDS)
 
-        SessionController.purge_expired_sessions(
-            session=session,
-            current_user=user,
-        )
+        SessionController.purge_expired_sessions(session=session, current_user=user)
 
-        response = RedirectResponse(
-            url=request.url_for(
-                "google_auth_success_login", session_id=str(session_data.id)
-            )
+        # expires_at = absolute epoch ms (not duration) — extension stores this directly.
+        expires_at_ms = int(
+            (datetime.now(timezone.utc) + access_delta).timestamp() * 1000
         )
+        auth_code = str(_uuid.uuid4())
+        auth_payload = json.dumps(
+            {
+                "version": 1,
+                "auth_provider": "google",
+                "access_token": access_token,
+                "expires_at": expires_at_ms,
+                "user": {
+                    # Bounded to prevent oversized Redis payloads / UI rendering issues.
+                    "name": (user.full_name or "")[:128],
+                    "email": (user.email or "")[:254],
+                    "avatar": (user.avatar or "")[:512],
+                },
+                "code_challenge": code_challenge,
+            }
+        )
+        AuthCodeStore(redis).store(auth_code, auth_payload)
+
+        # Consume session only after auth_code is safely stored.
+        # If any earlier step failed we never reach this line — session stays valid for retry.
+        OAuthSessionStore(redis).delete(state)
+
+        # auth_code delivered via fragment — never appears in server/proxy logs.
+        # SameSite note: cookies set on a chrome-extension:// redirect may be dropped
+        # by the browser. This is harmless — the extension uses the auth_code, not cookies.
+        # Cookies remain for SPA clients that share this backend.
+        response = RedirectResponse(url=f"{redirect_target}#auth_code={auth_code}")
         response.set_cookie(
             key="access_token",
             value=access_token,
             httponly=True,
             secure=_SECURE_COOKIE,
             samesite="lax",
-            max_age=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES).seconds,
+            max_age=int(access_delta.total_seconds()),
         )
         response.set_cookie(
             key="refresh_token",

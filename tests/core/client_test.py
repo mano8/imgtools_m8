@@ -6,8 +6,10 @@ from unittest.mock import MagicMock
 
 
 from auth_user_service.core.client import (
+    AuthCodeStore,
+    ExchangeRateLimiter,
     LoginRateLimiter,
-    PKCEStore,
+    OAuthSessionStore,
     RateLimitResult,
     RedisRateLimiter,
     RedisRefreshStore,
@@ -218,46 +220,162 @@ class TestRateLimitResult:
         assert result.exceeded_period == Period.DAY
 
 
-class TestPKCEStore:
+class TestOAuthSessionStore:
+    """OAuthSessionStore uses get()+delete() — NOT GETDEL."""
+
     def setup_method(self):
         self.mock_redis = MagicMock()
-        self.store = PKCEStore(self.mock_redis)
+        self.store = OAuthSessionStore(self.mock_redis)
 
     def test_store_sets_key_with_correct_prefix(self):
-        self.store.store("mystate", "myverifier")
+        self.store.store("my-state", '{"flow":"google"}')
         args = self.mock_redis.setex.call_args[0]
-        assert args[0] == "pkce:mystate"
+        assert args[0] == "oauth_session:my-state"
 
-    def test_store_passes_verifier(self):
-        self.store.store("mystate", "myverifier")
+    def test_store_passes_payload(self):
+        payload = '{"pkce_verifier": "abc"}'
+        self.store.store("my-state", payload)
         args = self.mock_redis.setex.call_args[0]
-        assert args[2] == "myverifier"
+        assert args[2] == payload
 
-    def test_store_uses_ttl(self):
-        self.store.store("mystate", "myverifier")
+    def test_store_uses_10min_ttl(self):
+        self.store.store("my-state", "{}")
         args = self.mock_redis.setex.call_args[0]
         assert args[1] == timedelta(minutes=10)
 
-    def test_pop_returns_verifier_via_getdel(self):
-        """pop() must use atomic GETDEL, not separate GET + DELETE."""
-        self.mock_redis.getdel.return_value = "myverifier"
+    def test_get_reads_without_deleting(self):
+        self.mock_redis.get.return_value = '{"flow":"google"}'
+        result = self.store.get("my-state")
+        assert result == '{"flow":"google"}'
+        self.mock_redis.get.assert_called_once_with("oauth_session:my-state")
+        self.mock_redis.getdel.assert_not_called()
+        self.mock_redis.delete.assert_not_called()
 
-        result = self.store.pop("mystate")
+    def test_get_returns_none_when_absent(self):
+        self.mock_redis.get.return_value = None
+        assert self.store.get("nonexistent") is None
 
-        assert result == "myverifier"
-        self.mock_redis.getdel.assert_called_once_with("pkce:mystate")
+    def test_delete_removes_key(self):
+        self.store.delete("my-state")
+        self.mock_redis.delete.assert_called_once_with("oauth_session:my-state")
+        self.mock_redis.getdel.assert_not_called()
+
+    def test_prefix_constant(self):
+        assert OAuthSessionStore.PREFIX == "oauth_session:"
+
+    def test_ttl_constant(self):
+        assert OAuthSessionStore.TTL == timedelta(minutes=10)
+
+
+class TestAuthCodeStore:
+    """AuthCodeStore uses GETDEL for atomic single-use replay protection."""
+
+    def setup_method(self):
+        self.mock_redis = MagicMock()
+        self.store = AuthCodeStore(self.mock_redis)
+
+    def test_store_sets_key_with_correct_prefix(self):
+        self.store.store("mycode", '{"version":1}')
+        args = self.mock_redis.setex.call_args[0]
+        assert args[0] == "auth_code:mycode"
+
+    def test_store_passes_payload(self):
+        payload = '{"access_token": "tok"}'
+        self.store.store("mycode", payload)
+        args = self.mock_redis.setex.call_args[0]
+        assert args[2] == payload
+
+    def test_store_uses_60s_ttl(self):
+        self.store.store("mycode", "{}")
+        args = self.mock_redis.setex.call_args[0]
+        assert args[1] == timedelta(seconds=60)
+
+    def test_pop_uses_getdel_atomically(self):
+        self.mock_redis.getdel.return_value = '{"version":1}'
+        result = self.store.pop("mycode")
+        assert result == '{"version":1}'
+        self.mock_redis.getdel.assert_called_once_with("auth_code:mycode")
         self.mock_redis.get.assert_not_called()
         self.mock_redis.delete.assert_not_called()
 
-    def test_pop_returns_none_when_key_not_found(self):
+    def test_pop_returns_none_when_absent(self):
         self.mock_redis.getdel.return_value = None
         assert self.store.pop("nonexistent") is None
 
+    def test_second_pop_returns_none_replay_prevention(self):
+        self.mock_redis.getdel.side_effect = ['{"version":1}', None]
+        self.store.pop("mycode")
+        assert self.store.pop("mycode") is None
+
     def test_prefix_constant(self):
-        assert PKCEStore.PREFIX == "pkce:"
+        assert AuthCodeStore.PREFIX == "auth_code:"
 
     def test_ttl_constant(self):
-        assert PKCEStore.TTL == timedelta(minutes=10)
+        assert AuthCodeStore.TTL == timedelta(seconds=60)
+
+
+class TestExchangeRateLimiter:
+    def setup_method(self):
+        self.mock_redis = MagicMock()
+        self.limiter = ExchangeRateLimiter(self.mock_redis)
+
+    def test_key_format(self):
+        key = self.limiter._key("192.168.1.1")
+        assert key == "exchange:attempts:192.168.1.1"
+
+    def test_is_allowed_first_attempt_sets_expiry(self):
+        self.mock_redis.incr.return_value = 1
+        result = self.limiter.is_allowed("192.168.1.1")
+        assert result is True
+        self.mock_redis.expire.assert_called_once()
+        _, ttl = self.mock_redis.expire.call_args[0]
+        assert ttl == 60
+
+    def test_is_allowed_within_max_attempts(self):
+        self.mock_redis.incr.return_value = 10
+        assert self.limiter.is_allowed("192.168.1.1") is True
+
+    def test_is_allowed_exceeds_max_attempts(self):
+        self.mock_redis.incr.return_value = 11
+        assert self.limiter.is_allowed("192.168.1.1") is False
+
+    def test_is_allowed_subsequent_no_expire(self):
+        self.mock_redis.incr.return_value = 3
+        self.limiter.is_allowed("192.168.1.1")
+        self.mock_redis.expire.assert_not_called()
+
+    def test_key_strips_control_chars(self):
+        key = self.limiter._key("127.0.0.1\ninjection")
+        assert "\n" not in key
+
+    def test_key_truncated_to_max_len(self):
+        long_ip = "a" * 100
+        key = self.limiter._key(long_ip)
+        expected_len = len(ExchangeRateLimiter.PREFIX) + ExchangeRateLimiter.MAX_ID_LEN
+        assert len(key) == expected_len
+
+    def test_constants(self):
+        assert ExchangeRateLimiter.DEFAULT_MAX_REQUESTS == 10
+        assert ExchangeRateLimiter.DEFAULT_WINDOW_SECONDS == 60
+        assert ExchangeRateLimiter.PREFIX == "exchange:attempts:"
+
+    def test_custom_params_used_for_expiry(self):
+        limiter = ExchangeRateLimiter(
+            self.mock_redis, max_requests=3, window_seconds=30
+        )
+        self.mock_redis.incr.return_value = 1
+        limiter.is_allowed("1.2.3.4")
+        _, ttl = self.mock_redis.expire.call_args[0]
+        assert ttl == 30
+
+    def test_custom_blocks_at_correct_count(self):
+        limiter = ExchangeRateLimiter(
+            self.mock_redis, max_requests=3, window_seconds=30
+        )
+        self.mock_redis.incr.return_value = 3
+        assert limiter.is_allowed("1.2.3.4") is True
+        self.mock_redis.incr.return_value = 4
+        assert limiter.is_allowed("1.2.3.4") is False
 
 
 class TestLoginRateLimiter:
