@@ -38,7 +38,7 @@ export function Home() {
     <div class="p-4 min-w-[340px] flex flex-col gap-4">
       <div class="flex items-center gap-3">
         {user?.avatar && (
-          <img src={user.avatar} alt="" class="w-10 h-10 rounded-full" />
+          <img src={user.avatar} alt="" width={40} height={40} class="w-10 h-10 rounded-full" />
         )}
         <div>
           <p class="font-semibold">{user?.name || '—'}</p>

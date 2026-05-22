@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority"
-import { forwardRef, HTMLAttributes } from "preact/compat"
+import { forwardRef } from "preact/compat"
+import type { HTMLAttributes } from "preact/compat"
 
 const SeparatorVariants = cva(
   "shrink-0 bg-border h-[1px] w-full"

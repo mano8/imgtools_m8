@@ -35,6 +35,63 @@ _SECURE_COOKIE = settings.ENVIRONMENT != "local"
 _REFRESH_TTL_SECONDS = settings.REFRESH_TOKEN_EXPIRE_MINUTES * 60
 
 
+def _get_oauth_session(redis: object, state: str) -> dict:
+    """Retrieve and parse the OAuth session; raises 400 if missing/expired."""
+    raw_session = OAuthSessionStore(redis).get(state)  # type: ignore[arg-type]
+    if not raw_session:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired state parameter",
+        )
+    return json.loads(raw_session)
+
+
+def _get_or_create_user(session: SessionDep, oauth_token: object) -> object:
+    """Return the existing user or create one from the OAuth token data."""
+    user = UserController.get_user_by_email(
+        session=session,
+        email=oauth_token.email,  # type: ignore[attr-defined]
+    )
+    if user is None:
+        user_in = UserCreate(
+            provider=AuthProviderType.GOOGLE,
+            oauth_user_id=oauth_token.user_id,  # type: ignore[attr-defined]
+            email=oauth_token.email,  # type: ignore[attr-defined]
+            email_verified=oauth_token.email_verified,  # type: ignore[attr-defined]
+            full_name=oauth_token.name.strip(),  # type: ignore[attr-defined]
+        )
+        user = UserController.create_user(session=session, user_create=user_in)
+    return user
+
+
+def _build_redirect_response(
+    redirect_target: str,
+    auth_code: str,
+    access_token: str,
+    refresh_token: str,
+    access_delta: timedelta,
+) -> RedirectResponse:
+    """Build the redirect response with auth cookies."""
+    response = RedirectResponse(url=f"{redirect_target}#auth_code={auth_code}")
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=_SECURE_COOKIE,
+        samesite="lax",
+        max_age=int(access_delta.total_seconds()),
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=_SECURE_COOKIE,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS,
+    )
+    return response
+
+
 @router.get("/oauth-callback/")
 async def google_auth_callback(
     request: Request,
@@ -56,13 +113,7 @@ async def google_auth_callback(
                 detail="Cache service unavailable. Cannot complete OAuth flow.",
             )
         # CSRF check: get() without consuming. If state is unknown/expired → 400.
-        raw_session = OAuthSessionStore(redis).get(state)
-        if not raw_session:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid or expired state parameter",
-            )
-        oauth_session = json.loads(raw_session)
+        oauth_session = _get_oauth_session(redis, state)
         code_verifier: str = oauth_session.get("pkce_verifier", "")
         redirect_target: str = oauth_session.get("redirect_target", "")
         code_challenge: str = oauth_session.get("code_challenge", "")
@@ -84,20 +135,7 @@ async def google_auth_callback(
             redirect_uri=callback_uri,
         )
 
-        user = UserController.get_user_by_email(
-            session=session,
-            email=oauth_token.email,
-        )
-        if user is None:
-            user_in = UserCreate(
-                provider=AuthProviderType.GOOGLE,
-                oauth_user_id=oauth_token.user_id,
-                email=oauth_token.email,
-                email_verified=oauth_token.email_verified,
-                full_name=oauth_token.name.strip(),
-            )
-            user = UserController.create_user(session=session, user_create=user_in)
-
+        user = _get_or_create_user(session, oauth_token)
         access_token, refresh_token, jti = AuthController.create_auth_tokens(user=user)
         access_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
@@ -148,22 +186,8 @@ async def google_auth_callback(
         # SameSite note: cookies set on a chrome-extension:// redirect may be dropped
         # by the browser. This is harmless — the extension uses the auth_code, not cookies.
         # Cookies remain for SPA clients that share this backend.
-        response = RedirectResponse(url=f"{redirect_target}#auth_code={auth_code}")
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            secure=_SECURE_COOKIE,
-            samesite="lax",
-            max_age=int(access_delta.total_seconds()),
-        )
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=_SECURE_COOKIE,
-            samesite="lax",
-            max_age=settings.REFRESH_TOKEN_COOKIE_EXPIRE_SECONDS,
+        response = _build_redirect_response(
+            redirect_target, auth_code, access_token, refresh_token, access_delta
         )
 
         _m = _get_metrics()

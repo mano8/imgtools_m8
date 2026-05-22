@@ -67,6 +67,55 @@ def _verify_pkce(verifier: str, challenge: str) -> bool:
     return hmac.compare_digest(computed, challenge)
 
 
+def _validate_redirect_target(redirect_target: str) -> None:
+    """Validate redirect_target string, scheme, and prefix restrictions."""
+    if not redirect_target:
+        raise HTTPException(status_code=400, detail="redirect_target is required.")
+    if len(redirect_target) > 2048:
+        raise HTTPException(status_code=400, detail="redirect_target too long.")
+
+    parsed = urlparse(redirect_target)
+    scheme = f"{parsed.scheme}://"
+
+    if scheme in _WEB_SCHEMES:
+        raise HTTPException(
+            status_code=400,
+            detail="redirect_target scheme not allowed: web origins are not permitted.",
+        )
+    if scheme not in settings.OAUTH_ALLOWED_REDIRECT_SCHEMES:
+        raise HTTPException(
+            status_code=400, detail="redirect_target scheme not allowed."
+        )
+    if not parsed.netloc:
+        raise HTTPException(
+            status_code=400, detail="redirect_target must include a host."
+        )
+    if settings.OAUTH_ALLOWED_REDIRECT_PREFIXES and not _uri_prefix_match_any(
+        redirect_target, settings.OAUTH_ALLOWED_REDIRECT_PREFIXES
+    ):
+        raise HTTPException(
+            status_code=400, detail="redirect_target not in allowed prefixes."
+        )
+
+
+def _build_session_payload(
+    pkce_verifier: str, redirect_target: str, code_challenge: str
+) -> str:
+    """Serialise OAuth session payload and guard against oversized values."""
+    payload = json.dumps(
+        {
+            "pkce_verifier": pkce_verifier,
+            "redirect_target": redirect_target,
+            "code_challenge": code_challenge,
+            "created_at": int(datetime.now(timezone.utc).timestamp()),
+            "flow": "google",
+        }
+    )
+    if len(payload) > _SESSION_PAYLOAD_MAX:
+        raise HTTPException(status_code=400, detail="Session payload too large.")
+    return payload
+
+
 @router.get("/login-url/")
 async def get_google_login_url(
     redirect_target: str = "",
@@ -87,39 +136,11 @@ async def get_google_login_url(
       intentional.  Set ``OAUTH_ALLOWED_REDIRECT_PREFIXES`` to restrict to
       specific extension IDs.
     """
-    if not redirect_target:
-        raise HTTPException(status_code=400, detail="redirect_target is required.")
-    if len(redirect_target) > 2048:
-        raise HTTPException(status_code=400, detail="redirect_target too long.")
+    _validate_redirect_target(redirect_target)
     if not code_challenge:
         raise HTTPException(status_code=400, detail="code_challenge is required.")
     if not _CHALLENGE_RE.fullmatch(code_challenge):
         raise HTTPException(status_code=400, detail="code_challenge format invalid.")
-
-    parsed = urlparse(redirect_target)
-    scheme = f"{parsed.scheme}://"
-
-    if scheme in _WEB_SCHEMES:
-        raise HTTPException(
-            status_code=400,
-            detail="redirect_target scheme not allowed: web origins are not permitted.",
-        )
-    if scheme not in settings.OAUTH_ALLOWED_REDIRECT_SCHEMES:
-        raise HTTPException(
-            status_code=400, detail="redirect_target scheme not allowed."
-        )
-    if not parsed.netloc:
-        raise HTTPException(
-            status_code=400, detail="redirect_target must include a host."
-        )
-
-    if settings.OAUTH_ALLOWED_REDIRECT_PREFIXES:
-        if not _uri_prefix_match_any(
-            redirect_target, settings.OAUTH_ALLOWED_REDIRECT_PREFIXES
-        ):
-            raise HTTPException(
-                status_code=400, detail="redirect_target not in allowed prefixes."
-            )
 
     redis = get_redis_client()
     if redis is None:
@@ -130,18 +151,9 @@ async def get_google_login_url(
         redirect_uri=callback_uri
     )
 
-    session_payload = json.dumps(
-        {
-            "pkce_verifier": pkce_verifier,
-            "redirect_target": redirect_target,
-            "code_challenge": code_challenge,
-            "created_at": int(datetime.now(timezone.utc).timestamp()),
-            "flow": "google",
-        }
+    session_payload = _build_session_payload(
+        pkce_verifier, redirect_target, code_challenge
     )
-    if len(session_payload) > _SESSION_PAYLOAD_MAX:
-        raise HTTPException(status_code=400, detail="Session payload too large.")
-
     OAuthSessionStore(redis).store(state, session_payload)
     return {"url": url}
 
@@ -167,6 +179,33 @@ class ExchangeRequest(BaseModel):
     code: str
     code_verifier: str
     client_hint: str | None = Field(default=None, max_length=128)
+
+
+def _check_exchange_origin(request: Request) -> None:
+    """Opportunistic Origin check — not a security gate (PKCE is the control).
+
+    Rejects unexpected origins when CORS scheme allowlist is explicitly
+    configured.
+    """
+    origin = request.headers.get("origin", "")
+    if not origin or not settings.CORS_ALLOWED_ORIGIN_SCHEMES:
+        return
+    cors_regex = _build_cors_origin_regex(settings.CORS_ALLOWED_ORIGIN_SCHEMES)
+    if cors_regex and not re.fullmatch(cors_regex, origin):
+        logger.warning("exchange: unexpected Origin header: %s", origin)
+        raise HTTPException(status_code=400, detail="Origin not allowed.")
+
+
+def _pop_auth_code_payload(redis: object, code: str) -> dict:
+    """Pop auth code from store, validate size, parse JSON and return payload."""
+    raw = AuthCodeStore(redis).pop(code)  # type: ignore[arg-type]
+    if not raw:
+        _inc_exchange_metric("expired_or_invalid")
+        raise HTTPException(status_code=400, detail="Invalid or expired auth code.")
+    if len(raw) > _AUTH_CODE_PAYLOAD_MAX:
+        _inc_exchange_metric("expired_or_invalid")
+        raise HTTPException(status_code=400, detail="Invalid or expired auth code.")
+    return json.loads(raw)
 
 
 @router.post("/exchange/")
@@ -204,25 +243,9 @@ async def exchange_auth_code(
         _inc_exchange_metric("expired_or_invalid")
         raise HTTPException(status_code=400, detail="Invalid or expired auth code.")
 
-    # Opportunistic Origin check — not a security gate (PKCE is the control).
-    # Reject unexpected origins when CORS scheme allowlist is explicitly configured.
-    origin = request.headers.get("origin", "")
-    if origin and settings.CORS_ALLOWED_ORIGIN_SCHEMES:
-        cors_regex = _build_cors_origin_regex(settings.CORS_ALLOWED_ORIGIN_SCHEMES)
-        if cors_regex and not re.fullmatch(cors_regex, origin):
-            logger.warning("exchange: unexpected Origin header: %s", origin)
-            raise HTTPException(status_code=400, detail="Origin not allowed.")
+    _check_exchange_origin(request)
 
-    raw = AuthCodeStore(redis).pop(body.code)
-    if not raw:
-        _inc_exchange_metric("expired_or_invalid")
-        raise HTTPException(status_code=400, detail="Invalid or expired auth code.")
-
-    if len(raw) > _AUTH_CODE_PAYLOAD_MAX:
-        _inc_exchange_metric("expired_or_invalid")
-        raise HTTPException(status_code=400, detail="Invalid or expired auth code.")
-
-    payload = json.loads(raw)
+    payload = _pop_auth_code_payload(redis, body.code)
 
     if not _verify_pkce(body.code_verifier, payload.get("code_challenge", "")):
         _inc_exchange_metric("pkce_failed")

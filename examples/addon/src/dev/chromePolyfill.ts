@@ -6,7 +6,7 @@ function createLocalStorageBackend() {
         session_id: "test-session",
         user_name: "Console User",
       };
-    
+
       // Initialize localStorage if keys are missing
       for (const [key, value] of Object.entries(defaultValues)) {
         if (localStorage.getItem(key) === null) {
@@ -14,16 +14,19 @@ function createLocalStorageBackend() {
         }
       }
   return {
+    // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
     get(
       keys: string | string[] | Record<string, any>,
+      // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
       cb: (items: Record<string, any>) => void
     ) {
+      // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
       const result: Record<string, any> = {};
       if (Array.isArray(keys)) {
-        keys.forEach((k) => {
+        for (const k of keys) {
           const v = localStorage.getItem(k);
           result[k] = v != null ? JSON.parse(v) : undefined;
-        });
+        }
       } else if (typeof keys === "string") {
         const v = localStorage.getItem(keys);
         result[keys] = v != null ? JSON.parse(v) : undefined;
@@ -35,6 +38,7 @@ function createLocalStorageBackend() {
       }
       cb(result);
     },
+    // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
     set(items: Record<string, any>, cb?: () => void) {
       for (const [k, v] of Object.entries(items)) {
         localStorage.setItem(k, JSON.stringify(v));
@@ -43,7 +47,9 @@ function createLocalStorageBackend() {
     },
     remove(keys: string | string[], cb?: () => void) {
       if (Array.isArray(keys)) {
-        keys.forEach((k) => localStorage.removeItem(k));
+        for (const k of keys) {
+          localStorage.removeItem(k);
+        }
       } else {
         localStorage.removeItem(keys);
       }
@@ -53,12 +59,16 @@ function createLocalStorageBackend() {
 }
 
 // Fake runtime messaging
+// biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
 const listeners: Array<
+  // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
   (msg: any, sender: any, sendResponse: (resp?: any) => void) => void
 > = [];
 
 function fakeSendMessage(
+  // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
   message: any,
+  // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
   responseCallback?: (response: any) => void
 ) {
   console.log("[DEV] chrome.runtime.sendMessage called:", message);
@@ -84,11 +94,13 @@ function fakeOnMessage() {
 }
 
 // Attach to window.chrome
+// biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires window augmentation
 (window as any).chrome = (window as any).chrome || {};
 chrome.storage = chrome.storage || {};
 chrome.storage.local = createLocalStorageBackend();
 
 const changeListeners: Array<
+  // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
   (changes: Record<string, any>, areaName: string) => void
 > = [];
 
@@ -105,6 +117,7 @@ chrome.storage.onChanged = {
 // Patch set to fire change events
 const originalSet = chrome.storage.local.set;
 chrome.storage.local.set = (items, cb) => {
+  // biome-ignore lint/suspicious/noExplicitAny: browser polyfill requires flexible types
   const changes: Record<string, any> = {};
 
   for (const [key, newValue] of Object.entries(items)) {

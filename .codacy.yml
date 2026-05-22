@@ -25,3 +25,4 @@ exclude_paths:
   - "**/__pycache__/**"
   - "**/alembic/versions/**"
   - "examples/docker_compose/**"
+  - "examples/addon/package-lock.json"

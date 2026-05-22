@@ -9,7 +9,7 @@
 import { useState } from 'preact/hooks';
 import { getApiUrl } from '../utils/utils';
 import { storeAuthData, decodeJwtPayload } from '../context/AuthContext';
-import { UserProfile } from '../types/shared_types';
+import type { UserProfile } from '../types/shared_types';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Label } from './ui/Label';
@@ -27,6 +27,7 @@ export function LoginForm() {
         {(['oauth', 'password', 'apikey'] as Tab[]).map((t) => (
           <button
             key={t}
+            type="button"
             class={`px-3 py-1 rounded text-sm font-medium border ${tab === t ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
             onClick={() => { setTab(t); setError(''); }}
           >
@@ -143,7 +144,7 @@ function PasswordTab({ onError, loading, setLoading }: TabProps) {
       const exp = payload?.exp;
       if (
         typeof sub !== 'string' || !sub ||
-        typeof exp !== 'number' || !isFinite(exp)
+        typeof exp !== 'number' || !Number.isFinite(exp)
       ) {
         onError('Sign-in failed: token could not be read.');
         return;

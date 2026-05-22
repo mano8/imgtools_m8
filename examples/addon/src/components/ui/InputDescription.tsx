@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority"
-import { forwardRef, HTMLAttributes } from "preact/compat"
+import { forwardRef } from "preact/compat"
+import type { HTMLAttributes } from "preact/compat"
 import { Separator } from "./Separator"
 
 const InputDescriptionVariants = cva(
@@ -29,9 +30,9 @@ const InputDescription = forwardRef<HTMLDivElement, InputDescriptionProps>((
 
     if(separators === true){
       return [
-        <Separator className="mt-4" />,
+        <Separator key="sep-top" className="mt-4" />,
         obj,
-        <Separator className="mb-4" />
+        <Separator key="sep-bottom" className="mb-4" />
       ]
     }
 

@@ -1,6 +1,8 @@
-import { ComponentChildren, createContext } from 'preact';
+import type { ComponentChildren } from 'preact';
+import { createContext } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
-import { AuthState, UserProfile, isValidAuthState } from '../types/shared_types';
+import type { AuthState, UserProfile } from '../types/shared_types';
+import { isValidAuthState } from '../types/shared_types';
 
 export interface AuthContextType {
   user: UserProfile | null;
@@ -66,7 +68,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
 
-  const loadAuth = () => {
+  useEffect(() => {
+    // Initial load
     chrome.storage.local.get(['auth', 'user'], (stored) => {
       if (isValidAuthState(stored)) {
         setAuth(stored.auth);
@@ -78,10 +81,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUser(null);
       }
     });
-  };
-
-  useEffect(() => {
-    loadAuth();
 
     const storageListener = (
       changes: Record<string, chrome.storage.StorageChange>,
@@ -112,7 +111,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     chrome.storage.onChanged.addListener(storageListener);
     return () => chrome.storage.onChanged.removeListener(storageListener);
-  }, []);
+  }, [setAuth, setUser]);
 
   const handleLogout = () => {
     if (_loggingOut) return;

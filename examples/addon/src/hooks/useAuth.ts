@@ -1,5 +1,6 @@
 import { useContext } from 'preact/hooks';
-import { AuthContext, AuthContextType } from '../context/AuthContext';
+import { AuthContext } from '../context/AuthContext';
+import type { AuthContextType } from '../context/AuthContext';
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);

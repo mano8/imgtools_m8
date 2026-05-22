@@ -8,75 +8,56 @@
     /* Light mode colors (not used by default, but available if needed) */
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
-
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-
     --primary: 0 0% 9%;
     --primary-foreground: 0 0% 98%;
-
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
-
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
-
     --accent: 0 0% 96.1%;
     --accent-foreground: 0 0% 9%;
-
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
-
     --radius: 0.5rem;
-
-    --banner-color: rgba(119, 11, 0, 0.74);
+    --banner-color: rgb(119 11 0 / 74%);
   }
-  
+
   /* Dark mode overrides */
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
-
     --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
-
     --popover: 0 0% 3.9%;
     --popover-foreground: 0 0% 98%;
-
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
-
     --secondary: 0 0% 14.9%;
     --secondary-foreground: 0 0% 98%;
-
     --muted: 0 0% 14.9%;
     --muted-foreground: 0 0% 63.9%;
-
     --accent: 0 0% 14.9%;
     --accent-foreground: 0 0% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
-
     --radius: 0.5rem;
-
-    --banner-color: rgba(119, 11, 0, 0.74);
+    --banner-color: rgb(119 11 0 / 74%);
   }
 
   /* Base body styles using CSS variables */
   body {
     @apply dark;
+
     scroll-behavior: smooth;
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
@@ -92,18 +73,23 @@
   .border-b-red-theme {
     border-bottom-color: var(--banner-color);
   }
+
   .title-article {
     @apply uppercase border-b-2 border-spacing-2 pb-1 mb-3;
+
     border-bottom-color: var(--banner-color);
   }
+
   .title-article-rose {
     @apply uppercase border-b-2 border-spacing-2 pb-1 mb-3;
+
     border-bottom-color: theme('colors.rose.500');
   }
 
   /* Card component style */
   .card {
     @apply p-8 rounded-lg shadow;
+
     background-color: hsl(var(--card));
     color: hsl(var(--card-foreground));
   }
