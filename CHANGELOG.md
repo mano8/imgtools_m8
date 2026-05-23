@@ -4,6 +4,39 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] — 2026-05-22 · Example stack consolidation (10 → 5)
+
+### Changed
+
+- **Docker Compose examples consolidated from 10 stacks to 5** — each new stack serves
+  a distinct audience with a clear "choose this when" decision:
+  - `quickstart_m8` — replaces `lite_mysql_m8` + `template`; HS256, stateful, MariaDB;
+    recommended starting point. Token mode changed from `hybrid` to `stateful` for
+    consistency with the other HS256 stacks. Stateless mode remains available via a
+    commented `TOKEN_MODE=stateless` line in `auth.env.example`.
+  - `postgres_m8` — replaces `lite_postgres_m8`; HS256, stateful, PostgreSQL 16; no change
+    to config, pure rename.
+  - `rs256_m8` — replaces `lite_rs256_m8`, `lite_es256_m8`, `env_rs256_m8`,
+    `lite_hybrid_m8`; RS256 asymmetric signing, hybrid mode, MariaDB; no monitoring
+    services.
+  - `metrics_m8` — replaces `stateful_m8`; HS256, stateful; database migrated from MariaDB
+    to PostgreSQL 16; Prometheus + Grafana retained.
+  - `vault_rs256_postgres_m8` — unchanged.
+
+### Removed
+
+- `lite_es256_m8`, `lite_hybrid_m8`, `lite_stateless_m8`, `env_rs256_m8`, `template` —
+  functionality absorbed into the five consolidated stacks above.
+
+### Documentation
+
+- Each stack now has a self-contained `README.md` with "choose this when" guidance,
+  token-mode explanation, and full port/config reference.
+- Root `README.md` and `examples/docker_compose/README.md` selection tables updated to
+  reflect the five-stack structure.
+
+---
+
 ## [0.8.2] — 2026-05-22 · Chrome extension auth template
 
 ### Added

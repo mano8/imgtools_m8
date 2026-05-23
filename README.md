@@ -86,22 +86,17 @@ Consumer services validate tokens locally (JWT signature check + optional Redis 
 
 ## Docker Compose Stacks
 
-Ten ready-to-run stacks are provided under [`examples/docker_compose/`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose). See the [stack selection guide](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose#which-stack-should-i-use) for help choosing.
+Five ready-to-run stacks are provided under [`examples/docker_compose/`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose). See the [stack selection guide](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose#which-stack-should-i-use) for help choosing.
 
 | Stack | Database | Algorithm | Token mode | Observability | Notes |
 | ----- | -------- | --------- | ---------- | ------------- | ----- |
-| [`lite_mysql_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_mysql_m8) | MariaDB | HS256 | `hybrid` | — | Fastest start |
-| [`lite_postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_postgres_m8) | PostgreSQL 16 | HS256 | `stateful` | — | PostgreSQL variant |
-| [`lite_rs256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_rs256_m8) | MariaDB | RS256 | `stateful` | — | Asymmetric signing + JWKS |
-| [`lite_es256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_es256_m8) | MariaDB | ES256 | `stateful` | — | ECDSA asymmetric signing |
-| [`lite_hybrid_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_hybrid_m8) | MariaDB | RS256 | `hybrid` | — | RS256 + hybrid mode |
-| [`lite_stateless_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_stateless_m8) | MariaDB | HS256 | `stateless` | — | No Redis for JWT validation |
-| [`stateful_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/stateful_m8) | MariaDB | HS256 | `stateful` | Prometheus + Grafana | Full stateful stack + metrics |
-| [`env_rs256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/env_rs256_m8) | MariaDB | RS256 | `stateful` | Prometheus + Grafana | RS256 + JWKS + metrics |
-| [`vault_rs256_postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/vault_rs256_postgres_m8) | PostgreSQL 16 | RS256 | `stateful` | Prometheus + Grafana | HashiCorp Vault + hardened |
-| [`template`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/template) | configurable | configurable | configurable | — | Bare template for new stacks |
+| [`quickstart_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/quickstart_m8) | MariaDB | HS256 | `stateful` | — | **Start here** — simplest onboarding |
+| [`postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/postgres_m8) | PostgreSQL 16 | HS256 | `stateful` | — | PostgreSQL variant |
+| [`rs256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/rs256_m8) | MariaDB | RS256 | `hybrid` | — | Asymmetric signing + JWKS |
+| [`metrics_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/metrics_m8) | PostgreSQL 16 | HS256 | `stateful` | Prometheus + Grafana | Metrics dashboards |
+| [`vault_rs256_postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/vault_rs256_postgres_m8) | PostgreSQL 16 | RS256 | `stateful` | Prometheus + Grafana | HashiCorp Vault secret injection |
 
-**Start here →** [`lite_mysql_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/lite_mysql_m8) for the fastest path to a running stack.
+**Start here →** [`quickstart_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/quickstart_m8) for the fastest path to a running stack.
 
 ### Token modes at a glance
 
