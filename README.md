@@ -1,4 +1,4 @@
-# fa-auth-m8
+# fa-auth-m8 — FastAPI JWT Authentication Microservice
 
 ![CI/CD](https://github.com/mano8/fa-auth-m8/actions/workflows/CI.yaml/badge.svg?branch=main)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/edab51cc8805468fb3884e1d9e57ccdc)](https://app.codacy.com/gh/mano8/fa-auth-m8/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
@@ -6,7 +6,7 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/tepochtli/fa-auth-m8)](https://hub.docker.com/r/tepochtli/fa-auth-m8)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/mano8/fa-auth-m8/blob/main/LICENSE)
 
-A self-contained FastAPI authentication microservice designed to run as a Docker container via Docker Compose. It provides JWT-based authentication, Google OAuth2 with PKCE, session management, user management, API key management, and private inter-service endpoints — ready to integrate with any Docker-based microservice project.
+A production-ready, self-hosted FastAPI (Python 3.14) authentication microservice for Docker Compose. Provides JWT authentication (HS256, RS256, ES256), Google OAuth2 with PKCE, Redis-backed stateful session management, role-based access control (RBAC), API key management with per-key rate limiting, and a private inter-service API — ready to drop into any Docker-based Python microservice stack.
 
 Consumer services validate tokens **locally** using the companion [auth-sdk-m8](https://github.com/mano8/auth-sdk-m8) package (`pip install auth-sdk-m8`) — no round-trip to the auth service on every request.
 
@@ -14,7 +14,7 @@ The included example stacks use `_m8` in their names as a personal naming conven
 
 ---
 
-## Summary
+## Table of Contents
 
 - [Features](#features)
 - [Architecture](#architecture)
@@ -164,9 +164,9 @@ Interactive docs at `{BACKEND_HOST}{API_PREFIX}/docs` when `SET_DOCS=true`.
 ### 1. Choose a stack
 
 ```bash
-cd examples/docker_compose/lite_mysql_m8      # fastest start — HS256 + hybrid mode
+cd examples/docker_compose/quickstart_m8      # fastest start — HS256 + stateful mode
 # or
-cd examples/docker_compose/lite_rs256_m8      # asymmetric RS256 + JWKS
+cd examples/docker_compose/rs256_m8           # asymmetric RS256 + JWKS
 ```
 
 See the [Docker Compose stack guide](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose) to pick the right stack.
@@ -360,7 +360,7 @@ Set `SELECTED_DB` in `.env` (or `auth.env`):
 
 **HS256 (default)** — set `ACCESS_SECRET_KEY` and `REFRESH_SECRET_KEY`; leave asymmetric key vars blank.
 
-**RS256 / ES256** — set `ACCESS_TOKEN_ALGORITHM`, `ACCESS_PRIVATE_KEY_FILE`, `ACCESS_PUBLIC_KEY_FILE`. Mount the key files into the container (see `examples/docker_compose/env_rs256_m8/keys/`). Generate a key pair:
+**RS256 / ES256** — set `ACCESS_TOKEN_ALGORITHM`, `ACCESS_PRIVATE_KEY_FILE`, `ACCESS_PUBLIC_KEY_FILE`. Mount the key files into the container (see `examples/docker_compose/rs256_m8/keys/`). Generate a key pair:
 
 ```bash
 # RS256
@@ -749,6 +749,8 @@ Alert rules for `metrics_m8` and `vault_m8` stacks (`prometheus/alerts.yml`):
 ---
 
 ## Dependencies
+
+**Stack:** Python 3.14 · FastAPI · SQLModel · Redis · MariaDB / PostgreSQL 16 · Traefik · Docker Compose · Prometheus · Grafana
 
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [SQLModel](https://sqlmodel.tiangolo.com/) + [Alembic](https://alembic.sqlalchemy.org/)
