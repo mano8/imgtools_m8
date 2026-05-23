@@ -215,20 +215,6 @@ class TestGetCurrentActiveSuperuser:
         assert exc_info.value.status_code == 403
 
 
-class TestGetTemplates:
-    def test_returns_jinja2_templates(self):
-        from auth_user_service.core.deps import get_templates
-
-        with patch("auth_user_service.core.deps.Jinja2Templates") as mock_jinja:
-            mock_instance = MagicMock()
-            mock_jinja.return_value = mock_instance
-
-            result = get_templates()
-
-        assert result is mock_instance
-        mock_jinja.assert_called_once()
-
-
 class TestGetRedisClient:
     def test_returns_redis_instance_when_ping_succeeds(self):
         from redis import Redis

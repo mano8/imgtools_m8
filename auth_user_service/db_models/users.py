@@ -7,7 +7,7 @@ the validation rules for user-related operations.
 from typing import List, Optional, TYPE_CHECKING
 import uuid
 
-from pydantic import EmailStr, ValidationError, model_validator
+from pydantic import EmailStr, ValidationError, field_validator, model_validator
 from sqlalchemy import Column
 from sqlmodel import Field, Relationship, SQLModel, Uuid
 
@@ -18,6 +18,23 @@ from auth_user_service.core.db_utils import get_table_args, prefixed_tables
 if TYPE_CHECKING:
     from auth_user_service.db_models.api_keys import ApiKey, RateLimit
     from auth_user_service.db_models.sessions import ClientSession
+
+
+def _check_avatar_url(v: object) -> object:
+    """Reject non-URL avatar values; only http/https URLs accepted."""
+    if v is None:
+        return v
+    if not isinstance(v, str):
+        raise ValueError("avatar must be a string URL")
+    if any(c.isspace() for c in v):
+        raise ValueError("avatar URL must not contain whitespace")
+    if not v.startswith(("http://", "https://")):
+        raise ValueError("avatar must be an http:// or https:// URL")
+    host_part = v.split("://", 1)[1].split("/")[0]
+    if not host_part or host_part.startswith(("?", "#")):
+        raise ValueError("avatar URL must include a valid host")
+    return v
+
 
 # ---------------------------------------------------------------
 # ---------------------------------------------------------------
@@ -50,7 +67,7 @@ class UserBase(TimestampMixin, SQLModel):
     avatar: Optional[str] = Field(
         default=None,
         max_length=255,
-        description="URL to user avatar image",
+        description="HTTP/HTTPS URL to user avatar image",
     )
     is_active: bool = Field(
         default=True,
@@ -68,6 +85,12 @@ class UserBase(TimestampMixin, SQLModel):
         default=RoleType.USER,
         description="Role assigned to the user for access control",
     )
+
+    @field_validator("avatar", mode="before")
+    @classmethod
+    def validate_avatar_url(cls, v: object) -> object:
+        """Reject non-URL avatar values; only http/https URLs accepted."""
+        return _check_avatar_url(v)
 
 
 class UserCreate(UserBase):
@@ -200,6 +223,12 @@ class UserUpdate(SQLModel):
     )
     provider: Optional[AuthProviderType] = None  # for validation context
 
+    @field_validator("avatar", mode="before")
+    @classmethod
+    def validate_avatar_url(cls, v: object) -> object:
+        """Reject non-URL avatar values; only http/https URLs accepted."""
+        return _check_avatar_url(v)
+
     @model_validator(mode="after")
     def enforce_provider_rules(self) -> "UserUpdate":
         """
@@ -257,6 +286,12 @@ class UserUpdateMe(SQLModel):
         max_length=255,
         description="Updated avatar URL",
     )
+
+    @field_validator("avatar", mode="before")
+    @classmethod
+    def validate_avatar_url(cls, v: object) -> object:
+        """Reject non-URL avatar values; only http/https URLs accepted."""
+        return _check_avatar_url(v)
 
 
 class UpdatePassword(SQLModel):

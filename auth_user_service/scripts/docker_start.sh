@@ -1,12 +1,6 @@
 #!/bin/sh
 set -e
 
-# Install local SDK override when mounted at /opt/auth_sdk_m8_src (dev only)
-if [ -d /opt/auth_sdk_m8_src ]; then
-    echo "Installing local auth_sdk_m8 from /opt/auth_sdk_m8_src..."
-    pip install --quiet --user /opt/auth_sdk_m8_src[all]
-fi
-
 # Run migrations
 # Check if alembic/versions has no .py files (ignores .gitkeep)
 if [ -z "$(find /opt/shared_migrations/auth_user/versions -maxdepth 1 -name '*.py' -print -quit)" ]; then

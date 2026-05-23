@@ -7,7 +7,6 @@ from fastapi import FastAPI, Response
 from fastapi.openapi.utils import get_openapi
 from fastapi.routing import APIRoute
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi_service.app.main import api_router
 from fastapi_service.core.config import settings
 from auth_sdk_m8.observability import metrics as _metrics
@@ -115,8 +114,6 @@ def custom_openapi(current_app: FastAPI):
 
 
 app.openapi = lambda: custom_openapi(app)
-
-app.mount("/static", StaticFiles(directory=settings.STATIC_BASE_PATH), name="static")
 
 app.include_router(api_router, prefix=settings.API_PREFIX)
 

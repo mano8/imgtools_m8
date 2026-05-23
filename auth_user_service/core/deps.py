@@ -12,7 +12,6 @@ from typing import Annotated, Optional
 
 from fastapi import Depends, Header, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordBearer
-from fastapi.templating import Jinja2Templates
 from redis import ConnectionPool, Redis
 from sqlmodel import Session
 
@@ -220,11 +219,6 @@ def get_current_active_superuser(current_user: CurrentUser) -> UserModel:
             detail="The user doesn't have enough privileges",
         )
     return current_user
-
-
-def get_templates() -> Jinja2Templates:
-    """Return the Jinja2 template engine bound to the configured directory."""
-    return Jinja2Templates(directory=settings.TEMPLATES_BASE_PATH)
 
 
 def verify_private_api_secret(

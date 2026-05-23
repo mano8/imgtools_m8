@@ -80,8 +80,6 @@ jobs:
           PROJECT_NAME=fa-auth-m8
           STACK_NAME=fa-auth-m8
           API_PREFIX=/user
-          STATIC_BASE_PATH=/static
-          TEMPLATES_BASE_PATH=/templates
           BACKEND_HOST=http://localhost:8000
           FRONTEND_HOST=http://localhost:5173
           BACKEND_CORS_ORIGINS=http://localhost:8000,http://localhost:5173

@@ -4,6 +4,105 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] — 2026-05-23 · Remove avatar upload; clean shared settings; unify secret-key validation
+
+### Breaking changes
+
+- **`POST /profile/upload_avatar/` removed.** The auth service no longer stores or serves
+  avatar files. The `avatar` field on user profiles now accepts only `http://` or `https://`
+  URLs. Any existing row whose `avatar` column contains a bare filename (e.g.
+  `"abc123.jpg"`) will fail Pydantic validation at the schema layer — update those rows to
+  a full URL before migrating to this version.
+
+- **`STATIC_BASE_PATH` and `TEMPLATES_BASE_PATH` removed from `CommonSettings`** (and from
+  all env example files). These settings had no business being in the shared backend base
+  class. Services that referenced them will fail at startup — remove the keys from your
+  `.env` files.
+
+### Changed
+
+- Avatar field description updated to "HTTP/HTTPS URL to user avatar image". The
+  `UserBase` model now validates the URL at the Pydantic layer (rejects non-http/https
+  schemes, whitespace, protocol-only strings, and missing hosts).
+
+- `SECRET_KEY_REGEX` in `auth-sdk-m8` unified with `PASSWORD_REGEX`: both now require
+  upper, lower, digit, and at least one non-alphanumeric character, with no whitespace.
+  Previously restricted to `[A-Za-z0-9_-]`; now accepts any non-alphanumeric special
+  character (`[^a-zA-Z0-9]`). Minimum length unchanged at 32 characters.
+
+- All env example `auth.env.example` generator comments updated to use
+  `secrets.token_urlsafe(48)` (simpler, standards-aligned).
+
+### Removed
+
+- `auth_user_service/utils/files.py` (`FilesHelper`) — deleted.
+- `ResponseUploadedAvatar` schema — deleted.
+- `STATIC_BASE_PATH` static-mount block from `auth_user_service/main.py`.
+- `STATIC_BASE_PATH` / `TEMPLATES_BASE_PATH` from all env example and live `.env` files.
+- Unused `get_templates()` helper and static mount from `examples/fastapi_service`.
+- Static volume mounts (`./auth_user/static`, `./fastapi_service/static`, `auth_static`) from
+  all six Docker Compose example stacks; `auth_static` named volume removed from `hardened_m8`.
+- Empty `auth_user/` and `fastapi_service/` placeholder directories from all six stacks.
+
+### Fixed
+
+- Redis `redis-cli -a` password flag replaced with `REDISCLI_AUTH` env var across all six
+  stacks — eliminates the "Using a password with '-a' option on the command line interface
+  may not be safe" warning on startup and in healthchecks.
+
+---
+
+## [0.9.0] — 2026-05-22 · Example stack consolidation (10 → 6) + Docker Hub image + hardened stack
+
+### Changed
+
+- **Docker Compose examples consolidated from 10 stacks to 5** — each new stack serves
+  a distinct audience with a clear "choose this when" decision:
+  - `quickstart_m8` — replaces `lite_mysql_m8` + `template`; HS256, stateful, MariaDB;
+    recommended starting point. Token mode changed from `hybrid` to `stateful` for
+    consistency with the other HS256 stacks. Stateless mode remains available via a
+    commented `TOKEN_MODE=stateless` line in `auth.env.example`.
+  - `postgres_m8` — replaces `lite_postgres_m8`; HS256, stateful, PostgreSQL 16; no change
+    to config, pure rename.
+  - `rs256_m8` — replaces `lite_rs256_m8`, `lite_es256_m8`, `env_rs256_m8`,
+    `lite_hybrid_m8`; RS256 asymmetric signing, hybrid mode, MariaDB; no monitoring
+    services.
+  - `metrics_m8` — replaces `stateful_m8`; HS256, stateful; database migrated from MariaDB
+    to PostgreSQL 16; Prometheus + Grafana retained.
+  - `hardened_m8` — new stack; PostgreSQL 16, RS256, stateful, Prometheus + Grafana;
+    container hardening (`no-new-privileges`, `cap_drop: ALL`, `read_only`, tmpfs),
+    network segmentation (`app_net` / `data_net internal`), `AUTH_STRICT_MODE=true`,
+    `fail_closed` degradation policy. `auth_user_service` from Docker Hub image.
+  - `vault_m8` — renamed from `vault_rs256_postgres_m8`; `auth_user_service` now pulls
+    `tepochtli/fa-auth-m8:latest` from Docker Hub instead of building locally. Pin to a
+    specific release tag for production use.
+
+- **`vault_m8` env corrections** — `api.env` / `api.env.example` aligned across all stacks:
+  `quickstart_m8` `TOKEN_MODE` corrected to `stateful`; `rs256_m8` `TOKEN_MODE` corrected
+  to `hybrid` and `METRICS_ENABLED` corrected to `false`; `metrics_m8` `SELECTED_DB` and
+  `DB_PORT` corrected to PostgreSQL values.
+
+### Removed
+
+- `lite_es256_m8`, `lite_hybrid_m8`, `lite_stateless_m8`, `env_rs256_m8`, `template` —
+  functionality absorbed into the five consolidated stacks above.
+
+### Fixed
+
+- `auth_user_service/scripts/docker_start.sh` and `examples/fastapi_service/scripts/docker_start.sh`
+  had Windows CRLF line endings. Volume mounts bypass the Dockerfile's CRLF-strip step,
+  causing `exec: no such file or directory` on Linux. Both files converted to LF. Root-level
+  `.gitattributes` added enforcing `*.sh text eol=lf` across the repo.
+
+### Documentation
+
+- Each stack now has a self-contained `README.md` with "choose this when" guidance,
+  token-mode explanation, and full port/config reference.
+- Root `README.md` and `examples/docker_compose/README.md` selection tables updated to
+  reflect the five-stack structure.
+
+---
+
 ## [0.8.2] — 2026-05-22 · Chrome extension auth template
 
 ### Added
