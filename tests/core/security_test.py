@@ -198,7 +198,7 @@ class TestSecurityHelper:
         "secret_key, expected_exception",
         [
             (SecretStr(""), ValidationError),
-            (SecretStr("sdfsdfJKKJSHD_sdf4564sd5f46_QDQSDQS4654!"), ValidationError),
+            (SecretStr("sdfsdfkkkjshd_sdf4564sd5f46_qdqdqs4654!"), ValidationError),
         ],
     )
     def test_create_access_token_with_invalid_secret(
@@ -222,7 +222,7 @@ class TestSecurityHelper:
         "secret_key, expected_exception",
         [
             (SecretStr(""), ValidationError),
-            (SecretStr("sdfsdfJKKJSHD_sdf4564sd5f46_QDQSDQS4654!"), ValidationError),
+            (SecretStr("sdfsdfkkkjshd_sdf4564sd5f46_qdqdqs4654!"), ValidationError),
         ],
     )
     def test_create_refresh_token_with_invalid_secret(

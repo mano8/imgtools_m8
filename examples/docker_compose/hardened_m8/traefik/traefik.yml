@@ -1,0 +1,51 @@
+# traefik.yml — Development
+log:
+  level: WARN
+
+api:
+  dashboard: true
+  insecure: true    # safe — port 8080 is bound to 127.0.0.1 in docker-compose
+
+ping: {}
+
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    entryPoint: metrics
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: hardened_m8_app_net   # resolve IPs from this network when containers span multiple networks
+  file:
+    filename: /etc/traefik/dynamic_conf.yml
+    watch: true
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+    http3: {}            # HTTP/3 / QUIC — requires UDP port mapping (see docker-compose.yml)
+    forwardedHeaders:
+      trustedIPs:
+        - "127.0.0.1/32"
+        - "172.16.0.0/12"   # Docker bridge networks
+        - "::1/128"
+  api:
+    address: ":9000"     # Internal service-to-service entryPoint — TCP only, no HTTP/3
+    forwardedHeaders:
+      trustedIPs:
+        - "127.0.0.1/32"
+        - "172.16.0.0/12"   # Docker bridge networks
+        - "::1/128"
+  metrics:
+    address: ":8082"     # Prometheus scrapes traefik:8082 — internal only, not host-exposed

@@ -596,99 +596,64 @@ class TestF_PrivateAPI:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# G  FILE UPLOAD SECURITY
+# G  AVATAR URL VALIDATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class TestG_FileUpload:
-    """Category G — Avatar upload endpoint abuse."""
+class TestG_AvatarUrl:
+    """Category G — Avatar URL validation via PATCH /profile/update/me/."""
 
-    _URL = f"{AUTH_BASE}/profile/upload_avatar/"
+    _URL = f"{AUTH_BASE}/profile/update/me/"
 
-    def test_g01_upload_requires_auth(self):
-        r = requests.post(
+    def test_g01_valid_https_url_accepted(self, regular_user: dict):
+        r = requests.patch(
             self._URL,
-            files={"file": ("x.jpg", b"x", "image/jpeg")},
+            json={"avatar": "https://cdn.example.com/avatar.jpg"},
+            headers=regular_user["headers"],
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 200
+
+    def test_g02_bare_filename_rejected(self, regular_user: dict):
+        r = requests.patch(
+            self._URL,
+            json={"avatar": "avatar.png"},
+            headers=regular_user["headers"],
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 422, (
+            "[FINDING-G02] Bare filename accepted as avatar — should be URL only"
+        )
+
+    def test_g03_ftp_scheme_rejected(self, regular_user: dict):
+        r = requests.patch(
+            self._URL,
+            json={"avatar": "ftp://example.com/avatar.png"},
+            headers=regular_user["headers"],
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 422, (
+            "[FINDING-G03] ftp:// avatar URL accepted — only http/https allowed"
+        )
+
+    def test_g04_protocol_only_rejected(self, regular_user: dict):
+        r = requests.patch(
+            self._URL,
+            json={"avatar": "https://"},
+            headers=regular_user["headers"],
+            timeout=TIMEOUT,
+        )
+        assert r.status_code == 422, (
+            "[FINDING-G04] Protocol-only URL accepted — host required"
+        )
+
+    def test_g05_requires_auth(self):
+        r = requests.patch(
+            self._URL,
+            json={"avatar": "https://cdn.example.com/avatar.jpg"},
             timeout=TIMEOUT,
         )
         assert r.status_code in (401, 403)
-
-    def test_g02_php_file_rejected_by_mime(self, regular_user: dict):
-        r = requests.post(
-            self._URL,
-            files={
-                "file": ("shell.php", b"<?php system($_GET['c']); ?>", "text/plain")
-            },
-            headers=regular_user["headers"],
-            timeout=TIMEOUT,
-        )
-        assert r.status_code in (400, 422), (
-            "[FINDING-G02] PHP file with text/plain MIME accepted — webshell risk"
-        )
-
-    def test_g03_script_extension_rejected(self, regular_user: dict):
-        r = requests.post(
-            self._URL,
-            files={"file": ("evil.js", b"alert(1)", "image/jpeg")},
-            headers=regular_user["headers"],
-            timeout=TIMEOUT,
-        )
-        assert r.status_code in (400, 422), (
-            "[FINDING-G03] .js extension accepted despite image MIME type"
-        )
-
-    def test_g04_svg_with_xss_rejected_or_sanitised(self, regular_user: dict):
-        """SVG files can carry inline JavaScript."""
-        svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
-        r = requests.post(
-            self._URL,
-            files={"file": ("evil.svg", svg, "image/svg+xml")},
-            headers=regular_user["headers"],
-            timeout=TIMEOUT,
-        )
-        if r.status_code == 200:
-            body_str = json.dumps(r.json())
-            assert "<script>" not in body_str, (
-                "[FINDING-G04] SVG with XSS accepted without sanitization"
-            )
-
-    def test_g05_path_traversal_in_filename_sanitised(self, regular_user: dict):
-        """../../etc/passwd as filename must not escape the avatar directory."""
-        r = requests.post(
-            self._URL,
-            files={"file": ("../../etc/passwd", b"\xff\xd8\xff\xe0", "image/jpeg")},
-            headers=regular_user["headers"],
-            timeout=TIMEOUT,
-        )
-        if r.status_code == 200:
-            fname = r.json().get("avatar", "")
-            assert "/" not in fname and ".." not in fname, (
-                f"[FINDING-G05] Path traversal filename not sanitised: '{fname}'"
-            )
-
-    def test_g06_oversized_file_rejected(self, regular_user: dict):
-        """Files beyond MAX_IMG_FILE_SIZE (≈2 MB) must be rejected."""
-        big = b"\xff\xd8\xff" + b"A" * (3 * 1024 * 1024)
-        r = requests.post(
-            self._URL,
-            files={"file": ("big.jpg", big, "image/jpeg")},
-            headers=regular_user["headers"],
-            timeout=TIMEOUT,
-        )
-        assert r.status_code in (400, 413, 422), (
-            "[FINDING-G06] 3 MB file accepted — potential storage/DoS attack"
-        )
-
-    def test_g07_exe_extension_with_image_mime_rejected(self, regular_user: dict):
-        r = requests.post(
-            self._URL,
-            files={"file": ("malware.exe", b"\xff\xd8\xff", "image/png")},
-            headers=regular_user["headers"],
-            timeout=TIMEOUT,
-        )
-        assert r.status_code in (400, 422), (
-            "[FINDING-G07] .exe disguised as image accepted"
-        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

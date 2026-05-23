@@ -28,6 +28,22 @@ done
 
 echo "==> M8 init: $(basename "$(pwd)")"
 
+# --- Bootstrap missing env files from .example counterparts ---
+_copied=()
+for tmpl in .env.example auth.env.example api.env.example; do
+    target="${tmpl%.example}"
+    if [[ -f "$tmpl" ]] && [[ ! -f "$target" ]]; then
+        cp "$tmpl" "$target"
+        _copied+=("$target")
+    fi
+done
+if [[ ${#_copied[@]} -gt 0 ]]; then
+    echo ""
+    echo "NOTE: copied example env files — replace every 'changethis' before 'docker compose up':"
+    for f in "${_copied[@]}"; do echo "        $f"; done
+    echo ""
+fi
+
 # --- DB reset (destructive, confirmation-gated) ---
 if [[ "$RESET_DB" == "true" ]]; then
     echo ""

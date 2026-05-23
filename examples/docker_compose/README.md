@@ -20,21 +20,23 @@ Five ready-to-run stacks, each targeting a distinct use case. Each runs the same
 
 ## Which stack should I use?
 
-| Stack | Database | Algorithm | Token mode | Secrets | Monitoring | Best for |
-| --- | --- | --- | --- | --- | --- | --- |
-| [quickstart_m8](quickstart_m8/) | MariaDB | HS256 | `stateful` | env file | — | **Start here** — fastest onboarding |
-| [postgres_m8](postgres_m8/) | PostgreSQL 16 | HS256 | `stateful` | env file | — | PostgreSQL projects |
-| [rs256_m8](rs256_m8/) | MariaDB | RS256 | `hybrid` | env file | — | Asymmetric signing + JWKS |
-| [metrics_m8](metrics_m8/) | PostgreSQL 16 | HS256 | `stateful` | env file | Prometheus + Grafana | Metrics dashboards |
-| [vault_rs256_postgres_m8](vault_rs256_postgres_m8/) | PostgreSQL 16 | RS256 | `stateful` | **HashiCorp Vault** | Prometheus + Grafana | Hardened secrets management |
+| Stack | Database | Algorithm | Token mode | Secrets | Monitoring | Hardening | Best for |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [quickstart_m8](quickstart_m8/) | MariaDB | HS256 | `stateful` | env file | — | — | **Start here** — fastest onboarding |
+| [postgres_m8](postgres_m8/) | PostgreSQL 16 | HS256 | `stateful` | env file | — | — | PostgreSQL projects |
+| [rs256_m8](rs256_m8/) | MariaDB | RS256 | `hybrid` | env file | — | — | Asymmetric signing + JWKS |
+| [metrics_m8](metrics_m8/) | PostgreSQL 16 | HS256 | `stateful` | env file | Prometheus + Grafana | — | Metrics dashboards |
+| [hardened_m8](hardened_m8/) | PostgreSQL 16 | RS256 | `stateful` | env file | Prometheus + Grafana | container + network | Hardened posture without Vault |
+| [vault_m8](vault_m8/) | PostgreSQL 16 | RS256 | `stateful` | **HashiCorp Vault** | Prometheus + Grafana | container + network | Hardened + secrets manager |
 
 **Decision guide:**
 
 - **Just want things running** → [quickstart_m8](quickstart_m8/)
 - **Need PostgreSQL without monitoring** → [postgres_m8](postgres_m8/)
-- **Asymmetric signing / multiple consumers** → [rs256_m8](rs256_m8/) or [vault_rs256_postgres_m8](vault_rs256_postgres_m8/)
+- **Asymmetric signing / multiple consumers** → [rs256_m8](rs256_m8/) or [hardened_m8](hardened_m8/)
 - **Metrics and dashboards** → [metrics_m8](metrics_m8/)
-- **Secrets manager (Vault)** → [vault_rs256_postgres_m8](vault_rs256_postgres_m8/) — credentials never live in plain env files
+- **Container hardening + observability** → [hardened_m8](hardened_m8/) — Docker Hub image, read-only rootfs, network segmentation
+- **Secrets manager (Vault)** → [vault_m8](vault_m8/) — credentials never live in plain env files
 - **Stateless mode** → start from [quickstart_m8](quickstart_m8/) and set `TOKEN_MODE=stateless` in `auth.env`
 
 ---
@@ -59,7 +61,7 @@ auth_user_service :8000            fastapi_service :8000
         m8_db          redis_cache
    (MariaDB / PG)      (Redis 7.4)
 
-(metrics_m8 and vault_rs256_postgres_m8 also include Prometheus + Grafana)
+(metrics_m8, hardened_m8, and vault_m8 also include Prometheus + Grafana)
 ```
 
 Traefik is the single entry point. Both application services sit on an internal Docker network (`m8_app_network`) and are not directly reachable from the host.
@@ -196,9 +198,9 @@ Migrations run automatically every time the containers start. If you switch stac
 | `8080` | `127.0.0.1` | Traefik dashboard |
 | `3306` / `5432` | `127.0.0.1` | Database |
 | `6379` | `127.0.0.1` | Redis |
-| `8200` | `127.0.0.1` | HashiCorp Vault UI/API (`vault_rs256_postgres_m8` only) |
-| `9090` | `127.0.0.1` | Prometheus (`metrics_m8`, `vault_rs256_postgres_m8`) |
-| `3000` | `127.0.0.1` | Grafana (`metrics_m8`, `vault_rs256_postgres_m8`) |
+| `8200` | `127.0.0.1` | HashiCorp Vault UI/API (`vault_m8` only) |
+| `9090` | `127.0.0.1` | Prometheus (`metrics_m8`, `hardened_m8`, `vault_m8`) |
+| `3000` | `127.0.0.1` | Grafana (`metrics_m8`, `hardened_m8`, `vault_m8`) |
 
 Port `9000` is the one you'll use most in development — all API requests go through it.
 

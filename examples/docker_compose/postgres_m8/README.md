@@ -62,7 +62,7 @@ Traefik is the single entry point. Both services run on the internal `m8_app_net
 
 - **No Prometheus / Grafana.** Use [metrics_m8](../metrics_m8/) if you need dashboards.
 - **HS256 symmetric signing.** All services share the same secret. Use [rs256_m8](../rs256_m8/) for asymmetric signing with JWKS.
-- **No Vault.** Secrets live in the `auth.env` file. Use [vault_rs256_postgres_m8](../vault_rs256_postgres_m8/) for secrets-manager integration.
+- **No Vault.** Secrets live in the `auth.env` file. Use [vault_m8](../vault_m8/) for secrets-manager integration.
 
 ---
 

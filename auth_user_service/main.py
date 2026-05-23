@@ -12,7 +12,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.routing import APIRoute
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from redis.exceptions import ConnectionError as RedisConnectionError
 from sqlalchemy.exc import OperationalError as SQLAlchemyOperationalError
 from starlette.middleware.sessions import SessionMiddleware
@@ -262,12 +261,6 @@ app.add_middleware(
 
 if settings.METRICS_ENABLED:
     app.add_middleware(MetricsMiddleware)
-
-app.mount(
-    f"{settings.API_PREFIX}/static",
-    StaticFiles(directory=settings.STATIC_BASE_PATH),
-    name="static",
-)
 
 app.include_router(api_router, prefix=settings.API_PREFIX)
 

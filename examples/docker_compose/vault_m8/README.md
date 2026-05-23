@@ -1,4 +1,4 @@
-# vault_rs256_postgres_m8
+# vault_m8
 
 **PostgreSQL 16** + **RS256 asymmetric token signing** + **HashiCorp Vault** secret injection + **stateful** token mode + **Prometheus & Grafana** observability.
 
@@ -131,7 +131,7 @@ auth_user_service reads secret/data/app → injects into CommonSettings
 | redis_cache | redis:7.4-alpine | `127.0.0.1:6379` |
 | prometheus | ubuntu/prometheus:3.11-24.04_stable | `127.0.0.1:9090` |
 | grafana | grafana/grafana:13.1.0 | `127.0.0.1:3000` |
-| auth_user_service | local build | via Traefik at `/user` |
+| auth_user_service | [tepochtli/fa-auth-m8:latest](https://hub.docker.com/r/tepochtli/fa-auth-m8) | via Traefik at `/user` |
 | fastapi_service | local build | via Traefik at `/fastapi` |
 
 ---
@@ -187,8 +187,10 @@ bash init.sh
 ### 3. Start
 
 ```sh
-docker compose up --build
+docker compose up -d
 ```
+
+`auth_user_service` uses a pre-built image from Docker Hub — no `--build` needed. Only `fastapi_service` is built locally.
 
 **Startup order:**
 

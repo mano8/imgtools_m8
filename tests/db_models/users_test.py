@@ -163,6 +163,66 @@ class TestUpdatePassword:
         assert p.new_password == "newpassword"
 
 
+class TestAvatarUrlValidator:
+    """Validate the UserBase.validate_avatar_url field validator."""
+
+    def _make(self, avatar):
+        return UserUpdateMe(avatar=avatar)
+
+    def test_none_passes(self):
+        assert self._make(None).avatar is None
+
+    def test_valid_https_url(self):
+        url = "https://cdn.example.com/avatar.jpg"
+        assert self._make(url).avatar == url
+
+    def test_valid_http_url(self):
+        url = "http://img.example.com/avatar.png"
+        assert self._make(url).avatar == url
+
+    def test_bare_filename_rejected(self):
+        with pytest.raises(Exception):
+            self._make("avatar.png")
+
+    def test_ftp_scheme_rejected(self):
+        with pytest.raises(Exception):
+            self._make("ftp://example.com/avatar.png")
+
+    def test_protocol_only_http_rejected(self):
+        with pytest.raises(Exception):
+            self._make("http://")
+
+    def test_protocol_only_https_rejected(self):
+        with pytest.raises(Exception):
+            self._make("https://")
+
+    def test_query_only_no_host_rejected(self):
+        with pytest.raises(Exception):
+            self._make("https://?x=1")
+
+    def test_fragment_only_no_host_rejected(self):
+        with pytest.raises(Exception):
+            self._make("https://#frag")
+
+    def test_trailing_whitespace_rejected(self):
+        with pytest.raises(Exception):
+            self._make("https://example.com/avatar.jpg ")
+
+    def test_leading_whitespace_rejected(self):
+        with pytest.raises(Exception):
+            self._make(" https://example.com/avatar.jpg")
+
+    def test_non_string_rejected(self):
+        with pytest.raises(Exception):
+            self._make(12345)
+
+    def test_user_update_avatar_validated(self):
+        url = "https://cdn.example.com/a.jpg"
+        assert UserUpdate(avatar=url).avatar == url
+        with pytest.raises(Exception):
+            UserUpdate(avatar="bad.jpg")
+
+
 class TestUserPublicAndList:
     def test_users_public_wrapper(self):
         pub_user = UserPublic(

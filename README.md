@@ -48,7 +48,7 @@ The included example stacks use `_m8` in their names as a personal naming conven
 - **API key authentication** with per-key fixed-window rate limiting (MINUTE / HOUR / DAY / MONTH), `X-RateLimit-*` response headers, and write-behind `last_used_at` tracking
 - Role-based access control (`user`, `admin`, `superuser`)
 - User management CRUD (superuser only)
-- Profile self-service (read, update, password change, delete account, avatar upload)
+- Profile self-service (read, update, password change, delete account, avatar URL)
 - Dashboard activity endpoints
 - Private inter-service API (protected by shared secret + Docker network isolation)
 - MySQL **or** PostgreSQL — switchable via a single env var
@@ -94,7 +94,8 @@ Five ready-to-run stacks are provided under [`examples/docker_compose/`](https:/
 | [`postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/postgres_m8) | PostgreSQL 16 | HS256 | `stateful` | — | PostgreSQL variant |
 | [`rs256_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/rs256_m8) | MariaDB | RS256 | `hybrid` | — | Asymmetric signing + JWKS |
 | [`metrics_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/metrics_m8) | PostgreSQL 16 | HS256 | `stateful` | Prometheus + Grafana | Metrics dashboards |
-| [`vault_rs256_postgres_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/vault_rs256_postgres_m8) | PostgreSQL 16 | RS256 | `stateful` | Prometheus + Grafana | HashiCorp Vault secret injection |
+| [`hardened_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/hardened_m8) | PostgreSQL 16 | RS256 | `stateful` | Prometheus + Grafana | Container hardening + Docker Hub image |
+| [`vault_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/vault_m8) | PostgreSQL 16 | RS256 | `stateful` | Prometheus + Grafana | HashiCorp Vault + Docker Hub image |
 
 **Start here →** [`quickstart_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/quickstart_m8) for the fastest path to a running stack.
 
@@ -130,7 +131,6 @@ All routes are prefixed with `API_PREFIX` (default `/user`).
 | profile | GET | `/profile/get/me/` | JWT | Read own profile |
 | profile | PATCH | `/profile/update/me/` | JWT | Update own profile |
 | profile | PATCH | `/profile/me/password/` | JWT | Change own password |
-| profile | POST | `/profile/upload_avatar/` | JWT | Upload profile avatar |
 | profile | DELETE | `/profile/delete/me/` | JWT | Delete own account |
 | api-keys | GET | `/profile/api-keys/verify` | X-API-Key | Validate key header, enforce rate limits, return key metadata |
 | api-keys | POST | `/profile/api-keys/` | JWT | Create API key — plaintext returned once, never stored |
@@ -464,13 +464,6 @@ A startup warning is logged if the effective rate (requests ÷ window) exceeds 5
 | `TRUSTED_PROXY_IPS` | `172.16.0.0/12` | CIDR(s) Uvicorn trusts as reverse-proxy source for `X-Forwarded-For` |
 | `STRICT_PRODUCTION_MODE` | `false` | When `true`, enforce production-grade checks (e.g. secure cookies) even in non-production environments |
 
-### Static / Templates
-
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
-| `STATIC_BASE_PATH` | yes | Absolute path to static files directory |
-| `TEMPLATES_BASE_PATH` | yes | Absolute path to Jinja2 templates directory |
-
 ---
 
 ## Infrastructure Resilience
@@ -746,7 +739,7 @@ Enabled with `METRICS_ENABLED=true`. The metric prefix is derived from `API_PREF
 | auth | `{prefix}auth_api_key_lifecycle_total` | Counter | action: created \| revoked |
 | auth | `{prefix}auth_api_key_flush_duration_seconds` | Histogram | — |
 
-Alert rules for `stateful_m8`, `env_rs256_m8`, and `vault_rs256_postgres_m8` stacks (`prometheus/alerts.yml`):
+Alert rules for `metrics_m8` and `vault_m8` stacks (`prometheus/alerts.yml`):
 
 - `ApiKeyBlockRatioHigh` — hits/checks > 10% over 5 min
 - `ApiKeyRateLimitInvariantViolation` — hits > checks × 1.1 (instrumentation sanity guard)

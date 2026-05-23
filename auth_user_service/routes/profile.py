@@ -1,12 +1,8 @@
 """Users routes"""
 
-import uuid
 from typing import Any
-from os.path import join as PathJoin
-from pathlib import Path
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException
 
-from auth_user_service.core.config import settings
 from auth_user_service.services.users import UserController
 from auth_user_service.core.deps import CurrentUser, SessionDep
 from auth_user_service.core.security import SecurityHelper
@@ -16,8 +12,7 @@ from auth_user_service.db_models.users import (
     UserPublic,
     UserUpdateMe,
 )
-from auth_user_service.schemas.user import ResponseUploadedAvatar, ResponseUser
-from auth_user_service.utils.files import FilesHelper
+from auth_user_service.schemas.user import ResponseUser
 from auth_sdk_m8.controllers.base import BaseController
 from auth_sdk_m8.models.shared import Message
 from auth_user_service.core.exceptions import handle_route_exception
@@ -25,71 +20,6 @@ from auth_user_service.core.exceptions import handle_route_exception
 # pylint: disable=not-callable, broad-exception-caught
 
 router = APIRouter(prefix="/profile", tags=["profile"])
-
-
-@router.post(
-    "/upload_avatar/",
-    response_model=ResponseUploadedAvatar,
-    responses=BaseController.get_error_responses(),
-)
-def update_avatar(
-    *, session: SessionDep, current_user: CurrentUser, file: UploadFile = File(...)
-) -> Any:
-    """
-    Update own user.
-    """
-    try:
-        if file.content_type not in FilesHelper.ALLOWED_IMG_MIME_TYPES:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Invalid file MIME type. Allowed types: "
-                    f"{', '.join(FilesHelper.ALLOWED_IMG_MIME_TYPES)}"
-                ),
-            )
-        ext = FilesHelper.get_file_extension(file.filename)
-        if ext not in FilesHelper.ALLOWED_IMG_EXTENSIONS:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Invalid file extension. Allowed extensions: "
-                    f"{', '.join(FilesHelper.ALLOWED_IMG_EXTENSIONS)}"
-                ),
-            )
-        contents = file.file.read(FilesHelper.MAX_IMG_FILE_SIZE + 1)
-        if len(contents) > FilesHelper.MAX_IMG_FILE_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail=(
-                    f"File too large. Maximum size: {FilesHelper.MAX_IMG_FILE_SIZE} bytes"
-                ),
-            )
-        file.file.seek(0)
-        unique_filename = f"{uuid.uuid4().hex}{ext}"
-        file_path = PathJoin(
-            Path(settings.STATIC_BASE_PATH), "avatars", unique_filename
-        )
-
-        with open(file_path, "wb") as buffer:
-            while chunk := file.file.read(1024 * 1024):
-                buffer.write(chunk)
-        db_user = session.get(User, current_user.id)
-        if db_user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-        db_user.avatar = str(unique_filename)
-        session.add(db_user)
-        session.commit()
-        return ResponseUploadedAvatar(
-            success=True,
-            msg=f"Successfully uploaded {file.filename}",
-            avatar=unique_filename,
-        )
-    except HTTPException:
-        raise
-    except Exception as ex:
-        return handle_route_exception(ex=ex, session=session)
-    finally:
-        file.file.close()
 
 
 @router.patch(

@@ -1,0 +1,113 @@
+# dynamic_conf.yml — Development
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: "/etc/traefik/certs/local.crt"
+        keyFile:  "/etc/traefik/certs/local.key"
+  certificates:
+    - certFile: "/etc/traefik/certs/local.crt"
+      keyFile:  "/etc/traefik/certs/local.key"
+http:
+
+  routers:
+    # Dashboard — localhost only, IP-restricted
+    traefik-dashboard:
+      entryPoints:
+        - websecure
+      rule: "Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      service: api@internal
+      middlewares:
+        - ip-allowlist
+      tls: {}
+
+    # Auth-User-Service: public routes on HTTPS (health and metrics are internal-only)
+    auth-public-router:
+      entryPoints:
+        - websecure
+      rule: "Host(`localhost`) && PathPrefix(`/user`) && !(PathPrefix(`/user/health`) || PathPrefix(`/user/metrics`))"
+      service: auth-service
+      middlewares:
+        - security-headers
+      tls: {}
+      priority: 2
+
+    # Auth-User-Service: all routes on the localhost-bound api entryPoint (port 9000)
+    auth-internal-router:
+      entryPoints:
+        - api
+      rule: "PathPrefix(`/user`)"
+      service: auth-service
+      middlewares:
+        - security-headers
+        - internal-only
+
+    # FastAPI-Service: public routes on HTTPS
+    fastapi-public-router:
+      entryPoints:
+        - websecure
+      rule: "Host(`localhost`) && PathPrefix(`/fastapi`)"
+      service: fastapi-service
+      middlewares:
+        - security-headers
+      tls: {}
+
+    # FastAPI-Service: all routes on the localhost-bound api entryPoint (port 9000)
+    fastapi-internal-router:
+      entryPoints:
+        - api
+      rule: "PathPrefix(`/fastapi`)"
+      service: fastapi-service
+      middlewares:
+        - security-headers
+        - internal-only
+
+  services:
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://auth_user_service:8000"
+    fastapi-service:
+      loadBalancer:
+        servers:
+          - url: "http://fastapi_service:8000"
+
+  middlewares:
+    ip-allowlist:
+      IPAllowList:
+        # Only allow dashboard from the Docker host itself
+        sourceRange:
+          - "127.0.0.1/32"
+          - "172.16.0.0/12"   # Docker bridge networks
+          - "::1/128"
+
+    internal-only:
+      IPAllowList:
+        # Restrict health/metrics to localhost and Docker bridge networks
+        sourceRange:
+          - "127.0.0.1/32"
+          - "172.16.0.0/12"   # Docker bridge networks
+          - "::1/128"
+
+    security-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex,nofollow"
+          Server: ""
+        # ── HSTS — opt-in, public/production deployments only ────────────────
+        # WARNING: enabling HSTS instructs browsers to refuse all HTTP connections
+        # to this host for the duration of stsSeconds — even after you disable it.
+        # Do NOT enable unless:
+        #   - TLS is correctly configured with a stable, trusted certificate
+        #   - this hostname will remain HTTPS-only for the full stsSeconds period
+        # In self-hosted / LAN deployments, enabling HSTS prematurely can lock
+        # browsers out until the HSTS cache expires (up to 1 year).
+        # Uncomment the block below only when the above conditions are met:
+        #
+        # stsSeconds: 31536000       # 1 year
+        # stsIncludeSubdomains: true
+        # stsPreload: false          # only set true after submitting to HSTS preload list

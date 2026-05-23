@@ -4,7 +4,7 @@
 
 Access tokens are signed with a private RSA key (auth service only) and verified with the corresponding public key (consumer services). Consumers discover the public key automatically via the **JWKS endpoint** — no manual key distribution required.
 
-**Choose this when:** you need asymmetric signing with JWKS support, but don't need Prometheus/Grafana dashboards. Use [metrics_m8](../metrics_m8/) or [vault_rs256_postgres_m8](../vault_rs256_postgres_m8/) if you also want metrics.
+**Choose this when:** you need asymmetric signing with JWKS support, but don't need Prometheus/Grafana dashboards. Use [hardened_m8](../hardened_m8/) for RS256 with metrics and container hardening, or [vault_m8](../vault_m8/) if you also need Vault.
 
 ---
 
@@ -63,9 +63,9 @@ The auth service holds the **private key** and issues signed tokens. The fastapi
 
 ## Limitations
 
-- **No Prometheus / Grafana.** Use [metrics_m8](../metrics_m8/) for HS256+metrics or [vault_rs256_postgres_m8](../vault_rs256_postgres_m8/) for RS256+metrics.
-- **No Vault.** The RSA private key is stored as a file mounted into the container. Use [vault_rs256_postgres_m8](../vault_rs256_postgres_m8/) for secrets-manager integration.
-- **MariaDB only.** For PostgreSQL with RS256, use [vault_rs256_postgres_m8](../vault_rs256_postgres_m8/).
+- **No Prometheus / Grafana.** Use [hardened_m8](../hardened_m8/) for RS256+metrics or [metrics_m8](../metrics_m8/) for HS256+metrics.
+- **No Vault.** The RSA private key is stored as a file mounted into the container. Use [vault_m8](../vault_m8/) for secrets-manager integration.
+- **MariaDB only.** For PostgreSQL with RS256, use [hardened_m8](../hardened_m8/) or [vault_m8](../vault_m8/).
 
 ---
 
