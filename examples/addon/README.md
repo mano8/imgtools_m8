@@ -73,7 +73,7 @@ oauth-callback.tsx
 ### 1 — Generate keys and start the backend
 
 ```bash
-cd examples/docker_compose/env_rs256_m8
+cd examples/docker_compose/rs256_m8
 bash init.sh          # generates RSA keys + mkcert TLS certs
 cp auth.env.example auth.env
 # edit auth.env: set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT_URI,
@@ -95,7 +95,7 @@ CORS_ALLOWED_ORIGIN_SCHEMES=chrome-extension://
 # URI schemes allowed as redirect_target (default shown).
 OAUTH_ALLOWED_REDIRECT_SCHEMES=chrome-extension://
 
-# Metrics (already enabled in env_rs256_m8).
+# Metrics (already enabled in rs256_m8).
 METRICS_ENABLED=true
 ```
 
