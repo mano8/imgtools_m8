@@ -9,18 +9,14 @@ from typing import Annotated, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from redis import ConnectionPool, Redis
 
 from auth_sdk_m8.core.exceptions import InvalidToken
 from auth_sdk_m8.schemas.base import RoleType
 from auth_sdk_m8.schemas.user import UserModel
-from auth_sdk_m8.security import (
-    AccessTokenBlacklist,
-    ValidationHooks,
-    build_access_validator,
-)
+from auth_sdk_m8.security import ValidationHooks, build_access_validator
 
 from fastapi_service.core.config import settings
+from fastapi_service.core.revocation import RemoteRevocationClient, RevocationCheckError
 
 _logger = logging.getLogger(__name__)
 
@@ -43,56 +39,31 @@ class _LoggingHooks:
 _hooks: ValidationHooks = _LoggingHooks()
 
 # Module-level validator — created once at startup, not per-request.
-# iss/aud enforcement is opt-in via TOKEN_ISSUER / TOKEN_AUDIENCE settings.
 _validator = build_access_validator(settings, _hooks)
 
-# Shared connection pool — avoids creating a new TCP connection on every
-# request.  Skipped entirely in stateless mode (no Redis needed).
-_redis_pool: Optional[ConnectionPool] = (
-    ConnectionPool(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        username=settings.REDIS_USER,
-        password=settings.REDIS_PASSWORD.get_secret_value() or None,
-        decode_responses=True,
+# Revocation client — created only for stateful consumers.
+# INTROSPECTION_URL and PRIVATE_API_SECRET are guaranteed non-None by the
+# _require_introspection_for_stateful_consumer validator when this branch runs.
+_revocation_client: Optional[RemoteRevocationClient] = None
+if settings.is_stateful and settings.AUTH_SERVICE_ROLE == "consumer":
+    _revocation_client = RemoteRevocationClient(
+        introspection_url=str(settings.INTROSPECTION_URL),  # type: ignore[arg-type]
+        private_api_secret=settings.PRIVATE_API_SECRET.get_secret_value(),  # type: ignore[union-attr]
     )
-    if settings.requires_redis
-    else None
-)
 
 
-def get_redis_client() -> Optional[Redis]:
-    """Return a Redis client from the shared pool, or None when unavailable.
-
-    A ping is issued on every call so that ``if redis is not None:`` guards
-    correctly reflect the actual connection state.
-    """
-    if _redis_pool is None:
-        return None
-    try:
-        client = Redis(connection_pool=_redis_pool)
-        client.ping()
-        return client
-    except Exception:
-        _logger.warning("redis.unavailable blacklist_check=skipped")
-        return None
-
-
-RedisDep = Annotated[Optional[Redis], Depends(get_redis_client)]
-
-
-def get_current_user(token: TokenDep, redis: RedisDep) -> UserModel:
+async def get_current_user(token: TokenDep) -> UserModel:
     """Retrieve the current user from the JWT access token.
 
     Args:
         token: JWT string extracted from the Authorization header.
-        redis: Optional Redis client; None when Redis is unavailable.
 
     Returns:
         Authenticated ``UserModel``.
 
     Raises:
         HTTPException 403: Token invalid, expired, revoked, or user inactive.
+        HTTPException 503: Revocation check unavailable (fail-closed mode only).
     """
     try:
         payload = _validator.validate_access_token(token)
@@ -102,13 +73,18 @@ def get_current_user(token: TokenDep, redis: RedisDep) -> UserModel:
             detail="Could not validate credentials.",
         ) from ex
 
-    # In stateful mode, verify the JTI has not been blacklisted by auth service.
-    if settings.is_stateful and redis is not None:
-        if AccessTokenBlacklist(redis).is_revoked(payload.jti):
+    if _revocation_client is not None:
+        try:
+            if await _revocation_client.is_revoked(payload.jti):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Token has been revoked.",
+                )
+        except RevocationCheckError as ex:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Token has been revoked.",
-            )
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Token revocation check unavailable.",
+            ) from ex
 
     payload_dict = payload.model_dump(exclude={"exp", "jti", "type", "sub"})
     payload_dict["id"] = payload.sub

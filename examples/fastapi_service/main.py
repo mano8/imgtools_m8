@@ -24,34 +24,26 @@ _metrics.setup(
 
 
 def _startup_checks() -> None:
-    """Log env-var consistency warnings and verify Redis when needed."""
+    """Log env-var consistency warnings at startup."""
     from auth_sdk_m8.core.config import check_config_health
 
     check_config_health(settings, _logger)
 
-    if settings.requires_redis:
-        try:
-            from fastapi_service.core.deps import get_redis_client  # type: ignore[import]
-
-            redis = get_redis_client()
-            if redis is None:
-                _logger.critical(
-                    "STARTUP: Redis unreachable but TOKEN_MODE=%s — "
-                    "token revocation checks are disabled",
-                    settings.TOKEN_MODE,
-                )
-            else:
-                _logger.info(
-                    "STARTUP: Redis connected OK (TOKEN_MODE=%s)", settings.TOKEN_MODE
-                )
-        except ImportError:
-            _logger.debug("STARTUP: no Redis dep module — skipping Redis check")
+    if settings.is_stateful and settings.AUTH_SERVICE_ROLE == "consumer":
+        _logger.info(
+            "STARTUP: token revocation via HTTP introspection at %s",
+            settings.INTROSPECTION_URL,
+        )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _startup_checks()
     yield
+    from fastapi_service.core.deps import _revocation_client  # noqa: PLC0415
+
+    if _revocation_client is not None:
+        await _revocation_client.close()
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:

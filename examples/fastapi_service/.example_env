@@ -1,6 +1,6 @@
 # Copy to .env and replace every "changethis" with real values.
 # Consumer service — validates tokens issued by auth_user_service.
-# Does NOT include auth-service-only settings (FIRST_SUPERUSER, PRIVATE_API_SECRET,
+# Does NOT include auth-service-only settings (FIRST_SUPERUSER,
 # TOKENS_ENCRYPTION_KEY, key files).
 
 # ── Identity ──────────────────────────────────────────────────────────────────
@@ -34,12 +34,6 @@ DB_DATABASE=api_db
 DB_USER=changethis
 DB_PASSWORD=changethis
 
-# ── Redis ─────────────────────────────────────────────────────────────────────
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-REDIS_USER=appuser
-REDIS_PASSWORD=changethis
-
 # ── Token verification ────────────────────────────────────────────────────────
 # HS256 mode: share the same ACCESS_SECRET_KEY with auth_user_service
 ACCESS_SECRET_KEY=changethis
@@ -48,9 +42,9 @@ ACCESS_TOKEN_ALGORITHM=HS256
 REFRESH_TOKEN_ALGORITHM=HS256
 
 # Must match auth_user_service TOKEN_MODE exactly:
-#   stateless — no Redis needed, no revocation
-#   hybrid    — Redis for refresh JTIs only
-#   stateful  — Redis blacklist for access tokens (full revocation)
+#   stateless — no revocation
+#   hybrid    — revocation for refresh tokens only (no introspection needed)
+#   stateful  — full revocation via HTTP introspection (requires INTROSPECTION_URL)
 TOKEN_MODE=stateful
 
 ACCESS_TOKEN_EXPIRE_MINUTES=60
@@ -66,6 +60,12 @@ REFRESH_TOKEN_EXPIRE_MINUTES=3600
 # Optional claim enforcement — must match auth_user_service if set:
 # TOKEN_ISSUER=https://auth.example.com
 # TOKEN_AUDIENCE=https://api.example.com
+
+# ── Token revocation (stateful mode only) ─────────────────────────────────────
+# Required when TOKEN_MODE=stateful. Must match auth_user_service PRIVATE_API_SECRET.
+# The auth service exposes this endpoint on its Docker-internal network only.
+INTROSPECTION_URL=http://auth_user_service:8000/user/private/v1/jti-status
+PRIVATE_API_SECRET=changethis
 
 # ── Observability ─────────────────────────────────────────────────────────────
 # Master switch — false = zero overhead, /metrics endpoint not registered

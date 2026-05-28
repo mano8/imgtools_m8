@@ -4,6 +4,62 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] — 2026-05-26 · Redis isolation — consumer services use HTTP introspection
+
+### Breaking changes
+
+- **Consumer services no longer connect to auth Redis directly.** The `REDIS_*`
+  env vars (`REDIS_HOST`, `REDIS_PORT`, `REDIS_USER`, `REDIS_PASSWORD`) are
+  **removed from `fastapi_service` and all `api.env` / `api.env.example`
+  files**.  Consumer services that set these fields must remove them; the
+  `auth-sdk-m8` SDK now rejects unknown Redis fields for consumer roles via
+  `extra="forbid"`.
+
+- **`INTROSPECTION_URL` and `PRIVATE_API_SECRET` are now required when
+  `AUTH_SERVICE_ROLE=consumer` and `TOKEN_MODE=stateful`.**  Both must be set
+  in each consumer's env file before upgrading a stateful stack.
+  `PRIVATE_API_SECRET` must match the auth service value.
+
+### Added
+
+- **`POST /private/v1/jti-status`** — new private inter-service endpoint on
+  `auth_user_service`.  Accepts `{"jti": "..."}` and returns
+  `{"active": bool}`.  Hidden from Swagger (`include_in_schema=False`).
+  Protected by `X-Internal-Token` + Docker network isolation like all private
+  routes.  Fails-open when Redis is unavailable (matches the default
+  `ACCESS_REVOCATION_FAILURE_MODE` behaviour).
+
+- **`examples/fastapi_service/core/revocation.py`** — `RemoteRevocationClient`
+  async HTTP client (httpx-backed).  Fail-open by default; set
+  `fail_closed=True` to reject tokens when the auth service is unreachable.
+
+- **`INTROSPECTION_URL`** (`Optional[HttpUrl]`) and **`PRIVATE_API_SECRET`**
+  (`Optional[SecretStr]`) added to `fastapi_service` `Settings`.  Validated at
+  startup: both required for `consumer + stateful`; ignored for `hybrid` /
+  `stateless`.
+
+### Changed
+
+- `fastapi_service/core/deps.py` — removed Redis pool, `get_redis_client`,
+  and `RedisDep`.  `get_current_user` is now `async`; revocation check calls
+  `RemoteRevocationClient.is_revoked()` instead of `AccessTokenBlacklist`.
+  Returns HTTP 503 in fail-closed mode when the introspection endpoint is
+  unreachable.
+
+- `fastapi_service/main.py` — startup check updated: logs introspection URL
+  instead of Redis connectivity.  Lifespan now closes the revocation client
+  httpx session on shutdown.
+
+- All six `docker-compose.yml` stacks — removed `redis_cache: condition:
+  service_healthy` from `fastapi_service.depends_on`.  The consumer no longer
+  needs Redis to start; it waits only for the database and auth service.
+
+- All six `api.env` and `api.env.example` files — removed `REDIS_*` block;
+  added `INTROSPECTION_URL` + `PRIVATE_API_SECRET` for stateful stacks;
+  hybrid (`rs256_m8`) shows them commented-out as optional.
+
+---
+
 ## [0.10.0] — 2026-05-23 · Remove avatar upload; clean shared settings; unify secret-key validation
 
 ### Breaking changes

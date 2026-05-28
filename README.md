@@ -8,7 +8,7 @@
 
 A production-ready, self-hosted FastAPI (Python 3.14) authentication microservice for Docker Compose. Provides JWT authentication (HS256, RS256, ES256), Google OAuth2 with PKCE, Redis-backed stateful session management, role-based access control (RBAC), API key management with per-key rate limiting, and a private inter-service API — ready to drop into any Docker-based Python microservice stack.
 
-Consumer services validate tokens **locally** using the companion [auth-sdk-m8](https://github.com/mano8/auth-sdk-m8) package (`pip install auth-sdk-m8`) — no round-trip to the auth service on every request.
+Consumer services validate tokens **locally** using the companion [auth-sdk-m8](https://github.com/mano8/auth-sdk-m8) package (`pip install auth-sdk-m8`) — no round-trip to the auth service on every request. In `stateful` mode, revocation is checked via a lightweight HTTP call to the auth service private API (`POST /private/v1/jti-status`) instead of connecting to auth Redis directly, keeping the Redis instance private to the auth service.
 
 The included example stacks use `_m8` in their names as a personal naming convention — not a framework requirement. Any stack can be copied and adapted for your own project by renaming the Docker services, network, and env files.
 
@@ -598,6 +598,7 @@ Endpoints under `/user/private/` are for inter-service calls only:
 | Method | Path | Description |
 | ------ | ---- | ----------- |
 | POST | `/private/users/` | Create a user account (called by other microservices) |
+| POST | `/private/v1/jti-status` | Check whether a JTI is revoked (`stateful` mode only; fails-open when Redis unavailable) |
 
 ---
 
@@ -633,15 +634,19 @@ JWKS_CACHE_TTL_SECONDS=300
 
 ### Revocation check (stateful mode)
 
-Consumer services must share the same Redis instance and set `TOKEN_MODE="stateful"`.
+Consumer services check revocation via an HTTP call to the auth service private API —
+auth Redis is never shared with consumers. Set `INTROSPECTION_URL` and `PRIVATE_API_SECRET`
+(both must match the auth service) when `TOKEN_MODE=stateful`:
 
-```python
-from auth_sdk_m8.security import AccessTokenBlacklist
-
-if settings.TOKEN_MODE == "stateful" and redis is not None:
-    if AccessTokenBlacklist(redis).is_revoked(payload.jti):
-        raise HTTPException(status_code=403, detail="Token has been revoked.")
+```ini
+INTROSPECTION_URL=http://auth_user_service:8000/user/private/v1/jti-status
+PRIVATE_API_SECRET=<same as auth service PRIVATE_API_SECRET>
 ```
+
+The `RemoteRevocationClient` in `examples/fastapi_service/core/revocation.py` handles
+the check asynchronously with configurable timeouts. It **fails-open** by default
+(network error → token treated as active). Set `fail_closed=True` to reject tokens
+when the endpoint is unreachable instead.
 
 ### Issuer / audience enforcement (opt-in)
 
