@@ -212,8 +212,6 @@ services:
     depends_on:
       m8_db:
         condition: service_healthy
-      redis_cache:
-        condition: service_healthy
       auth_user_service:
         condition: service_started
     networks:
