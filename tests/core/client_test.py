@@ -255,6 +255,11 @@ class TestOAuthSessionStore:
         self.mock_redis.get.return_value = None
         assert self.store.get("nonexistent") is None
 
+    def test_get_decodes_bytes_response(self):
+        self.mock_redis.get.return_value = b'{"flow":"google"}'
+        result = self.store.get("my-state")
+        assert result == '{"flow":"google"}'
+
     def test_delete_removes_key(self):
         self.store.delete("my-state")
         self.mock_redis.delete.assert_called_once_with("oauth_session:my-state")
@@ -301,6 +306,11 @@ class TestAuthCodeStore:
     def test_pop_returns_none_when_absent(self):
         self.mock_redis.getdel.return_value = None
         assert self.store.pop("nonexistent") is None
+
+    def test_pop_decodes_bytes_response(self):
+        self.mock_redis.getdel.return_value = b'{"version":1}'
+        result = self.store.pop("mycode")
+        assert result == '{"version":1}'
 
     def test_second_pop_returns_none_replay_prevention(self):
         self.mock_redis.getdel.side_effect = ['{"version":1}', None]

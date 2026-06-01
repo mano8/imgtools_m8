@@ -174,7 +174,10 @@ class OAuthSessionStore:
 
     def get(self, state: str) -> Optional[str]:
         """Read session without consuming — used for CSRF validation."""
-        return self.client.get(self.PREFIX + state)
+        result = self.client.get(self.PREFIX + state)
+        if isinstance(result, bytes):
+            return result.decode("utf-8")
+        return result
 
     def delete(self, state: str) -> None:
         """Consume session after successful exchange — called only on auth success."""
@@ -202,7 +205,10 @@ class AuthCodeStore:
 
     def pop(self, code: str) -> Optional[str]:
         """Atomically retrieve and delete — prevents replay under concurrent requests."""
-        return self.client.getdel(self.PREFIX + code)
+        result = self.client.getdel(self.PREFIX + code)
+        if isinstance(result, bytes):
+            return result.decode("utf-8")
+        return result
 
 
 class LoginRateLimiter:

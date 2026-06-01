@@ -107,7 +107,7 @@ def custom_openapi(current_app: FastAPI):
     return current_app.openapi_schema
 
 
-app.openapi = lambda: custom_openapi(app)
+app.openapi = lambda: custom_openapi(app)  # type: ignore[method-assign]
 
 app.include_router(api_router, prefix=settings.API_PREFIX)
 

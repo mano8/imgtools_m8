@@ -24,13 +24,13 @@ class PrefixedBase(SQLModel):
     Automatiquelly prefix table names.
     """
 
-    @declared_attr
+    @declared_attr  # type: ignore[arg-type]
     @classmethod
     def __tablename__(cls) -> str:
         return f"{settings.TABLES_PREFIX}_{cls.__name__.lower()}"
 
 
-def prefixed_fk(model: type, column: str) -> str:
+def prefixed_fk(model: str, column: str) -> str:
     """
     Build a ForeignKey string like "prefix_model.column" dynamically,
     so it always matches model.__tablename__.

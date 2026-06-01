@@ -75,7 +75,7 @@ def update_password_me(
         db_user = session.get(User, current_user.id)
         if db_user is None:
             raise HTTPException(status_code=404, detail="User not found")
-        if not SecurityHelper.verify_password(
+        if not db_user.hashed_password or not SecurityHelper.verify_password(
             body.current_password, db_user.hashed_password
         ):
             raise HTTPException(status_code=400, detail="Incorrect password")

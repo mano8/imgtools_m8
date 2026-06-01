@@ -82,7 +82,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         compare_type=True,
-        include_object=include_object,
+        include_object=include_object,  # type: ignore[arg-type]
         version_table=VERSION_TABLE,
         version_locations=VERSION_LOCATIONS,
     )
@@ -97,10 +97,11 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in online mode."""
     configuration = config.get_section(config.config_ini_section)
+    assert configuration is not None
     configuration["sqlalchemy.url"] = get_url()
 
     connectable = engine_from_config(
-        configuration,
+        configuration,  # type: ignore[arg-type]
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -110,7 +111,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
-            include_object=include_object,
+            include_object=include_object,  # type: ignore[arg-type]
             version_table=VERSION_TABLE,
             version_locations=VERSION_LOCATIONS,
         )

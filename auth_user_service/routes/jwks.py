@@ -19,7 +19,7 @@ def _build_jwk(public_key_pem: str, algorithm: str, kid: str) -> dict[str, Any]:
 
     key_obj = load_pem_public_key(public_key_pem.encode())
     alg_cls = ECAlgorithm if algorithm.startswith("ES") else RSAAlgorithm
-    jwk: dict[str, Any] = json.loads(alg_cls.to_jwk(key_obj))
+    jwk: dict[str, Any] = json.loads(alg_cls.to_jwk(key_obj))  # type: ignore[arg-type]
     jwk["use"] = "sig"
     jwk["alg"] = algorithm
     jwk["kid"] = kid

@@ -129,7 +129,7 @@ class UserCreate(UserBase):
         """
         if self.provider == AuthProviderType.PASSWORD:
             if not self.password:
-                raise ValidationError(
+                raise ValidationError(  # type: ignore[call-arg]
                     [
                         {
                             "loc": ("password",),
@@ -140,7 +140,7 @@ class UserCreate(UserBase):
                     model=type(self),
                 )
             if self.oauth_user_id is not None:
-                raise ValidationError(
+                raise ValidationError(  # type: ignore[call-arg]
                     [
                         {
                             "loc": ("oauth_user_id",),
@@ -153,7 +153,7 @@ class UserCreate(UserBase):
 
         if self.provider == AuthProviderType.GOOGLE:
             if not self.oauth_user_id:
-                raise ValidationError(
+                raise ValidationError(  # type: ignore[call-arg]
                     [
                         {
                             "loc": ("oauth_user_id",),
@@ -164,7 +164,7 @@ class UserCreate(UserBase):
                     model=type(self),
                 )
             if self.password is not None:
-                raise ValidationError(
+                raise ValidationError(  # type: ignore[call-arg]
                     [
                         {
                             "loc": ("password",),
@@ -263,7 +263,7 @@ class UserUpdate(SQLModel):
             self.provider == AuthProviderType.PASSWORD
             and self.oauth_user_id is not None
         ):
-            raise ValidationError(
+            raise ValidationError(  # type: ignore[call-arg]
                 [
                     {
                         "loc": ("oauth_user_id",),
@@ -275,7 +275,7 @@ class UserUpdate(SQLModel):
             )
 
         if self.provider == AuthProviderType.GOOGLE and self.password is not None:
-            raise ValidationError(
+            raise ValidationError(  # type: ignore[call-arg]
                 [
                     {
                         "loc": ("password",),

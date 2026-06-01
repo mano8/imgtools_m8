@@ -149,7 +149,11 @@ class AuthController:
         db_user = UserController.get_user_by_email(session=session, email=email)
         # Always run bcrypt regardless of whether the user exists so that response
         # time is constant and cannot be used to enumerate valid email addresses.
-        hash_to_check = db_user.hashed_password if db_user else _DUMMY_HASH
+        hash_to_check = (
+            db_user.hashed_password
+            if db_user and db_user.hashed_password
+            else _DUMMY_HASH
+        )
         if not SecurityHelper.verify_password(password, hash_to_check):
             return None
         return db_user

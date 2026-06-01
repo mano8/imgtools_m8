@@ -10,7 +10,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import SecretStr
 
 from auth_user_service.services.auth import AuthController
-from auth_user_service.db_models.users import UserCreate
+from auth_user_service.db_models.users import User, UserCreate
 from auth_user_service.core.deps import SessionDep
 from auth_user_service.services.client_sessions import SessionController
 from auth_user_service.services.users import UserController
@@ -46,7 +46,7 @@ def _get_oauth_session(redis: object, state: str) -> dict:
     return json.loads(raw_session)
 
 
-def _get_or_create_user(session: SessionDep, oauth_token: object) -> object:
+def _get_or_create_user(session: SessionDep, oauth_token: object) -> User:
     """Return the existing user or create one from the OAuth token data."""
     user = UserController.get_user_by_email(
         session=session,

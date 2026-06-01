@@ -30,7 +30,7 @@ class Settings(ObservabilitySettingsMixin, CommonSettings):
         env_file_encoding="utf-8",
         env_ignore_empty=True,
         extra="forbid",
-        settings_customise_sources=settings_customise_sources,
+        settings_customise_sources=settings_customise_sources,  # type: ignore[typeddict-unknown-key]
     )
 
     # Extend validation lists

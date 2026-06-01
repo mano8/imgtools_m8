@@ -7,7 +7,11 @@ from sqlalchemy import case, and_
 from sqlmodel import Session, select, func
 from auth_sdk_m8.controllers.base import BaseController
 from fastapi_service.core.deps import CurrentUser
-from fastapi_service.schemas.dashboard import RangeActivityType, UsersActivity
+from fastapi_service.schemas.dashboard import (
+    ActivityStats,
+    RangeActivityType,
+    UsersActivity,
+)
 from fastapi_service.db_models.categories import Category
 # pylint: disable=broad-exception-caught
 
@@ -18,7 +22,7 @@ class DashboardController:
     """
 
     @staticmethod
-    def get_range_activity(time_range: RangeActivityType) -> tuple[int, int]:
+    def get_range_activity(time_range: RangeActivityType) -> tuple[datetime, datetime]:
         """
         Calculate the start and end datetime for a given time range.
         Args:
@@ -68,7 +72,7 @@ class DashboardController:
         current_user: CurrentUser,
         time_range: RangeActivityType,
         is_current: bool = False,
-    ) -> list[dict[str, int]]:
+    ) -> ActivityStats:
         """
         Count, per model, the number of rows that have been updated
         (updated_at) and the number of rows that have been added
@@ -91,7 +95,7 @@ class DashboardController:
         models = [
             (Category, "Category"),
         ]
-        result = {"max": 0, "min": 0, "activity": []}
+        result: ActivityStats = {"max": 0, "min": 0, "activity": []}
         for model, model_name in models:
             stmt = select(
                 func.sum(
@@ -113,8 +117,12 @@ class DashboardController:
                 else:
                     stmt = stmt.where(model.owner_id == current_user.id)
             row = session.exec(stmt).first()
-            updated_count = row.updated if row and row.updated is not None else 0
-            added_count = row.added if row and row.added is not None else 0
+            updated_count: int = (
+                int(row.updated) if row and row.updated is not None else 0  # type: ignore[attr-defined]
+            )
+            added_count: int = (
+                int(row.added) if row and row.added is not None else 0  # type: ignore[attr-defined]
+            )
             result["activity"].append(
                 {"model": model_name, "updated": updated_count, "added": added_count}
             )

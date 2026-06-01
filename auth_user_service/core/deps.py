@@ -91,7 +91,7 @@ _redis_pool: Optional[ConnectionPool] = ConnectionPool(
     decode_responses=True,
     socket_connect_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
     socket_timeout=_REDIS_CONNECT_TIMEOUT_SECS,
-    **_ssl_kwargs,
+    **_ssl_kwargs,  # type: ignore[arg-type]
 )
 
 

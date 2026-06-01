@@ -3,12 +3,17 @@ Dashboard Controller
 """
 
 from datetime import datetime, timedelta
+from typing import Any
 from sqlalchemy import case, and_
 from sqlmodel import Session, literal_column, select, func, union_all
 from auth_sdk_m8.controllers.base import BaseController
 from auth_user_service.services.users import UserController
 from auth_user_service.core.deps import CurrentUser
-from auth_user_service.schemas.dashboard import RangeActivityType, UsersActivity
+from auth_user_service.schemas.dashboard import (
+    ActivityStats,
+    RangeActivityType,
+    UsersActivity,
+)
 from auth_user_service.db_models.users import User
 # pylint: disable=broad-exception-caught
 
@@ -19,7 +24,7 @@ class DashboardController:
     """
 
     @staticmethod
-    def get_range_activity(time_range: RangeActivityType) -> tuple[int, int]:
+    def get_range_activity(time_range: RangeActivityType) -> tuple[datetime, datetime]:
         """
         Calculate the start and end datetime for a given time range.
         Args:
@@ -64,17 +69,17 @@ class DashboardController:
     @staticmethod
     def get_updates_count_by_model(
         *, session: Session, current_user: CurrentUser, time_range: RangeActivityType
-    ) -> dict[str, int]:
+    ) -> list[dict[str, Any]]:
         """
         Count the number of updates per model within the given time range.
         """
         start, end = DashboardController.get_range_activity(time_range)
 
-        models: list[tuple[type, str]] = [(User, "User")]
+        models: list[tuple[type[User], str]] = [(User, "User")]
 
-        subqueries = []
+        subqueries: list[Any] = []
         for model, model_name in models:
-            query = (
+            query: Any = (
                 select(literal_column(f"'{model_name}'").label("model"))
                 .select_from(model)
                 .where(model.updated_at >= start, model.updated_at < end)
@@ -103,7 +108,7 @@ class DashboardController:
         current_user: CurrentUser,
         time_range: RangeActivityType,
         is_current: bool = False,
-    ) -> list[dict[str, int]]:
+    ) -> ActivityStats:
         """
         Count updated and added rows per model within the given time range.
         """
@@ -112,7 +117,7 @@ class DashboardController:
         models = [
             (User, "User"),
         ]
-        result = {"max": 0, "min": 0, "activity": []}
+        result: ActivityStats = {"max": 0, "min": 0, "activity": []}
         for model, model_name in models:
             stmt = select(
                 func.sum(
@@ -134,8 +139,12 @@ class DashboardController:
                 else:  # pragma: no cover
                     stmt = stmt.where(model.owner_id == current_user.id)
             row = session.exec(stmt).first()
-            updated_count = row.updated if row and row.updated is not None else 0
-            added_count = row.added if row and row.added is not None else 0
+            updated_count: int = (
+                int(row.updated) if row and row.updated is not None else 0  # type: ignore[attr-defined]
+            )
+            added_count: int = (
+                int(row.added) if row and row.added is not None else 0  # type: ignore[attr-defined]
+            )
             result["activity"].append(
                 {"model": model_name, "updated": updated_count, "added": added_count}
             )
@@ -154,7 +163,7 @@ class DashboardController:
         Retrieves dashboard user statistics.
         """
         try:
-            nb_users, activity = 0, []
+            nb_users = 0
             if current_user.is_superuser:
                 nb_users = UserController.count_users(session=session)
 

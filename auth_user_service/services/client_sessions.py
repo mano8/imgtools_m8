@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from redis import Redis
-from sqlmodel import Session, select, delete
+from collections.abc import Sequence
+from sqlmodel import Session, col, select, delete
 from auth_user_service.core.config import settings
 from auth_user_service.db_models.users import User
 from auth_user_service.db_models.sessions import ClientSessionCreate, ClientSession
@@ -133,7 +134,7 @@ class SessionController:
             session: SQLModel DB session.
             jti: JWT identifier of the session to remove.
         """
-        stmt = delete(ClientSession).where(ClientSession.jwt_jti == jti)
+        stmt = delete(ClientSession).where(col(ClientSession.jwt_jti) == jti)
         session.exec(stmt)
         session.commit()
 
@@ -156,8 +157,8 @@ class SessionController:
         """
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         stmt = delete(ClientSession).where(
-            ClientSession.user_id == current_user.id,
-            ClientSession.refresh_expires_at < now,
+            col(ClientSession.user_id) == current_user.id,
+            col(ClientSession.refresh_expires_at) < now,
         )
         result = session.exec(stmt)
         deleted = result.rowcount or 0
@@ -166,7 +167,9 @@ class SessionController:
         return deleted
 
     @staticmethod
-    def get_user_active_sessions(session: Session, user_id: str) -> list[ClientSession]:
+    def get_user_active_sessions(
+        session: Session, user_id: str
+    ) -> Sequence[ClientSession]:
         """
         Retrieve all non-revoked, non-expired sessions for a user.
 
@@ -218,7 +221,7 @@ class SessionController:
                     access_mgr.blacklist_jti(s.jwt_jti, ttl)
                 refresh_store.revoke(s.jwt_jti)
 
-        stmt = delete(ClientSession).where(ClientSession.user_id == user_id)
+        stmt = delete(ClientSession).where(col(ClientSession.user_id) == user_id)
         result = session.exec(stmt)
         session.commit()
         return result.rowcount or 0

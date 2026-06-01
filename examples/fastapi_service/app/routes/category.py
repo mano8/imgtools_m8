@@ -27,7 +27,7 @@ router = APIRouter(prefix="/category", tags=["category"])
 )
 async def read_root(
     session: SessionDep, current_user: CurrentUser, skip: int = 0, limit: int = 100
-) -> dict:
+) -> Any:
     """Retrieve category list."""
     try:
         if current_user.is_superuser:
@@ -52,7 +52,7 @@ async def read_root(
 
         return CategoriesPublic(data=items, count=count)
     except Exception as ex:
-        BaseController.handle_exception(ex=ex, session=session)
+        return BaseController.handle_exception(ex=ex, session=session)
 
 
 @router.get(

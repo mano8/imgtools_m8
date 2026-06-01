@@ -13,7 +13,7 @@ This module provides functions for:
 import base64
 import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Union
+from typing import Optional
 import uuid
 
 import bcrypt
@@ -38,7 +38,7 @@ class SecurityHelper(ComSecurityHelper):
         issuer: Optional[str] = None,
         audience: Optional[str] = None,
         kid: Optional[str] = None,
-    ) -> Union[jwt.PyJWT, str]:
+    ) -> tuple[str, str]:
         """
         Create a JWT access token.
 
@@ -77,8 +77,8 @@ class SecurityHelper(ComSecurityHelper):
         data: TokenMinimalData,
         expires_delta: timedelta,
         secrets: TokenSecret,
-        jti: str = None,
-    ) -> Union[jwt.PyJWT, str]:
+        jti: str | None = None,
+    ) -> tuple[str, str]:
         """
         Create a JWT refresh token.
 
