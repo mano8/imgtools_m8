@@ -29,6 +29,27 @@ jobs:
       - name: Lint
         run: ruff check .
 
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          pip install -r auth_user_service/requirements_dev.txt
+          pip install -r examples/fastapi_service/requirements_base.txt
+
+      - name: Type check auth_user_service
+        run: mypy auth_user_service --ignore-missing-imports
+
+      - name: Type check fastapi_service
+        run: mypy examples/fastapi_service --ignore-missing-imports
+
   security:
     runs-on: ubuntu-latest
     steps:

@@ -109,6 +109,13 @@ def custom_openapi(current_app: FastAPI):
 
 app.openapi = lambda: custom_openapi(app)  # type: ignore[method-assign]
 
+
+@app.get(f"{settings.API_PREFIX}/health/", include_in_schema=False, tags=["health"])
+def health() -> dict[str, str]:
+    """Process-only liveness probe — always returns 200 when the process is running."""
+    return {"status": "ok"}
+
+
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
 if settings.METRICS_ENABLED:
