@@ -6,6 +6,35 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased] — SecureAndAlign branch
 
+### Fixed
+
+- **80 mypy errors eliminated across `auth_user_service` and `fastapi_service`** — resolved
+  all type errors covering: wrong return types (`SecurityHelper` token creators, dashboard
+  controllers, `get_range_activity`); missing `None` guards for `hashed_password` in
+  `profile.py` and `services/auth.py` (OAuth users now explicitly blocked from the password-
+  change endpoint); `prefixed_fk` signature corrected from `type` to `str`; `OAuthSessionStore`
+  and `AuthCodeStore` now decode `bytes` responses from redis-py (some deployments return raw
+  bytes); SQLAlchemy `delete().where()` comparisons wrapped with `col()` for type safety;
+  `Sequence[ClientSession]` return type aligned with SQLModel output; alembic env files
+  narrowed with `assert configuration is not None` before indexed assignment; `ActivityStats`
+  TypedDict used throughout dashboard controllers instead of untyped dicts; missing `return`
+  added to `fastapi_service/category.py` exception handler. A `mypy.ini` at the repo root
+  excludes auto-generated alembic migration files.
+
+- **Bandit scan returns 0 issues** — no medium/high severity findings in `auth_user_service`
+  or `fastapi_service`.
+
+### Added
+
+- **Route tests for `profile` and `google_auth`** — `tests/routes/test_profile.py` (16 tests)
+  covers all branches of `read_user_me`, `update_user_me`, `update_password_me`, and
+  `delete_user_me`. `tests/routes/test_google_auth.py` (19 tests) covers all helpers and
+  every error/success branch of `google_auth_callback` including Redis unavailability,
+  HTTPXError, HTTPException re-raise, and callback URI derivation.
+
+- **100% branch coverage enforced in CI** — `.github/workflows/CI.yaml` now includes
+  `--cov-fail-under=100`. Any PR that drops coverage below 100% on measured code will fail.
+
 ### Security
 
 - **Production Traefik CSP profile** — added `production_dynamic_conf.yml` to all 6 compose

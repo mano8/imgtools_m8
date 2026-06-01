@@ -334,6 +334,7 @@ Set `SELECTED_DB` in `.env` (or `auth.env`):
 | `TABLES_PREFIX` | no | `auth` | DB table name prefix (e.g. `auth_user`, `auth_api_key`) |
 | `SET_DOCS` | no | `true` | Enable Swagger UI at `{API_PREFIX}/docs`. Always disabled when `ENVIRONMENT=production`; setting `SET_DOCS=true` together with `ENVIRONMENT=production` raises a startup error. |
 | `SET_REDOC` | no | `true` | Enable ReDoc at `{API_PREFIX}/redoc`. Same production gate as `SET_DOCS`. |
+| `SET_OPEN_API` | no | `true` | Enable OpenAPI schema at `{API_PREFIX}/openapi.json`. Same production gate as `SET_DOCS`. |
 
 ### Tokens
 
@@ -693,6 +694,19 @@ alembic -c auth_user_service/alembic.ini upgrade head
 ruff format .
 ruff check .
 ruff check . --fix
+```
+
+### Type checking
+
+```bash
+mypy auth_user_service --ignore-missing-imports
+mypy examples/fastapi_service --ignore-missing-imports
+```
+
+### Security scan
+
+```bash
+bandit -r auth_user_service examples/fastapi_service --severity-level medium
 ```
 
 ### Tests
