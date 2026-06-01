@@ -176,6 +176,34 @@ class TestIsSessionRevoked:
 
         assert result is False
 
+    def test_redis_unavailable_fail_closed_returns_true(self):
+        """When Redis is None and fail_closed: treat as revoked (deny access)."""
+        with (
+            patch(
+                "auth_user_service.services.client_sessions.get_redis_client",
+                return_value=None,
+            ),
+            patch("auth_user_service.services.client_sessions.settings") as mock_cfg,
+        ):
+            mock_cfg.effective_failure_mode.return_value = "fail_closed"
+            result = SessionController.is_session_revoked("any-jti")
+
+        assert result is True
+
+    def test_redis_unavailable_fail_open_returns_false(self):
+        """When Redis is None and fail_open: allow request through."""
+        with (
+            patch(
+                "auth_user_service.services.client_sessions.get_redis_client",
+                return_value=None,
+            ),
+            patch("auth_user_service.services.client_sessions.settings") as mock_cfg,
+        ):
+            mock_cfg.effective_failure_mode.return_value = "fail_open"
+            result = SessionController.is_session_revoked("any-jti")
+
+        assert result is False
+
 
 class TestPurgeExpiredSessions:
     def test_deletes_expired_sessions(

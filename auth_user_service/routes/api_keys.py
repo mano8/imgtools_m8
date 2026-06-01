@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import func
 from sqlmodel import col, select
 
 from auth_sdk_m8.controllers.base import BaseController
@@ -63,11 +64,11 @@ def create_api_key(
     The plaintext key is returned exactly once and never stored.
     """
     try:
-        stmt = select(ApiKey).where(
+        count_stmt = select(func.count()).where(
             ApiKey.user_id == current_user.id,
             col(ApiKey.revoked).is_(False),
         )
-        active_count = len(session.exec(stmt).all())
+        active_count = session.exec(count_stmt).one()
         if active_count >= settings.API_KEY_MAX_PER_USER:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

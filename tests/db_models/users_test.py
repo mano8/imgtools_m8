@@ -223,6 +223,46 @@ class TestAvatarUrlValidator:
             UserUpdate(avatar="bad.jpg")
 
 
+class TestEmailNormalisation:
+    """Email normalisation applies to all models that carry an email field."""
+
+    def test_user_create_lowercases_email(self):
+        user = UserCreate(
+            email="User@Example.COM",
+            password="SecurePass1!",
+            provider=AuthProviderType.PASSWORD,
+        )
+        assert user.email == "user@example.com"
+
+    def test_user_create_strips_whitespace(self):
+        user = UserCreate(
+            email="  user@example.com  ",
+            password="SecurePass1!",
+            provider=AuthProviderType.PASSWORD,
+        )
+        assert user.email == "user@example.com"
+
+    def test_user_register_normalises(self):
+        reg = UserRegister(email="Admin@EXAMPLE.com", password="SecurePass1!")
+        assert reg.email == "admin@example.com"
+
+    def test_user_update_normalises_email(self):
+        upd = UserUpdate(email="Hello@World.COM")
+        assert upd.email == "hello@world.com"
+
+    def test_user_update_email_none_passes_through(self):
+        upd = UserUpdate(email=None)
+        assert upd.email is None
+
+    def test_user_update_me_normalises_email(self):
+        upd = UserUpdateMe(email="ME@DOMAIN.ORG")
+        assert upd.email == "me@domain.org"
+
+    def test_user_update_me_email_none_passes_through(self):
+        upd = UserUpdateMe(email=None)
+        assert upd.email is None
+
+
 class TestUserPublicAndList:
     def test_users_public_wrapper(self):
         pub_user = UserPublic(

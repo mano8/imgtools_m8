@@ -13,6 +13,7 @@ from sqlmodel import Field, Relationship, SQLModel, Uuid
 
 from auth_sdk_m8.schemas.base import AuthProviderType, RoleType
 from auth_sdk_m8.models.shared import TimestampMixin
+from auth_sdk_m8.utils.email import normalize_email
 from auth_user_service.core.db_utils import get_table_args, prefixed_tables
 
 if TYPE_CHECKING:
@@ -85,6 +86,12 @@ class UserBase(TimestampMixin, SQLModel):
         default=RoleType.USER,
         description="Role assigned to the user for access control",
     )
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalise_email(cls, v: str) -> str:
+        """Normalise email to lowercase and strip whitespace."""
+        return normalize_email(v)
 
     @field_validator("avatar", mode="before")
     @classmethod
@@ -177,6 +184,13 @@ class UserRegister(SQLModel):
     """
 
     email: EmailStr = Field(..., max_length=255, description="User email address")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalise_email(cls, v: str) -> str:
+        """Normalise email to lowercase and strip whitespace."""
+        return normalize_email(v)
+
     password: str = Field(
         ..., min_length=8, max_length=128, description="Plain-text password"
     )
@@ -196,6 +210,15 @@ class UserUpdate(SQLModel):
         max_length=255,
         description="Updated email address",
     )
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalise_email(cls, v: str | None) -> str | None:
+        """Normalise email to lowercase and strip whitespace."""
+        if v is None:
+            return v
+        return normalize_email(v)
+
     full_name: Optional[str] = Field(
         default=None,
         max_length=100,
@@ -276,6 +299,15 @@ class UserUpdateMe(SQLModel):
         max_length=255,
         description="Updated email address",
     )
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalise_email(cls, v: str | None) -> str | None:
+        """Normalise email to lowercase and strip whitespace."""
+        if v is None:
+            return v
+        return normalize_email(v)
+
     full_name: Optional[str] = Field(
         default=None,
         max_length=100,

@@ -7,6 +7,7 @@ persisting session metadata, and managing token revocation via Redis.
 
 import logging
 from datetime import datetime, timedelta, timezone
+from ipaddress import ip_address
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
@@ -69,13 +70,40 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _strip_port(raw: str) -> str:
+    """Remove optional port suffix from an IP string.
+
+    Handles bracketed IPv6 ([2001:db8::1]:8080 → 2001:db8::1) and
+    plain IPv4:port (192.0.2.1:45231 → 192.0.2.1). Pure IPv6 without
+    brackets is left unchanged (multiple colons, no port to strip).
+    """
+    raw = raw.strip()
+    if raw.startswith("[") and "]" in raw:
+        return raw[1 : raw.index("]")]
+    if raw.count(":") == 1:
+        return raw.split(":")[0]
+    return raw
+
+
 def _client_ip(request: Request) -> str:
-    # Correctness relies on Traefik stripping client-supplied X-Forwarded-For
-    # at the entrypoint boundary (forwardedHeaders.trustedIPs in traefik.yml).
-    # The leftmost IP is the real client only because the proxy chain is trusted.
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    """Extract the real client IP from X-Forwarded-For.
+
+    When TRUSTED_PROXY_COUNT > 0, the leftmost entry in X-Forwarded-For is
+    the real client (Traefik prepends the true client IP before forwarding).
+    When TRUSTED_PROXY_COUNT == 0, XFF is ignored entirely (no proxy in front).
+    Falls back to request.client.host on absence, garbage values, or no proxy.
+    """
+    if settings.TRUSTED_PROXY_COUNT > 0:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            ips = [p.strip() for p in xff.split(",")]
+            if ips:
+                candidate = _strip_port(ips[0])
+                try:
+                    ip_address(candidate)
+                    return candidate
+                except ValueError:
+                    pass
     return request.client.host if request.client else "unknown"
 
 
@@ -174,6 +202,113 @@ def login_access_token(
     return Token(access_token=access_token)
 
 
+# ── Private helpers for refresh-token and logout routes ───────────────────────
+
+
+def _decode_refresh_or_raise(refresh_token: str, _m: object) -> tuple:
+    """Decode a refresh token and return (user_id, old_jti) or raise 401."""
+    try:
+        return SecurityHelper.decode_refresh_token(
+            refresh_token,
+            secrets=_REFRESH_SECRETS,
+            return_jti=True,
+            old_secrets=_REFRESH_OLD_SECRETS,
+        )
+    except InvalidToken as err:
+        if _m and hasattr(_m, "token_refresh_total") and _m.token_refresh_total:
+            _m.token_refresh_total.labels(result="invalid").inc()
+        raise HTTPException(status_code=401, detail=str(err)) from err
+
+
+def _revoke_access_jti(
+    token: str, redis: object, _m: object
+) -> tuple[str | None, bool]:
+    """Blacklist the access token JTI; returns (jti, failed)."""
+    if not settings.is_stateful:
+        return None, False
+    try:
+        payload = _access_validator.validate_access_token(token)
+        jti = payload.jti
+        if payload.exp is not None:
+            expires_at = datetime.fromtimestamp(payload.exp, tz=timezone.utc)
+        else:
+            expires_at = datetime.now(timezone.utc) + timedelta(
+                minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            )
+        SessionController.revoke_session_jti(jti, expires_at, redis)
+        return jti, False
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not blacklist access token JTI on logout.")
+        if (
+            _m
+            and hasattr(_m, "revocation_failure_total")
+            and _m.revocation_failure_total
+        ):
+            _m.revocation_failure_total.labels(operation="access_blacklist").inc()
+        return None, True
+
+
+def _revoke_refresh_jti(
+    refresh_token: str, redis: object, access_jti: str | None, _m: object
+) -> tuple[str | None, bool]:
+    """Revoke the refresh JTI from the allowlist; returns (jti, failed)."""
+    if settings.is_stateless:
+        return access_jti, False
+    if redis is not None:
+        try:
+            _, refresh_jti = SecurityHelper.decode_refresh_token(
+                refresh_token,
+                secrets=_REFRESH_SECRETS,
+                return_jti=True,
+                old_secrets=_REFRESH_OLD_SECRETS,
+            )
+            RedisRefreshStore(redis).revoke(refresh_jti)
+            return refresh_jti if access_jti is None else access_jti, False
+        except Exception:  # noqa: BLE001
+            logger.exception("Could not revoke refresh JTI on logout.")
+            if (
+                _m
+                and hasattr(_m, "revocation_failure_total")
+                and _m.revocation_failure_total
+            ):
+                _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
+            return access_jti, True
+    # Redis unavailable
+    _mode = settings.effective_failure_mode("session_write")
+    if _m and hasattr(_m, "degraded_decision_total") and _m.degraded_decision_total:
+        _m.degraded_decision_total.labels(
+            control="session_write", mode=_mode, reason="redis_unavailable"
+        ).inc()
+    if _mode == "fail_closed":
+        logger.error("Could not revoke refresh JTI on logout: Redis unavailable.")
+        if (
+            _m
+            and hasattr(_m, "revocation_failure_total")
+            and _m.revocation_failure_total
+        ):
+            _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
+        return access_jti, True
+    return access_jti, False
+
+
+def _delete_db_session(session: object, jti: str | None, _m: object) -> bool:
+    """Delete the DB session for jti; returns True if the operation failed."""
+    if settings.is_stateless or jti is None:
+        return False
+    try:
+        SessionController.delete_session_by_jti(session=session, jti=jti)
+        return False
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not delete DB session on logout.")
+        if (
+            _m
+            and hasattr(_m, "revocation_failure_total")
+            and _m.revocation_failure_total
+        ):
+            _m.revocation_failure_total.labels(operation="db_session").inc()
+        return True
+
+
 @router.post("/refresh-token/", response_model=Token)
 def login_refresh_token(
     request: Request,
@@ -191,17 +326,7 @@ def login_refresh_token(
     ip = _client_ip(request)
     _m = _get_metrics()
 
-    try:
-        user_id, old_jti = SecurityHelper.decode_refresh_token(
-            refresh_token,
-            secrets=_REFRESH_SECRETS,
-            return_jti=True,
-            old_secrets=_REFRESH_OLD_SECRETS,
-        )
-    except InvalidToken as err:
-        if _m and _m.token_refresh_total:
-            _m.token_refresh_total.labels(result="invalid").inc()
-        raise HTTPException(status_code=401, detail=str(err)) from err
+    user_id, old_jti = _decode_refresh_or_raise(refresh_token, _m)
 
     if redis is not None:
         if not RefreshRateLimiter(
@@ -320,73 +445,13 @@ def logout(
     refresh_token: str = Depends(_get_refresh_cookie),
 ) -> ResponseMessage:
     """Revoke both tokens, delete the DB session, and clear the cookie."""
-    jti: str | None = None
-    _revocation_failed = False
     _m = _get_metrics()
 
-    # Blacklist the access token JTI so it cannot be reused until natural expiry.
-    if settings.is_stateful:
-        try:
-            payload = _access_validator.validate_access_token(token)
-            jti = payload.jti
-            if payload.exp is not None:
-                expires_at = datetime.fromtimestamp(payload.exp, tz=timezone.utc)
-            else:
-                expires_at = datetime.now(timezone.utc) + timedelta(
-                    minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-                )
-            SessionController.revoke_session_jti(payload.jti, expires_at, redis)
-        except Exception:  # noqa: BLE001
-            logger.error("Could not blacklist access token JTI on logout.")
-            if _m and _m.revocation_failure_total:
-                _m.revocation_failure_total.labels(operation="access_blacklist").inc()
-            _revocation_failed = True
+    access_jti, access_failed = _revoke_access_jti(token, redis, _m)
+    jti, refresh_failed = _revoke_refresh_jti(refresh_token, redis, access_jti, _m)
+    db_failed = _delete_db_session(session, jti, _m)
 
-    # Revoke the refresh JTI from the Redis allowlist.
-    if not settings.is_stateless:
-        if redis is not None:
-            try:
-                _, refresh_jti = SecurityHelper.decode_refresh_token(
-                    refresh_token,
-                    secrets=_REFRESH_SECRETS,
-                    return_jti=True,
-                    old_secrets=_REFRESH_OLD_SECRETS,
-                )
-                RedisRefreshStore(redis).revoke(refresh_jti)
-                if jti is None:
-                    jti = refresh_jti
-            except Exception:  # noqa: BLE001
-                logger.error("Could not revoke refresh JTI on logout.")
-                if _m and _m.revocation_failure_total:
-                    _m.revocation_failure_total.labels(
-                        operation="refresh_allowlist"
-                    ).inc()
-                _revocation_failed = True
-        else:
-            _mode = settings.effective_failure_mode("session_write")
-            if _m and _m.degraded_decision_total:
-                _m.degraded_decision_total.labels(
-                    control="session_write", mode=_mode, reason="redis_unavailable"
-                ).inc()
-            if _mode == "fail_closed":
-                logger.error(
-                    "Could not revoke refresh JTI on logout: Redis unavailable."
-                )
-                if _m and _m.revocation_failure_total:
-                    _m.revocation_failure_total.labels(
-                        operation="refresh_allowlist"
-                    ).inc()
-                _revocation_failed = True
-
-    # Remove the DB session record.
-    if not settings.is_stateless and jti is not None:
-        try:
-            SessionController.delete_session_by_jti(session=session, jti=jti)
-        except Exception:  # noqa: BLE001
-            logger.error("Could not delete DB session on logout.")
-            if _m and _m.revocation_failure_total:
-                _m.revocation_failure_total.labels(operation="db_session").inc()
-            _revocation_failed = True
+    _revocation_failed = access_failed or refresh_failed or db_failed
 
     if _revocation_failed:
         _mode = settings.effective_failure_mode("session_write")

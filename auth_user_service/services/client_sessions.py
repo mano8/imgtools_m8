@@ -11,6 +11,7 @@ from typing import Optional
 
 from redis import Redis
 from sqlmodel import Session, select, delete
+from auth_user_service.core.config import settings
 from auth_user_service.db_models.users import User
 from auth_user_service.db_models.sessions import ClientSessionCreate, ClientSession
 from auth_user_service.core.client import RedisRefreshStore, RedisSessionManager
@@ -105,14 +106,24 @@ class SessionController:
         """
         Check if a JWT identifier is blacklisted.
 
+        When Redis is unavailable, follows the configured
+        ACCESS_REVOCATION_FAILURE_MODE: fail_closed returns True (treats token
+        as revoked — revocation takes priority over availability) and fail_open
+        returns False (allows the request through). This is an explicit security
+        decision matching the pattern in core/deps.py.
+
         Args:
             jti (str): JWT token identifier.
 
         Returns:
-            bool: True if token is blacklisted.
+            bool: True if token is blacklisted or Redis is unavailable and
+                  fail_closed mode is active.
         """
-        redis = RedisSessionManager(get_redis_client())
-        return redis.is_blacklisted(jti)
+        redis = get_redis_client()
+        if redis is None:
+            mode = settings.effective_failure_mode("access_revocation")
+            return mode == "fail_closed"
+        return RedisSessionManager(redis).is_blacklisted(jti)
 
     @staticmethod
     def delete_session_by_jti(session: Session, jti: str) -> None:
