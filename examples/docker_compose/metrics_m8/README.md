@@ -317,6 +317,8 @@ Also update the `Host` rules in the production config to match your actual FQDN.
 
 **Services fail to start immediately** — `auth_user_service` waits for PostgreSQL to pass
 its health check (`pg_isready`). PostgreSQL typically initialises in 10–20 s on first boot.
+`fastapi_service` then waits for `auth_user_service` to pass its own health check. Watch
+the logs with `docker compose logs -f`.
 
 **`changethis` rejection on startup** — replace all `changethis` values in `.env`
 and `auth.env`.

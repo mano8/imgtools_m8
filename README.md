@@ -99,6 +99,8 @@ Five ready-to-run stacks are provided under [`examples/docker_compose/`](https:/
 
 **Start here →** [`quickstart_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/quickstart_m8) for the fastest path to a running stack.
 
+All stacks include `healthcheck` probes and `restart: unless-stopped` on `auth_user_service` and `fastapi_service`. The consumer service waits for the auth service health check to pass (`service_healthy`) before starting.
+
 ### Token modes at a glance
 
 The `TOKEN_MODE` column in the table above controls how tokens are validated across your services:

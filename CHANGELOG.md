@@ -6,6 +6,34 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased] — SecureAndAlign branch
 
+### Added
+
+- **mypy type-checking in CI** — new `typecheck` job in `.github/workflows/CI.yaml` runs
+  `mypy auth_user_service` and `mypy examples/fastapi_service` on every PR against `main`.
+  Runs on Python 3.14 only (no matrix needed for static analysis).
+
+- **Healthchecks + auto-restart on all 6 compose stacks** — `auth_user_service` and
+  `fastapi_service` now have `healthcheck` + `restart: unless-stopped` in every
+  `docker-compose.yml`. The probe uses Python's built-in `urllib.request` (no curl/wget
+  required in the slim image) against the service's own health endpoint:
+  `http://localhost:8000/user/health/` and `http://localhost:8000/fastapi/health/`
+  respectively. `fastapi_service.depends_on.auth_user_service` changed from
+  `service_started` → `service_healthy` so the consumer only starts once the auth service
+  is confirmed reachable.
+
+- **`/fastapi/health/` endpoint in `fastapi_service` template** — process-only liveness
+  probe added to `examples/fastapi_service/main.py`. Always returns `{"status": "ok"}` with
+  HTTP 200 when the process is running; has no external dependencies.
+
+- **Route tests for `profile` and `google_auth`** — `tests/routes/test_profile.py` (16 tests)
+  covers all branches of `read_user_me`, `update_user_me`, `update_password_me`, and
+  `delete_user_me`. `tests/routes/test_google_auth.py` (19 tests) covers all helpers and
+  every error/success branch of `google_auth_callback` including Redis unavailability,
+  HTTPXError, HTTPException re-raise, and callback URI derivation.
+
+- **100% branch coverage enforced in CI** — `.github/workflows/CI.yaml` now includes
+  `--cov-fail-under=100`. Any PR that drops coverage below 100% on measured code will fail.
+
 ### Fixed
 
 - **80 mypy errors eliminated across `auth_user_service` and `fastapi_service`** — resolved
@@ -23,17 +51,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - **Bandit scan returns 0 issues** — no medium/high severity findings in `auth_user_service`
   or `fastapi_service`.
-
-### Added
-
-- **Route tests for `profile` and `google_auth`** — `tests/routes/test_profile.py` (16 tests)
-  covers all branches of `read_user_me`, `update_user_me`, `update_password_me`, and
-  `delete_user_me`. `tests/routes/test_google_auth.py` (19 tests) covers all helpers and
-  every error/success branch of `google_auth_callback` including Redis unavailability,
-  HTTPXError, HTTPException re-raise, and callback URI derivation.
-
-- **100% branch coverage enforced in CI** — `.github/workflows/CI.yaml` now includes
-  `--cov-fail-under=100`. Any PR that drops coverage below 100% on measured code will fail.
 
 ### Security
 
