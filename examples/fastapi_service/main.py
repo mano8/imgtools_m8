@@ -41,9 +41,11 @@ async def lifespan(app: FastAPI):
     _startup_checks()
     yield
     from fastapi_service.core.deps import _revocation_client  # noqa: PLC0415
+    from fastapi_service.core.engine_sync import engine  # noqa: PLC0415
 
     if _revocation_client is not None:
         await _revocation_client.close()
+    engine.dispose()
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:

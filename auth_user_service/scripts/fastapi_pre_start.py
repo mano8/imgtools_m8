@@ -36,6 +36,7 @@ def main() -> None:
     logger.info("Initializing service")
     init(engine)
     logger.info("Service finished initializing")
+    engine.dispose()
 
 
 if __name__ == "__main__":
