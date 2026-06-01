@@ -8,7 +8,10 @@ persisting session metadata, and managing token revocation via Redis.
 import logging
 from datetime import datetime, timedelta, timezone
 from ipaddress import ip_address
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
+
+from redis import Redis
+from sqlmodel import Session
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
@@ -205,7 +208,7 @@ def login_access_token(
 # ── Private helpers for refresh-token and logout routes ───────────────────────
 
 
-def _decode_refresh_or_raise(refresh_token: str, _m: object) -> tuple:
+def _decode_refresh_or_raise(refresh_token: str, _m: Any) -> tuple:
     """Decode a refresh token and return (user_id, old_jti) or raise 401."""
     try:
         return SecurityHelper.decode_refresh_token(
@@ -215,13 +218,13 @@ def _decode_refresh_or_raise(refresh_token: str, _m: object) -> tuple:
             old_secrets=_REFRESH_OLD_SECRETS,
         )
     except InvalidToken as err:
-        if _m and hasattr(_m, "token_refresh_total") and _m.token_refresh_total:
+        if _m and _m.token_refresh_total:
             _m.token_refresh_total.labels(result="invalid").inc()
         raise HTTPException(status_code=401, detail=str(err)) from err
 
 
 def _revoke_access_jti(
-    token: str, redis: object, _m: object
+    token: str, redis: Optional[Redis], _m: Any
 ) -> tuple[str | None, bool]:
     """Blacklist the access token JTI; returns (jti, failed)."""
     if not settings.is_stateful:
@@ -239,59 +242,55 @@ def _revoke_access_jti(
         return jti, False
     except Exception:  # noqa: BLE001
         logger.exception("Could not blacklist access token JTI on logout.")
-        if (
-            _m
-            and hasattr(_m, "revocation_failure_total")
-            and _m.revocation_failure_total
-        ):
+        if _m and _m.revocation_failure_total:
             _m.revocation_failure_total.labels(operation="access_blacklist").inc()
         return None, True
 
 
+def _do_revoke_refresh_from_store(
+    refresh_token: str, redis: Redis, access_jti: str | None, _m: Any
+) -> tuple[str | None, bool]:
+    """Decode and revoke the refresh JTI from Redis; returns (jti, failed)."""
+    try:
+        _, refresh_jti = SecurityHelper.decode_refresh_token(
+            refresh_token,
+            secrets=_REFRESH_SECRETS,
+            return_jti=True,
+            old_secrets=_REFRESH_OLD_SECRETS,
+        )
+        RedisRefreshStore(redis).revoke(refresh_jti)
+        result_jti = refresh_jti if access_jti is None else access_jti
+        return result_jti, False
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not revoke refresh JTI on logout.")
+        if _m and _m.revocation_failure_total:
+            _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
+        return access_jti, True
+
+
 def _revoke_refresh_jti(
-    refresh_token: str, redis: object, access_jti: str | None, _m: object
+    refresh_token: str, redis: Optional[Redis], access_jti: str | None, _m: Any
 ) -> tuple[str | None, bool]:
     """Revoke the refresh JTI from the allowlist; returns (jti, failed)."""
     if settings.is_stateless:
         return access_jti, False
     if redis is not None:
-        try:
-            _, refresh_jti = SecurityHelper.decode_refresh_token(
-                refresh_token,
-                secrets=_REFRESH_SECRETS,
-                return_jti=True,
-                old_secrets=_REFRESH_OLD_SECRETS,
-            )
-            RedisRefreshStore(redis).revoke(refresh_jti)
-            return refresh_jti if access_jti is None else access_jti, False
-        except Exception:  # noqa: BLE001
-            logger.exception("Could not revoke refresh JTI on logout.")
-            if (
-                _m
-                and hasattr(_m, "revocation_failure_total")
-                and _m.revocation_failure_total
-            ):
-                _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
-            return access_jti, True
+        return _do_revoke_refresh_from_store(refresh_token, redis, access_jti, _m)
     # Redis unavailable
     _mode = settings.effective_failure_mode("session_write")
-    if _m and hasattr(_m, "degraded_decision_total") and _m.degraded_decision_total:
+    if _m and _m.degraded_decision_total:
         _m.degraded_decision_total.labels(
             control="session_write", mode=_mode, reason="redis_unavailable"
         ).inc()
     if _mode == "fail_closed":
         logger.error("Could not revoke refresh JTI on logout: Redis unavailable.")
-        if (
-            _m
-            and hasattr(_m, "revocation_failure_total")
-            and _m.revocation_failure_total
-        ):
+        if _m and _m.revocation_failure_total:
             _m.revocation_failure_total.labels(operation="refresh_allowlist").inc()
         return access_jti, True
     return access_jti, False
 
 
-def _delete_db_session(session: object, jti: str | None, _m: object) -> bool:
+def _delete_db_session(session: Session, jti: str | None, _m: Any) -> bool:
     """Delete the DB session for jti; returns True if the operation failed."""
     if settings.is_stateless or jti is None:
         return False
@@ -300,11 +299,7 @@ def _delete_db_session(session: object, jti: str | None, _m: object) -> bool:
         return False
     except Exception:  # noqa: BLE001
         logger.exception("Could not delete DB session on logout.")
-        if (
-            _m
-            and hasattr(_m, "revocation_failure_total")
-            and _m.revocation_failure_total
-        ):
+        if _m and _m.revocation_failure_total:
             _m.revocation_failure_total.labels(operation="db_session").inc()
         return True
 
