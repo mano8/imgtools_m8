@@ -104,7 +104,7 @@ jobs:
           ENVEOF
 
       - name: Run tests
-        run: pytest --cov-report=xml
+        run: pytest --cov-report=xml --cov-fail-under=100
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11' && github.actor != 'dependabot[bot]'
