@@ -6,11 +6,13 @@ Verifies that:
 - Fallback to request.client.host when header is absent
 - Fallback to "unknown" when both header and request.client are absent
 - Whitespace around IPs in the chain is stripped
+- Port suffixes are stripped before IP validation (IPv4:port and [IPv6]:port)
+- TRUSTED_PROXY_COUNT=0 bypasses XFF entirely
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from auth_user_service.routes.login import _client_ip
+from auth_user_service.routes.login import _client_ip, _strip_port
 
 
 def _make_request(
@@ -55,3 +57,50 @@ def test_empty_xff_falls_back_to_client_host():
     """An empty string header must not be returned — treat as absent."""
     req = _make_request(xff="", client_host="192.168.1.2")
     assert _client_ip(req) == "192.168.1.2"
+
+
+def test_xff_garbage_falls_back_to_client_host():
+    """Unparseable XFF entry falls back to request.client.host."""
+    req = _make_request(xff="not-an-ip", client_host="192.168.1.3")
+    assert _client_ip(req) == "192.168.1.3"
+
+
+def test_xff_ipv4_with_port_stripped():
+    """IPv4:port format in XFF — port is stripped before validation."""
+    req = _make_request(xff="192.0.2.1:45231", client_host="fallback")
+    assert _client_ip(req) == "192.0.2.1"
+
+
+def test_xff_ipv6_bracketed_port_stripped():
+    """[IPv6]:port format in XFF — brackets and port stripped before validation."""
+    req = _make_request(xff="[2001:db8::1]:8080", client_host="fallback")
+    assert _client_ip(req) == "2001:db8::1"
+
+
+def test_trusted_proxy_count_zero_ignores_xff():
+    """TRUSTED_PROXY_COUNT=0 skips XFF entirely and returns request.client.host."""
+    from auth_user_service.routes import login as login_mod
+
+    req = _make_request(xff="1.2.3.4", client_host="10.10.10.10")
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 0):
+        assert _client_ip(req) == "10.10.10.10"
+
+
+# ── _strip_port unit tests ────────────────────────────────────────────────────
+
+
+def test_strip_port_plain_ipv4():
+    assert _strip_port("192.0.2.1") == "192.0.2.1"
+
+
+def test_strip_port_ipv4_with_port():
+    assert _strip_port("192.0.2.1:45231") == "192.0.2.1"
+
+
+def test_strip_port_bracketed_ipv6():
+    assert _strip_port("[2001:db8::1]:8080") == "2001:db8::1"
+
+
+def test_strip_port_pure_ipv6_unchanged():
+    """Pure IPv6 (no brackets, no port) must be returned unchanged."""
+    assert _strip_port("2001:db8::1") == "2001:db8::1"

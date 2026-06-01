@@ -6,7 +6,7 @@ This module loads environment settings securely and applies best practices.
 from pathlib import Path
 from typing import Optional
 
-from pydantic import EmailStr, SecretStr
+from pydantic import EmailStr, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
 from auth_sdk_m8.utils.paths import find_dotenv
 from auth_sdk_m8.core.config import CommonSettings
@@ -44,6 +44,19 @@ class Settings(ObservabilitySettingsMixin, CommonSettings):
         "TOKENS_ENCRYPTION_KEY",
     ]
     TABLES_PREFIX: str = "auth"
+
+    # Number of trusted reverse-proxy hops in front of this service.
+    # Used to select the real client IP from X-Forwarded-For by taking
+    # xff[-TRUSTED_PROXY_COUNT-1] (Nth from right). Must be >= 0.
+    # Set to 1 when a single Traefik instance sits in front.
+    TRUSTED_PROXY_COUNT: int = 1
+
+    @field_validator("TRUSTED_PROXY_COUNT")
+    @classmethod
+    def _validate_proxy_count(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("TRUSTED_PROXY_COUNT must be >= 0")
+        return v
 
     # API key rate limiting defaults (0 = disabled for that period)
     API_KEY_STRICT_RATE_LIMIT: bool = False

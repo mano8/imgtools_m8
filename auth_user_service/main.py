@@ -208,13 +208,37 @@ def custom_generate_unique_id(route: APIRoute) -> str:
     return f"{route.tags[0]}-{route.name}"
 
 
+_is_production = settings.ENVIRONMENT == "production"
+
+if _is_production and (
+    settings.SET_DOCS or settings.SET_REDOC or settings.SET_OPEN_API
+):
+    raise ValueError(
+        "SET_DOCS, SET_REDOC, and SET_OPEN_API cannot be enabled in production "
+        "(ENVIRONMENT=production). Set all three to false in your env file."
+    )
+
+# In production docs are always disabled. In other environments the per-flag
+# overrides (SET_DOCS, SET_REDOC, SET_OPEN_API) apply as usual.
+_docs_url = (
+    f"{settings.API_PREFIX}/docs" if not _is_production and settings.SET_DOCS else None
+)
+_redoc_url = (
+    f"{settings.API_PREFIX}/redoc"
+    if not _is_production and settings.SET_REDOC
+    else None
+)
+_openapi_url = (
+    f"{settings.API_PREFIX}/openapi.json"
+    if not _is_production and settings.SET_OPEN_API
+    else None
+)
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=(
-        f"{settings.API_PREFIX}/openapi.json" if settings.SET_OPEN_API else None
-    ),
-    docs_url=f"{settings.API_PREFIX}/docs" if settings.SET_DOCS else None,
-    redoc_url=f"{settings.API_PREFIX}/redoc" if settings.SET_REDOC else None,
+    openapi_url=_openapi_url,
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
     generate_unique_id_function=custom_generate_unique_id,
     lifespan=lifespan,
 )

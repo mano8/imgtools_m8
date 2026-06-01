@@ -79,6 +79,7 @@ class TestForcedChurnDetection:
             mock_cfg.REFRESH_SECRET_KEY = MagicMock()
             mock_cfg.REFRESH_TOKEN_ALGORITHM = "HS256"
             mock_cfg.effective_failure_mode.return_value = "fail_open"
+            mock_cfg.TRUSTED_PROXY_COUNT = 1
 
             from auth_user_service.core.config import settings as real_settings
 

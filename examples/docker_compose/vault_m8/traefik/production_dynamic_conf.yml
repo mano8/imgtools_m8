@@ -1,0 +1,116 @@
+# production_dynamic_conf.yml — Production
+# Copy to dynamic_conf.yml when deploying to a public-facing environment.
+#
+# Changes from the dev config:
+#   1. security-headers-prod adds Content-Security-Policy and enables HSTS.
+#   2. Replace "localhost" in Host rules with your actual FQDN (e.g., auth.example.com).
+#   3. Update TLS section to use your real certificate paths or ACME resolver.
+#
+# HSTS WARNING: once enabled, browsers refuse plain HTTP to this host for
+# stsSeconds. Only enable after TLS is stable and trusted.
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: "/etc/traefik/certs/local.crt"
+        keyFile:  "/etc/traefik/certs/local.key"
+  certificates:
+    - certFile: "/etc/traefik/certs/local.crt"
+      keyFile:  "/etc/traefik/certs/local.key"
+http:
+
+  routers:
+    # Dashboard — localhost only, IP-restricted
+    traefik-dashboard:
+      entryPoints:
+        - websecure
+      rule: "Host(`localhost`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      service: api@internal
+      middlewares:
+        - ip-allowlist
+      tls: {}
+
+    # Auth-User-Service: public API routes on HTTPS (health and metrics are internal-only)
+    # PRODUCTION: docs are disabled via ENVIRONMENT=production — no CSP/docs conflict.
+    auth-public-router:
+      entryPoints:
+        - websecure
+      rule: "Host(`localhost`) && PathPrefix(`/user`) && !(PathPrefix(`/user/health`) || PathPrefix(`/user/metrics`))"
+      service: auth-service
+      middlewares:
+        - security-headers-prod
+      tls: {}
+      priority: 2
+
+    # Auth-User-Service: all routes on the localhost-bound api entryPoint (port 9000)
+    auth-internal-router:
+      entryPoints:
+        - api
+      rule: "PathPrefix(`/user`)"
+      service: auth-service
+      middlewares:
+        - security-headers-prod
+        - internal-only
+
+    # FastAPI-Service: public routes on HTTPS
+    fastapi-public-router:
+      entryPoints:
+        - websecure
+      rule: "Host(`localhost`) && PathPrefix(`/fastapi`)"
+      service: fastapi-service
+      middlewares:
+        - security-headers-prod
+      tls: {}
+
+    # FastAPI-Service: all routes on the localhost-bound api entryPoint (port 9000)
+    fastapi-internal-router:
+      entryPoints:
+        - api
+      rule: "PathPrefix(`/fastapi`)"
+      service: fastapi-service
+      middlewares:
+        - security-headers-prod
+        - internal-only
+
+  services:
+    auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://auth_user_service:8000"
+    fastapi-service:
+      loadBalancer:
+        servers:
+          - url: "http://fastapi_service:8000"
+
+  middlewares:
+    ip-allowlist:
+      IPAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+          - "::1/128"
+
+    internal-only:
+      IPAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+          - "::1/128"
+
+    security-headers-prod:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        # HSTS: enable only after TLS is stable with a trusted certificate.
+        # Once set, browsers enforce HTTPS for stsSeconds even if you later disable it.
+        stsSeconds: 63072000         # 2 years
+        stsIncludeSubdomains: true
+        stsPreload: false            # set true only after submitting to HSTS preload list
+        customResponseHeaders:
+          Content-Security-Policy: "default-src 'none'; frame-ancestors 'none'"
+          X-Robots-Tag: "noindex,nofollow"
+          Server: ""
