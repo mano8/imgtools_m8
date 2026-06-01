@@ -10,9 +10,11 @@ DOMAIN="localhost"
 ENVIRONMENT="local"
 
 API_PREFIX="/user"
-SET_OPEN_API=true    # set false in production to hide the schema endpoint
-SET_DOCS=true        # set false in production to disable Swagger UI
-SET_REDOC=true       # set false in production to disable ReDoc
+# Docs are always disabled when ENVIRONMENT=production (startup error if SET_DOCS=true there).
+# In development/staging these flags act as opt-in overrides.
+SET_OPEN_API=true
+SET_DOCS=true
+SET_REDOC=true
 PROJECT_NAME="M8App"
 STACK_NAME="full-stack-m8-app"
 
@@ -39,11 +41,9 @@ GOOGLE_CLIENT_SECRET="changethis"
 # Used by the auth_user_service to generate links in emails to the frontend
 BACKEND_HOST="http://127.0.0.1:9000"
 FRONTEND_HOST="http://localhost:5173"
-EXTENSION_ID="changethis"
 # In staging and production, set this env var to the frontend host, e.g.
 # FRONTEND_HOST=https://dashboard.example.com
 BACKEND_CORS_ORIGINS="http://localhost,http://localhost:5173,https://localhost,https://localhost:5173"
-SECRET_KEY="changethis"
 ACCESS_SECRET_KEY="changethis"
 REFRESH_SECRET_KEY="changethis"
 TOKEN_ALGORITHM="HS256"
@@ -71,6 +71,11 @@ DB_PORT=3306
 DB_DATABASE="m8_app"
 DB_USER="changethis"
 DB_PASSWORD="changethis"
+
+# ── Proxy trust ───────────────────────────────────────────────────────────────
+# Number of trusted reverse-proxy hops. Used to extract the real client IP from
+# X-Forwarded-For. Set to 0 to ignore XFF (running without a reverse proxy).
+TRUSTED_PROXY_COUNT=1
 
 # Redis
 REDIS_HOST="127.0.0.1"

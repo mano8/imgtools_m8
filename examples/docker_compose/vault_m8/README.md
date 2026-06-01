@@ -532,6 +532,7 @@ Dev-mode Vault UI. Log in with `VAULT_DEV_TOKEN` from `.env`. Use it to inspect 
 | `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | auth.env | Login rate-limit window in minutes (default: 15) |
 | `REFRESH_RATE_LIMIT_REQUESTS` | auth.env | Max refresh rotations per window per user (default: 10) |
 | `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | auth.env | Refresh rate-limit window in minutes (default: 5) |
+| `TRUSTED_PROXY_COUNT` | auth.env | Trusted proxy hops for real client IP extraction (default: 1). Set to `0` if no proxy in front. |
 
 ### `api.env` — consumer service
 
@@ -598,6 +599,18 @@ Manual smoke test:
 curl http://localhost:9000/user/health/
 # Expected: {"status":"ok","token_mode":"stateful","redis":"ok","database":"ok",...}
 ```
+
+---
+
+## Production deployment
+
+When deploying publicly, replace `traefik/dynamic_conf.yml` with `traefik/production_dynamic_conf.yml`. The production config:
+
+- Adds `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` to all API routes.
+- Enables `Strict-Transport-Security` (HSTS). Only use after TLS is stable with a trusted certificate.
+- Dev `dynamic_conf.yml` has no CSP so Swagger UI works during development.
+
+Also update the `Host` rules in the production config to match your actual FQDN.
 
 ---
 

@@ -243,6 +243,7 @@ Alert rules in `prometheus/alerts.yml` cover API key rate-limit ratios and flush
 | `AUTH_STRICT_MODE` | `true` | Overrides all failure modes to `fail_closed` |
 | `RATE_LIMIT_FAILURE_MODE` | `fail_closed` | Redis outage → 503 on rate-limited endpoints |
 | `ACCESS_REVOCATION_FAILURE_MODE` | `fail_closed` | Redis outage → tokens not accepted |
+| `TRUSTED_PROXY_COUNT` | `1` | Trusted proxy hops for real client IP extraction. Set to `0` if no proxy. |
 | `METRICS_ENABLED` | `true` | Exposes `/user/metrics` for Prometheus |
 
 ### `api.env` — consumer service
@@ -322,6 +323,18 @@ Manual smoke test:
 curl http://localhost:9000/user/health/
 # Expected: {"status":"ok","token_mode":"stateful","redis":"ok","database":"ok",...}
 ```
+
+---
+
+## Production deployment
+
+When deploying publicly, replace `traefik/dynamic_conf.yml` with `traefik/production_dynamic_conf.yml`. The production config:
+
+- Adds `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` to all API routes.
+- Enables `Strict-Transport-Security` (HSTS). Only use after TLS is stable with a trusted certificate.
+- Dev `dynamic_conf.yml` has no CSP so Swagger UI works during development.
+
+Also update the `Host` rules in the production config to match your actual FQDN.
 
 ---
 

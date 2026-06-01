@@ -4,6 +4,51 @@ All notable changes to `fa-auth-m8` will be documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] — SecureAndAlign branch
+
+### Security
+
+- **Production Traefik CSP profile** — added `production_dynamic_conf.yml` to all 6 compose
+  stacks. Sets `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and
+  enables HSTS on API routes. The dev `dynamic_conf.yml` is unchanged (no CSP, Swagger works).
+  Middleware chain test recommended after deployment (`curl -I` to verify no duplicates).
+
+- **OpenAPI docs gated by `ENVIRONMENT`** — `auth_user_service/main.py` now disables
+  `/docs`, `/redoc`, and `/openapi.json` when `ENVIRONMENT=production` regardless of
+  `SET_DOCS`. A startup `ValueError` is raised if `SET_DOCS=true` and
+  `ENVIRONMENT=production` are set simultaneously, preventing operator misconfiguration.
+
+- **`TRUSTED_PROXY_COUNT` setting** — new `int` config field (default `1`) in `Settings`.
+  `_client_ip()` in `routes/login.py` now validates the setting at startup, strips IPv4:port
+  and `[IPv6]:port` suffixes before IP validation, and ignores XFF entirely when
+  `TRUSTED_PROXY_COUNT=0` (no proxy in front). All `auth.env.example` files updated with
+  an opt-in commented entry.
+
+- **Email normalisation** — all user-facing email fields (`UserBase`, `UserRegister`,
+  `UserUpdate`, `UserUpdateMe`) now normalise to lowercase and strip whitespace via
+  `normalize_email()` from auth-sdk-m8 ≥ 0.6.17. Prevents duplicate accounts created
+  through mixed-case registration.
+
+- **Redis null guard in `is_session_revoked`** — `SessionController.is_session_revoked()`
+  no longer crashes with `AttributeError` when Redis is unavailable. Follows the configured
+  `ACCESS_REVOCATION_FAILURE_MODE`: fail_closed treats the token as revoked; fail_open allows
+  the request through. Matches the existing pattern in `core/deps.py`.
+
+### Changed
+
+- **`auth-sdk-m8` dependency bumped to `>=0.6.17`** — required for `normalize_email()`.
+
+- **`login_refresh_token` and `logout` decomposed** — extracted private helpers
+  `_decode_refresh_or_raise`, `_revoke_access_jti`, `_revoke_refresh_jti`,
+  `_delete_db_session` from the two route handlers, reducing them from ~135 and ~93 lines
+  to a clearly sequenced set of calls. Behaviour is identical.
+
+- **API key count query** — `routes/api_keys.py` now uses `select(func.count()).where(...)`
+  instead of `len(session.exec(stmt).all())`. Eliminates a full table scan for every key
+  creation request.
+
+---
+
 ## [0.11.0] — 2026-05-26 · Redis isolation — consumer services use HTTP introspection
 
 ### Breaking changes

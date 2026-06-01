@@ -187,6 +187,7 @@ All requests go through Traefik. Use port `9000` (HTTP) during development:
 | `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | `15` | Login rate-limit window in minutes |
 | `REFRESH_RATE_LIMIT_REQUESTS` | `10` | Max refresh rotations per window per user |
 | `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | `5` | Refresh rate-limit window in minutes |
+| `TRUSTED_PROXY_COUNT` | `1` | Trusted reverse-proxy hops in front. Used to extract real client IP from `X-Forwarded-For`. Set to `0` if no proxy. |
 | `METRICS_ENABLED` | `false` | Set to `true` to expose `/user/metrics` |
 | `AUTH_SERVICE_ROLE` | `issuer` | This service signs tokens |
 
@@ -278,6 +279,18 @@ Manual smoke test:
 curl http://localhost:9000/user/health/
 # Expected: {"status":"ok","token_mode":"stateful","redis":"ok","database":"ok",...}
 ```
+
+---
+
+## Production deployment
+
+When deploying publicly, replace `traefik/dynamic_conf.yml` with `traefik/production_dynamic_conf.yml`. The production config:
+
+- Adds `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` to all API routes.
+- Enables `Strict-Transport-Security` (HSTS). Only use after TLS is stable with a trusted certificate.
+- Dev `dynamic_conf.yml` has no CSP so Swagger UI works during development.
+
+Also update the `Host` rules in the production config to match your actual FQDN.
 
 ---
 

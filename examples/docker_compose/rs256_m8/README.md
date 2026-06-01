@@ -213,6 +213,7 @@ In `hybrid` mode, access tokens remain valid for their full lifetime after logou
 | `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | `15` | Login rate-limit window in minutes |
 | `REFRESH_RATE_LIMIT_REQUESTS` | `10` | Max refresh rotations per window per user |
 | `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | `5` | Refresh rate-limit window in minutes |
+| `TRUSTED_PROXY_COUNT` | `1` | Trusted proxy hops for real client IP extraction. Set to `0` if no proxy. |
 | `METRICS_ENABLED` | `false` | Set to `true` to expose `/user/metrics` |
 
 ### `api.env` — consumer service
@@ -297,6 +298,18 @@ curl http://localhost:9000/user/health/
 curl http://localhost:9000/user/.well-known/jwks.json
 # Expected: {"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"...","n":"...","e":"AQAB"}]}
 ```
+
+---
+
+## Production deployment
+
+When deploying publicly, replace `traefik/dynamic_conf.yml` with `traefik/production_dynamic_conf.yml`. The production config:
+
+- Adds `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` to all API routes.
+- Enables `Strict-Transport-Security` (HSTS). Only use after TLS is stable with a trusted certificate.
+- Dev `dynamic_conf.yml` has no CSP so Swagger UI works during development.
+
+Also update the `Host` rules in the production config to match your actual FQDN.
 
 ---
 

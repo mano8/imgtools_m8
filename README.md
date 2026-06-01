@@ -155,7 +155,7 @@ All routes are prefixed with `API_PREFIX` (default `/user`).
 | metrics | GET | `/metrics` | — | Prometheus metrics (`METRICS_ENABLED=true` only) |
 | private | POST | `/private/users/` | X-Internal-Token | Create user (inter-service, Docker network only) |
 
-Interactive docs at `{BACKEND_HOST}{API_PREFIX}/docs` when `SET_DOCS=true`.
+Interactive docs at `{BACKEND_HOST}{API_PREFIX}/docs` when `SET_DOCS=true` **and** `ENVIRONMENT ≠ production`. In production both flags are ignored and docs are always off.
 
 ---
 
@@ -332,8 +332,8 @@ Set `SELECTED_DB` in `.env` (or `auth.env`):
 | `FRONTEND_HOST` | yes | — | Full frontend URL (e.g. `http://localhost:5173`) |
 | `BACKEND_CORS_ORIGINS` | yes | — | Comma-separated allowed origins |
 | `TABLES_PREFIX` | no | `auth` | DB table name prefix (e.g. `auth_user`, `auth_api_key`) |
-| `SET_DOCS` | no | `true` | Enable Swagger UI at `{API_PREFIX}/docs` |
-| `SET_REDOC` | no | `true` | Enable ReDoc at `{API_PREFIX}/redoc` |
+| `SET_DOCS` | no | `true` | Enable Swagger UI at `{API_PREFIX}/docs`. Always disabled when `ENVIRONMENT=production`; setting `SET_DOCS=true` together with `ENVIRONMENT=production` raises a startup error. |
+| `SET_REDOC` | no | `true` | Enable ReDoc at `{API_PREFIX}/redoc`. Same production gate as `SET_DOCS`. |
 
 ### Tokens
 
@@ -461,6 +461,7 @@ A startup warning is logged if the effective rate (requests ÷ window) exceeds 5
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
 | `API_BIND_IP` | `127.0.0.1` | Host IP Traefik binds port 9000 to. Set to `0.0.0.0` for LAN/public exposure |
+| `TRUSTED_PROXY_COUNT` | `1` | Number of trusted reverse-proxy hops in front of this service. Used to extract the real client IP from `X-Forwarded-For` (leftmost entry). Set to `0` to ignore XFF entirely (no proxy in front). |
 | `TRUSTED_PROXY_IPS` | `172.16.0.0/12` | CIDR(s) Uvicorn trusts as reverse-proxy source for `X-Forwarded-For` |
 | `STRICT_PRODUCTION_MODE` | `false` | When `true`, enforce production-grade checks (e.g. secure cookies) even in non-production environments |
 
@@ -554,11 +555,20 @@ Requires a coordinated three-layer setup:
 
 1. **Traefik** — add `forwardedHeaders.trustedIPs` to each entrypoint in `traefik.yml` (strips client-supplied `X-Forwarded-For`, prevents IP spoofing).
 2. **Uvicorn** — the startup script reads `TRUSTED_PROXY_IPS` (default `172.16.0.0/12`) and passes it via `--proxy-headers --forwarded-allow-ips`. Never use `*`.
-3. **Application** — `_client_ip()` reads the leftmost `X-Forwarded-For` value, which is trustworthy only because layers 1 and 2 have been configured.
+3. **Application** — `_client_ip()` reads the leftmost `X-Forwarded-For` value, which is trustworthy only because layers 1 and 2 have been configured. Set `TRUSTED_PROXY_COUNT=0` in `auth.env` to bypass XFF entirely (no proxy in front of FastAPI).
+
+### Content Security Policy (production only)
+
+Each example stack ships two Traefik configs in `traefik/`:
+
+| File | Purpose |
+| ---- | ------- |
+| `dynamic_conf.yml` | Development — no CSP, Swagger UI works |
+| `production_dynamic_conf.yml` | Production — adds `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` and enables HSTS. Replace `dynamic_conf.yml` with this file when deploying publicly. Update the `Host` rules to your FQDN. |
 
 ### HSTS (opt-in, public deployments only)
 
-`Strict-Transport-Security` is commented out in all `traefik/dynamic_conf.yml` files. Uncomment after confirming TLS is stable and the hostname will remain HTTPS-only for the full `stsSeconds` period.
+`Strict-Transport-Security` is commented out in all `traefik/dynamic_conf.yml` files. It is enabled by default in `production_dynamic_conf.yml`. Only activate HSTS after confirming TLS is stable and the hostname will remain HTTPS-only for the full `stsSeconds` period.
 
 ---
 

@@ -234,6 +234,7 @@ histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
 | `LOGIN_RATE_LIMIT_WINDOW_MINUTES` | Default: 15 — login rate-limit window in minutes |
 | `REFRESH_RATE_LIMIT_REQUESTS` | Default: 10 — max refresh rotations per window per user |
 | `REFRESH_RATE_LIMIT_WINDOW_MINUTES` | Default: 5 — refresh rate-limit window in minutes |
+| `TRUSTED_PROXY_COUNT` | `1` | Trusted proxy hops for real client IP extraction. Set to `0` if no proxy. |
 | `METRICS_ENABLED` | `true` — exposes `/user/metrics` for Prometheus to scrape |
 | `AUTH_SERVICE_ROLE` | `issuer` — this service signs tokens |
 
@@ -297,6 +298,18 @@ docker compose down
 # Delete those directories manually if you also want to reset observability state.
 bash init.sh --reset-db
 ```
+
+---
+
+## Production deployment
+
+When deploying publicly, replace `traefik/dynamic_conf.yml` with `traefik/production_dynamic_conf.yml`. The production config:
+
+- Adds `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'` to all API routes.
+- Enables `Strict-Transport-Security` (HSTS). Only use after TLS is stable with a trusted certificate.
+- Dev `dynamic_conf.yml` has no CSP so Swagger UI works during development.
+
+Also update the `Host` rules in the production config to match your actual FQDN.
 
 ---
 
