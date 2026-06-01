@@ -187,6 +187,9 @@ async def lifespan(app: FastAPI):
             await asyncio.wait_for(asyncio.shield(flush_task), timeout=6.0)
         except (asyncio.CancelledError, asyncio.TimeoutError):
             pass
+        from auth_user_service.core.engine_sync import engine
+
+        engine.dispose()
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:

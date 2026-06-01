@@ -78,7 +78,8 @@ http:
         # Only allow dashboard from the Docker host itself
         sourceRange:
           - "127.0.0.1/32"
-          - "172.16.0.0/12"   # Docker bridge networks
+          - "172.16.0.0/12"   # Docker default bridge networks
+          - "192.168.0.0/16"  # Docker Desktop / Compose auto-assigned networks
           - "::1/128"
 
     internal-only:
@@ -86,7 +87,8 @@ http:
         # Restrict health/metrics to localhost and Docker bridge networks
         sourceRange:
           - "127.0.0.1/32"
-          - "172.16.0.0/12"   # Docker bridge networks
+          - "172.16.0.0/12"   # Docker default bridge networks
+          - "192.168.0.0/16"  # Docker Desktop / Compose auto-assigned networks
           - "::1/128"
 
     security-headers:
