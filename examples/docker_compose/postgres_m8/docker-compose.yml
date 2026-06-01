@@ -109,6 +109,13 @@ services:
         condition: service_healthy
       redis_cache:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/user/health/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
     networks:
       - m8_app_network
 
@@ -128,7 +135,14 @@ services:
       m8_db:
         condition: service_healthy
       auth_user_service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/fastapi/health/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
     networks:
       - m8_app_network
 
