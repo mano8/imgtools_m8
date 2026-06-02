@@ -30,7 +30,7 @@ def _startup_checks() -> None:
     check_config_health(settings, _logger)
 
     if settings.is_stateful and settings.AUTH_SERVICE_ROLE == "consumer":
-        _logger.info(
+        _logger.info(  # nosec B106
             "STARTUP: token revocation via HTTP introspection at %s",
             settings.INTROSPECTION_URL,
         )

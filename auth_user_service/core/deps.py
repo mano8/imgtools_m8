@@ -48,7 +48,7 @@ class _LoggingHooks:
     """Emit structured log lines for every token validation outcome."""
 
     def on_success(self, *, jti: str, sub: str, token_type: str) -> None:
-        _logger.info(
+        _logger.info(  # nosec B106
             "event=token.valid type=%s sub=%s jti=%s ts=%s",
             token_type,
             sub,
@@ -57,7 +57,7 @@ class _LoggingHooks:
         )
 
     def on_failure(self, *, reason: str, token_type: str) -> None:
-        _logger.warning(
+        _logger.warning(  # nosec B106
             "event=token.invalid type=%s reason=%s ts=%s",
             token_type,
             reason,
@@ -141,6 +141,34 @@ def get_redis_degraded_since() -> Optional[datetime]:
 RedisDep = Annotated[Optional[Redis], Depends(get_redis_client)]
 
 
+def _check_jti_revocation(jti: str) -> None:
+    """Raise HTTPException if the JTI is blacklisted or Redis is unavailable in fail-closed mode.
+
+    Only called in stateful mode.
+    """
+    redis = get_redis_client()
+    _m = _get_metrics()
+    if redis is None:
+        _mode = settings.effective_failure_mode("access_revocation")
+        if _m and _m.degraded_decision_total:
+            _m.degraded_decision_total.labels(
+                control="access_revocation", mode=_mode, reason="redis_unavailable"
+            ).inc()
+        if _mode == "fail_closed":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Authentication service temporarily unavailable",
+            )
+        return
+    if RedisSessionManager(redis).is_blacklisted(jti):
+        if _m and _m.token_validation_failures_total:
+            _m.token_validation_failures_total.labels(reason="revoked").inc()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session revoked",
+        )
+
+
 def get_current_user(token: TokenDep) -> UserModel:
     """Validate the access token and return the authenticated user.
 
@@ -168,27 +196,7 @@ def get_current_user(token: TokenDep) -> UserModel:
     # JTI blacklist check only applies in stateful mode.
     # In hybrid mode, access tokens are stateless; only refresh JTIs are tracked.
     if settings.is_stateful:
-        redis = get_redis_client()
-        if redis is None:
-            _mode = settings.effective_failure_mode("access_revocation")
-            _m = _get_metrics()
-            if _m and _m.degraded_decision_total:
-                _m.degraded_decision_total.labels(
-                    control="access_revocation", mode=_mode, reason="redis_unavailable"
-                ).inc()
-            if _mode == "fail_closed":
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Authentication service temporarily unavailable",
-                )
-        elif RedisSessionManager(redis).is_blacklisted(payload.jti):
-            _m = _get_metrics()
-            if _m and _m.token_validation_failures_total:
-                _m.token_validation_failures_total.labels(reason="revoked").inc()
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Session revoked",
-            )
+        _check_jti_revocation(payload.jti)
 
     if not payload.is_active:
         _m = _get_metrics()

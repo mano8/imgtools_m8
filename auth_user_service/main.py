@@ -133,13 +133,13 @@ def _startup_checks() -> None:
     if settings.requires_redis:
         redis = get_redis_client()
         if redis is None:
-            _logger.critical(
+            _logger.critical(  # nosec B106
                 "STARTUP: Redis unreachable but TOKEN_MODE=%s — "
                 "rate limiting and token revocation are disabled",
                 settings.TOKEN_MODE,
             )
         else:
-            _logger.info(
+            _logger.info(  # nosec B106
                 "STARTUP: Redis connected OK (TOKEN_MODE=%s)", settings.TOKEN_MODE
             )
 

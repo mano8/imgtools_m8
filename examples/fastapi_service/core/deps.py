@@ -30,10 +30,10 @@ class _LoggingHooks:
     """Emit structured log lines for every token validation outcome."""
 
     def on_success(self, *, jti: str, sub: str, token_type: str) -> None:
-        _logger.debug("token.valid type=%s sub=%s jti=%s", token_type, sub, jti)
+        _logger.debug("token.valid type=%s sub=%s jti=%s", token_type, sub, jti)  # nosec B106
 
     def on_failure(self, *, reason: str, token_type: str) -> None:
-        _logger.warning("token.invalid type=%s reason=%s", token_type, reason)
+        _logger.warning("token.invalid type=%s reason=%s", token_type, reason)  # nosec B106
 
 
 _hooks: ValidationHooks = _LoggingHooks()

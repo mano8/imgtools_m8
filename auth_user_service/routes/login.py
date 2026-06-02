@@ -110,6 +110,95 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _enforce_login_rate_limit(
+    redis: Optional[Redis], email: str, ip: str, _m: Any
+) -> None:
+    """Check and enforce the login rate limit. Raises 429 or 503 as appropriate."""
+    if redis is not None:
+        limiter = LoginRateLimiter(
+            redis,
+            settings.LOGIN_RATE_LIMIT_REQUESTS,
+            settings.LOGIN_RATE_LIMIT_WINDOW_MINUTES * 60,
+        )
+        if not limiter.is_allowed(email):
+            if _m and _m.login_attempts_total:
+                _m.login_attempts_total.labels(result="rate_limited").inc()
+            logger.warning("event=login.rate_limited ip=%s ts=%s", ip, _now_iso())
+            raise HTTPException(
+                status_code=429,
+                detail="Too many login attempts. Try again in 15 minutes.",
+            )
+        return
+    _mode = settings.effective_failure_mode("rate_limit")
+    if _m and _m.degraded_decision_total:
+        _m.degraded_decision_total.labels(
+            control="rate_limit", mode=_mode, reason="redis_unavailable"
+        ).inc()
+    if _mode == "fail_closed":
+        raise HTTPException(
+            status_code=503,
+            detail="Rate limiting service temporarily unavailable",
+        )
+
+
+def _enforce_refresh_rate_limit(
+    redis: Optional[Redis], user_id: Any, ip: str, _m: Any
+) -> None:
+    """Check and enforce the refresh rate limit. Raises 429 or 503 as appropriate."""
+    if redis is not None:
+        if not RefreshRateLimiter(
+            redis,
+            settings.REFRESH_RATE_LIMIT_REQUESTS,
+            settings.REFRESH_RATE_LIMIT_WINDOW_MINUTES * 60,
+        ).is_allowed(str(user_id)):
+            if _m and _m.token_refresh_total:
+                _m.token_refresh_total.labels(result="rate_limited").inc()
+            logger.warning(
+                "event=refresh.rate_limited user_id=%s ip=%s ts=%s",
+                str(user_id),
+                ip,
+                _now_iso(),
+            )
+            raise HTTPException(
+                status_code=429,
+                detail="Too many refresh attempts. Try again later.",
+            )
+        return
+    _mode = settings.effective_failure_mode("rate_limit")
+    if _m and _m.degraded_decision_total:
+        _m.degraded_decision_total.labels(
+            control="rate_limit", mode=_mode, reason="redis_unavailable"
+        ).inc()
+    if _mode == "fail_closed":
+        raise HTTPException(
+            status_code=503,
+            detail="Rate limiting service temporarily unavailable",
+        )
+
+
+def _check_refresh_allowlist(
+    redis: Optional[Redis], old_jti: str, response: Any, _m: Any
+) -> None:
+    """Verify refresh JTI is in the allowlist. Raises 503/401 as appropriate."""
+    if redis is None:
+        _mode = settings.effective_failure_mode("refresh_validation")
+        if _m and _m.degraded_decision_total:
+            _m.degraded_decision_total.labels(
+                control="refresh_validation", mode=_mode, reason="redis_unavailable"
+            ).inc()
+        if _mode == "fail_closed":
+            raise HTTPException(
+                status_code=503,
+                detail="Authentication service temporarily unavailable",
+            )
+        return
+    if not RedisRefreshStore(redis).is_valid(old_jti):
+        if _m and _m.token_refresh_total:
+            _m.token_refresh_total.labels(result="revoked").inc()
+        response.delete_cookie(key="refresh_token")
+        raise HTTPException(status_code=401, detail="Token revoked or reused")
+
+
 @router.post("/access-token", response_model=Token)
 def login_access_token(
     request: Request,
@@ -126,32 +215,7 @@ def login_access_token(
         raise HTTPException(status_code=422, detail="Invalid characters in credentials")
 
     _m = _get_metrics()
-
-    if redis is not None:
-        rate_limiter = LoginRateLimiter(
-            redis,
-            settings.LOGIN_RATE_LIMIT_REQUESTS,
-            settings.LOGIN_RATE_LIMIT_WINDOW_MINUTES * 60,
-        )
-        if not rate_limiter.is_allowed(email):
-            if _m and _m.login_attempts_total:
-                _m.login_attempts_total.labels(result="rate_limited").inc()
-            logger.warning("event=login.rate_limited ip=%s ts=%s", ip, _now_iso())
-            raise HTTPException(
-                status_code=429,
-                detail="Too many login attempts. Try again in 15 minutes.",
-            )
-    else:
-        _mode = settings.effective_failure_mode("rate_limit")
-        if _m and _m.degraded_decision_total:
-            _m.degraded_decision_total.labels(
-                control="rate_limit", mode=_mode, reason="redis_unavailable"
-            ).inc()
-        if _mode == "fail_closed":
-            raise HTTPException(
-                status_code=503,
-                detail="Rate limiting service temporarily unavailable",
-            )
+    _enforce_login_rate_limit(redis, email, ip, _m)
 
     user = AuthController.authenticate(
         session=session,
@@ -190,7 +254,6 @@ def login_access_token(
             jti=jti,
             refresh_token=refresh_token,
         )
-        # Register the refresh JTI in the allowlist so rotation can validate it.
         if redis is not None:
             RedisRefreshStore(redis).register(jti, _REFRESH_TTL_SECONDS)
 
@@ -323,54 +386,11 @@ def login_refresh_token(
 
     user_id, old_jti = _decode_refresh_or_raise(refresh_token, _m)
 
-    if redis is not None:
-        if not RefreshRateLimiter(
-            redis,
-            settings.REFRESH_RATE_LIMIT_REQUESTS,
-            settings.REFRESH_RATE_LIMIT_WINDOW_MINUTES * 60,
-        ).is_allowed(str(user_id)):
-            if _m and _m.token_refresh_total:
-                _m.token_refresh_total.labels(result="rate_limited").inc()
-            logger.warning(
-                "event=refresh.rate_limited user_id=%s ip=%s ts=%s",
-                str(user_id),
-                ip,
-                _now_iso(),
-            )
-            raise HTTPException(
-                status_code=429,
-                detail="Too many refresh attempts. Try again later.",
-            )
-    else:
-        _mode = settings.effective_failure_mode("rate_limit")
-        if _m and _m.degraded_decision_total:
-            _m.degraded_decision_total.labels(
-                control="rate_limit", mode=_mode, reason="redis_unavailable"
-            ).inc()
-        if _mode == "fail_closed":
-            raise HTTPException(
-                status_code=503,
-                detail="Rate limiting service temporarily unavailable",
-            )
+    _enforce_refresh_rate_limit(redis, user_id, ip, _m)
 
     # Allowlist check: stateful/hybrid modes require the JTI to be registered.
     if not settings.is_stateless:
-        if redis is None:
-            _mode = settings.effective_failure_mode("refresh_validation")
-            if _m and _m.degraded_decision_total:
-                _m.degraded_decision_total.labels(
-                    control="refresh_validation", mode=_mode, reason="redis_unavailable"
-                ).inc()
-            if _mode == "fail_closed":
-                raise HTTPException(
-                    status_code=503,
-                    detail="Authentication service temporarily unavailable",
-                )
-        elif not RedisRefreshStore(redis).is_valid(old_jti):
-            if _m and _m.token_refresh_total:
-                _m.token_refresh_total.labels(result="revoked").inc()
-            response.delete_cookie(key="refresh_token")
-            raise HTTPException(status_code=401, detail="Token revoked or reused")
+        _check_refresh_allowlist(redis, old_jti, response, _m)
 
     user = UserController.get_user(session=session, user_id=user_id)
     if user is None or user.is_active is not True:

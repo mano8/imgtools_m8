@@ -219,7 +219,7 @@ async def google_auth_callback(
         _inc_oauth_metric("success")
         return response
     except HTTPXError as ex:
-        logger.error("Google token exchange failed: %s", ex)
+        logger.error("Google token exchange failed: %s", ex)  # nosec B106
         _inc_oauth_metric("failed")
         raise HTTPException(
             status_code=400, detail="Token exchange with Google failed."

@@ -10,7 +10,7 @@ COPY ./fastapi_service/requirements_base.txt .
 COPY ./fastapi_service/requirements_dev.txt .
 COPY ./fastapi_service/requirements_prod.txt .
 
-RUN pip install --upgrade pip && \
+RUN pip install --upgrade "pip==26.1.1" && \
     pip install --prefix=/install --no-cache-dir -r requirements_base.txt && \
     if [ "$ENVIRONMENT" = "development" ]; then \
         pip install --prefix=/install --no-cache-dir -r requirements_dev.txt ; \
