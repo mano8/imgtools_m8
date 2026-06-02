@@ -19,6 +19,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **mypy type-checking in CI for `auth-sdk-m8`** — new `typecheck` job added to
   `.github/workflows/CI.yaml` in `auth-sdk-m8`. Mirrors the gate already in `fa-auth-m8`.
 
+- **`auth-sdk-m8` bumped to `>=0.6.18`** — both `auth_user_service/requirements_base.txt`
+  and `examples/fastapi_service/requirements_base.txt` updated to require the version that
+  includes the production boundary check.
+
 - **mypy type-checking in CI** — new `typecheck` job in `.github/workflows/CI.yaml` runs
   `mypy auth_user_service` and `mypy examples/fastapi_service` on every PR against `main`.
   Runs on Python 3.14 only (no matrix needed for static analysis).
