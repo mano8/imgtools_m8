@@ -56,7 +56,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trivy image scan (CRITICAL/HIGH CVEs — blocks push on findings)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@bfa4b33a029b9aa80ddb784b45574c30e072c59e # master
         with:
           scan-type: image
           image-ref: ${{ env.IMAGE_NAME }}:scan

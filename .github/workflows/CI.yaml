@@ -74,7 +74,7 @@ jobs:
           path: bandit-report.json
 
       - name: Trivy filesystem scan (CRITICAL/HIGH CVEs and secrets)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@bfa4b33a029b9aa80ddb784b45574c30e072c59e # master
         with:
           scan-type: fs
           scan-ref: .
