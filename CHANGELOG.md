@@ -8,6 +8,28 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Docker base image pinned to digest** — both `auth_user_service/Dockerfile` and
+  `examples/fastapi_service/Dockerfile` now use
+  `python:3.14-slim@sha256:c845af9399020c7e562969a13689e929074a10fd057acd1b1fad06a2fb068e97`
+  in both build and runtime stages. Eliminates silent base-image drift between builds.
+
+- **curl installed in runtime stage** — `apt-get install -y --no-install-recommends curl`
+  added to the runtime stage of both Dockerfiles. Makes curl available for explicit
+  healthcheck commands and production tooling without inflating the image unnecessarily.
+
+- **`ARG ENVIRONMENT=prod` fixed** — `fastapi_service/Dockerfile` now uses
+  `ENVIRONMENT=production` (matching `auth_user_service/Dockerfile` and all compose stacks).
+
+- **`.dockerignore` expanded** — both service `.dockerignore` files now exclude
+  `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`,
+  `*.egg-info/`, `tests/`, `.git/`, `.github/`, and `*.md` from the build context.
+  Reduces context size and prevents dev artefacts from leaking into the image.
+
+- **Trivy filesystem scan in CI** — `security` job in `.github/workflows/CI.yaml` now
+  runs `aquasecurity/trivy-action` on every PR. Scans for CRITICAL/HIGH CVEs in Python
+  packages and exposed secrets. Fails the build if any CRITICAL or HIGH vulnerability is
+  found.
+
 - **JWT issuer/audience startup enforcement** — `check_config_health()` in `auth-sdk-m8` now
   warns (or raises a fatal `ConfigurationError` in strict mode) when `ENVIRONMENT=production`
   and `TOKEN_ISSUER` or `TOKEN_AUDIENCE` are not set. Without these claims, a token signed

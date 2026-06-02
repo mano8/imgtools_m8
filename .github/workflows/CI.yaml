@@ -73,6 +73,15 @@ jobs:
           name: bandit-security-report
           path: bandit-report.json
 
+      - name: Trivy filesystem scan (CRITICAL/HIGH CVEs and secrets)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
   test:
     runs-on: ubuntu-latest
     strategy:
