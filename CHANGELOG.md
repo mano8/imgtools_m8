@@ -25,6 +25,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `*.egg-info/`, `tests/`, `.git/`, `.github/`, and `*.md` from the build context.
   Reduces context size and prevents dev artefacts from leaking into the image.
 
+- **v0.9.1 patch** — curl pinned to `8.14.1-2+deb13u3` in both Dockerfiles;
+  `trivy-action` pinned to full commit SHA; Trivy scans use `ignore-unfixed: true`
+  to skip OS-level CVEs with no Debian fix available yet (all Python packages clean).
+
 - **`auth-sdk-m8` bumped to `>=0.6.19`** — requires the version that ships JWT security
   regression tests and the cross-service contract test (0.6.19).
 
