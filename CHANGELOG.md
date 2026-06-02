@@ -25,6 +25,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   `*.egg-info/`, `tests/`, `.git/`, `.github/`, and `*.md` from the build context.
   Reduces context size and prevents dev artefacts from leaking into the image.
 
+- **`auth-sdk-m8` bumped to `>=0.6.19`** — requires the version that ships JWT security
+  regression tests and the cross-service contract test (0.6.19).
+
 - **Trivy filesystem scan in CI** — `security` job in `.github/workflows/CI.yaml` now
   runs `aquasecurity/trivy-action` after bandit on every PR. Scans Python packages and
   source files for CRITICAL/HIGH CVEs and exposed secrets without requiring Docker.

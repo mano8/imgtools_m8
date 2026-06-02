@@ -24,7 +24,7 @@ httpx>=0.28.1
 
 google-auth>=2.53.0
 requests>=2.34.2
-auth-sdk-m8>=0.6.18
+auth-sdk-m8>=0.6.19
 
 # Optional observability (required when METRICS_ENABLED=true)
 prometheus-client>=0.25.0

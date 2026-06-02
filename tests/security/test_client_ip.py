@@ -12,6 +12,7 @@ Verifies that:
 
 from unittest.mock import MagicMock, patch
 
+from auth_user_service.routes import login as login_mod
 from auth_user_service.routes.login import _client_ip, _strip_port
 
 
@@ -29,52 +30,61 @@ def _make_request(
 
 def test_xff_single_ip_returned():
     req = _make_request(xff="203.0.113.5")
-    assert _client_ip(req) == "203.0.113.5"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "203.0.113.5"
 
 
 def test_xff_chain_returns_leftmost_ip():
     """The leftmost IP in the chain is the original client; others are proxies."""
     req = _make_request(xff="203.0.113.5, 10.0.0.1, 172.17.0.2")
-    assert _client_ip(req) == "203.0.113.5"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "203.0.113.5"
 
 
 def test_xff_chain_strips_whitespace():
     req = _make_request(xff="  203.0.113.99  , 10.0.0.1")
-    assert _client_ip(req) == "203.0.113.99"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "203.0.113.99"
 
 
 def test_no_xff_falls_back_to_client_host():
     req = _make_request(xff=None, client_host="192.168.1.1")
-    assert _client_ip(req) == "192.168.1.1"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "192.168.1.1"
 
 
 def test_no_xff_no_client_returns_unknown():
     req = _make_request(xff=None, client_host=None)
-    assert _client_ip(req) == "unknown"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "unknown"
 
 
 def test_empty_xff_falls_back_to_client_host():
     """An empty string header must not be returned — treat as absent."""
     req = _make_request(xff="", client_host="192.168.1.2")
-    assert _client_ip(req) == "192.168.1.2"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "192.168.1.2"
 
 
 def test_xff_garbage_falls_back_to_client_host():
     """Unparseable XFF entry falls back to request.client.host."""
     req = _make_request(xff="not-an-ip", client_host="192.168.1.3")
-    assert _client_ip(req) == "192.168.1.3"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "192.168.1.3"
 
 
 def test_xff_ipv4_with_port_stripped():
     """IPv4:port format in XFF — port is stripped before validation."""
     req = _make_request(xff="192.0.2.1:45231", client_host="fallback")
-    assert _client_ip(req) == "192.0.2.1"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "192.0.2.1"
 
 
 def test_xff_ipv6_bracketed_port_stripped():
     """[IPv6]:port format in XFF — brackets and port stripped before validation."""
     req = _make_request(xff="[2001:db8::1]:8080", client_host="fallback")
-    assert _client_ip(req) == "2001:db8::1"
+    with patch.object(login_mod.settings, "TRUSTED_PROXY_COUNT", 1):
+        assert _client_ip(req) == "2001:db8::1"
 
 
 def test_trusted_proxy_count_zero_ignores_xff():
