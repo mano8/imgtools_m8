@@ -26,9 +26,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   Reduces context size and prevents dev artefacts from leaking into the image.
 
 - **Trivy filesystem scan in CI** — `security` job in `.github/workflows/CI.yaml` now
-  runs `aquasecurity/trivy-action` on every PR. Scans for CRITICAL/HIGH CVEs in Python
-  packages and exposed secrets. Fails the build if any CRITICAL or HIGH vulnerability is
-  found.
+  runs `aquasecurity/trivy-action` after bandit on every PR. Scans Python packages and
+  source files for CRITICAL/HIGH CVEs and exposed secrets without requiring Docker.
+
+- **Trivy image scan in publish workflow** — `docker-publish.yaml` now builds the amd64
+  image locally first, scans it with Trivy (CRITICAL/HIGH exit-code=1), then builds and
+  pushes the multi-arch image. A vulnerable image never reaches Docker Hub.
 
 - **JWT issuer/audience startup enforcement** — `check_config_health()` in `auth-sdk-m8` now
   warns (or raises a fatal `ConfigurationError` in strict mode) when `ENVIRONMENT=production`

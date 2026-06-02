@@ -43,7 +43,28 @@ jobs:
             type=semver,pattern={{major}}
             type=raw,value=dev,enable=${{ github.event_name == 'workflow_dispatch' }}
 
-      - name: Build and push
+      - name: Build image for scanning (amd64)
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: auth_user_service/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy image scan (CRITICAL/HIGH CVEs — blocks push on findings)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_NAME }}:scan
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          format: table
+
+      - name: Build and push (multi-arch)
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: .
