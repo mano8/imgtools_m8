@@ -36,6 +36,23 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`auth_user_service/.example_env` fully aligned with codebase** — rewrote the stale local
+  development env file. It was referencing deprecated field names (`TOKEN_ALGORITHM`,
+  `GOOGLE_REDIRECT_URI`, non-existent `GOOGLE_SCOPES`/`GOOGLE_TOKEN_URL`) and was missing
+  ~15 settings: `SELECTED_DB`, `TOKEN_MODE`, `REDIS_SSL` block, `REFRESH_SECRET_KEY_OLD`,
+  degradation policy block, rate limiting block, API key rate limiting block,
+  `METRICS_ENABLED`, `METRICS_GROUPS`, and Chrome extension OAuth settings.
+  `TRUSTED_PROXY_COUNT` now defaults to `0` for local development without a proxy.
+
+- **Root README Auth & OAuth table** — added `GOOGLE_OAUTH_REDIRECT_URI`,
+  `OAUTH_ALLOWED_REDIRECT_SCHEMES`, `OAUTH_ALLOWED_REDIRECT_PREFIXES`, and
+  `CORS_ALLOWED_ORIGIN_SCHEMES` (all present in every `auth.env.example` but missing
+  from the documentation table).
+
+- **Google OAuth section added to rs256_m8, vault_m8, hardened_m8, metrics_m8 READMEs** —
+  all 6 stack READMEs now include the Google OAuth section with both standard client
+  credentials and the Chrome extension / native-app PKCE optional settings.
+
 - **80 mypy errors eliminated across `auth_user_service` and `fastapi_service`** — resolved
   all type errors covering: wrong return types (`SecurityHelper` token creators, dashboard
   controllers, `get_range_activity`); missing `None` guards for `hashed_password` in

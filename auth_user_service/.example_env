@@ -1,12 +1,8 @@
-# local envs
-# Domain
-# This would be set to the production domain with an env var on deployment
-# used by Traefik to transmit traffic and aqcuire TLS certificates
-DOMAIN="localhost"
-# To test the local Traefik config
-# DOMAIN=localhost.tiangolo.com
+# local envs — for running auth_user_service directly (no Docker / no proxy)
+# Copy to auth_user_service/.env and replace every "changethis" with real values.
+# Generate secret keys: python -c "import secrets; print(secrets.token_urlsafe(48))"
 
-# Environment: local, staging, production
+DOMAIN="localhost"
 ENVIRONMENT="local"
 
 API_PREFIX="/user"
@@ -18,67 +14,103 @@ SET_REDOC=true
 PROJECT_NAME="M8App"
 STACK_NAME="full-stack-m8-app"
 
-# Google OAuth
-GOOGLE_CLIENT_ID="changethis"
-GOOGLE_CLIENT_SECRET="changethis"
-# Google OAuth Redirect URI
-# This is the URL that Google will redirect to after authentication
-# It should match the URL of your frontend application
-# For local development, it might look like this:
-# http://localhost:5173/auth/callback
-#GOOGLE_REDIRECT_URI="http://localhost:5173/auth/callback"
-# Google OAuth Scopes
-# These are the scopes that your application will request from Google
-# You can adjust these based on your application's needs
-#GOOGLE_SCOPES="openid email profile"
-# Google OAuth Token URL
-# This is the URL that your application will use to exchange the authorization code for an access token
-# It should match the URL of your Google OAuth provider
-# For local development, it might look like this:
-# https://oauth2.googleapis.com/token
-
-# Backend
-# Used by the auth_user_service to generate links in emails to the frontend
+# ── Backend & CORS ─────────────────────────────────────────────────────────────
 BACKEND_HOST="http://127.0.0.1:9000"
 FRONTEND_HOST="http://localhost:5173"
-# In staging and production, set this env var to the frontend host, e.g.
-# FRONTEND_HOST=https://dashboard.example.com
 BACKEND_CORS_ORIGINS="http://localhost,http://localhost:5173,https://localhost,https://localhost:5173"
-ACCESS_SECRET_KEY="changethis"
-REFRESH_SECRET_KEY="changethis"
-TOKEN_ALGORITHM="HS256"
+
+# ── Service role ───────────────────────────────────────────────────────────────
 # issuer — this service signs tokens and serves /.well-known/jwks.json
 AUTH_SERVICE_ROLE="issuer"
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-REFRESH_TOKEN_EXPIRE_MINUTES=3600
 
-FIRST_SUPERUSER="changethis"
-FIRST_SUPERUSER_PASSWORD="changethis"
-
-# Shared secret for inter-service calls to /private/* endpoints.
-# Generate with: python -c "import secrets; print(secrets.token_urlsafe(48))"
-# Must be 32+ chars with upper, lower, digit and special characters.
-PRIVATE_API_SECRET="changethis"
-
-# Symmetric key used to encrypt Google OAuth tokens at rest.
-# Generate with: python -c "import secrets; print(secrets.token_urlsafe(48))"
-# Must be 32+ chars with upper, lower, digit and special characters.
-TOKENS_ENCRYPTION_KEY="changethis"
-
-# Mysql
+# ── Database (local — adjust DB_HOST for Docker) ──────────────────────────────
+SELECTED_DB=Mysql
 DB_HOST="127.0.0.1"
 DB_PORT=3306
 DB_DATABASE="m8_app"
 DB_USER="changethis"
 DB_PASSWORD="changethis"
 
-# ── Proxy trust ───────────────────────────────────────────────────────────────
-# Number of trusted reverse-proxy hops. Used to extract the real client IP from
-# X-Forwarded-For. Set to 0 to ignore XFF (running without a reverse proxy).
-TRUSTED_PROXY_COUNT=1
-
-# Redis
+# ── Redis (local — no TLS required) ───────────────────────────────────────────
 REDIS_HOST="127.0.0.1"
 REDIS_PORT=6379
 REDIS_USER="appuser"
 REDIS_PASSWORD="changethis"
+#REDIS_SSL=false
+#REDIS_SSL_CA=   # path to CA cert — required when REDIS_SSL=true
+#REDIS_SSL_CERT= # path to client cert for mTLS
+#REDIS_SSL_KEY=  # path to client key for mTLS
+
+# ── Tokens ─────────────────────────────────────────────────────────────────────
+ACCESS_TOKEN_ALGORITHM=HS256
+REFRESH_TOKEN_ALGORITHM=HS256
+ACCESS_SECRET_KEY="changethis"
+REFRESH_SECRET_KEY="changethis"
+# Previous refresh signing key — used during key rotation (optional).
+#REFRESH_SECRET_KEY_OLD=
+TOKEN_MODE=stateful
+#TOKEN_MODE=stateless  # stateless: JWTs are self-contained; Redis not required
+
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REFRESH_TOKEN_EXPIRE_MINUTES=3600
+
+# ── Bootstrap superuser ────────────────────────────────────────────────────────
+FIRST_SUPERUSER="changethis"
+FIRST_SUPERUSER_PASSWORD="changethis"
+
+# ── Inter-service & encryption secrets ────────────────────────────────────────
+# Shared secret for inter-service calls to /private/* endpoints.
+PRIVATE_API_SECRET="changethis"
+
+# Symmetric key used to encrypt Google OAuth tokens at rest.
+TOKENS_ENCRYPTION_KEY="changethis"
+
+# ── Auth degradation policy (optional) ────────────────────────────────────────
+# Controls behaviour when Redis is unavailable. Defaults shown.
+# fail_open: allow through.  fail_closed: return 503.
+# AUTH_STRICT_MODE=true overrides all per-control modes to fail_closed.
+#AUTH_STRICT_MODE=false
+#REFRESH_VALIDATION_FAILURE_MODE=fail_closed
+#SESSION_WRITE_FAILURE_MODE=fail_closed
+#RATE_LIMIT_FAILURE_MODE=fail_open
+#ACCESS_REVOCATION_FAILURE_MODE=fail_open
+
+# ── Proxy trust ────────────────────────────────────────────────────────────────
+# Set to 0 when running without a reverse proxy (local dev without Docker/Traefik).
+# Set to 1 when a single Traefik instance sits in front (Docker Compose stacks).
+TRUSTED_PROXY_COUNT=0
+
+# ── Login / refresh rate limiting (optional) ──────────────────────────────────
+#LOGIN_RATE_LIMIT_REQUESTS=5
+#LOGIN_RATE_LIMIT_WINDOW_MINUTES=15
+#REFRESH_RATE_LIMIT_REQUESTS=10
+#REFRESH_RATE_LIMIT_WINDOW_MINUTES=5
+
+# ── API key rate limiting (optional) ──────────────────────────────────────────
+#API_KEY_STRICT_RATE_LIMIT=false
+#API_KEY_DEFAULT_LIMIT_MINUTE=60
+#API_KEY_DEFAULT_LIMIT_HOUR=1000
+#API_KEY_DEFAULT_LIMIT_DAY=10000
+#API_KEY_DEFAULT_LIMIT_MONTH=200000
+#API_KEY_MAX_PER_USER=10
+
+# ── Observability ──────────────────────────────────────────────────────────────
+METRICS_ENABLED=false
+METRICS_GROUPS=all
+
+# ── Google OAuth (optional — uncomment to enable) ─────────────────────────────
+# GOOGLE_CLIENT_ID="changethis"
+# GOOGLE_CLIENT_SECRET="changethis"
+
+# ── Chrome extension / native-app OAuth (optional) ────────────────────────────
+# Fixed backend callback URI — must match Google Console exactly.
+# GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8000/user/google-auth/oauth-callback/
+
+# URI schemes accepted as redirect_target at /google-api/login-url/ (default shown).
+# OAUTH_ALLOWED_REDIRECT_SCHEMES=chrome-extension://
+
+# Optional: lock to specific extension IDs (empty = open public-client model).
+# OAUTH_ALLOWED_REDIRECT_PREFIXES=chrome-extension://abc123def456.../
+
+# Scheme-level CORS — required for Chrome extension fetch() calls.
+# CORS_ALLOWED_ORIGIN_SCHEMES=chrome-extension://

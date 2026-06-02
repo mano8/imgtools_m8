@@ -409,6 +409,10 @@ Or use `bash init.sh` in any asymmetric stack — it generates the correct key t
 | `FIRST_SUPERUSER_PASSWORD` | yes | Password of the bootstrap superuser — used only on first run |
 | `GOOGLE_CLIENT_ID` | no | Google OAuth2 client ID |
 | `GOOGLE_CLIENT_SECRET` | no | Google OAuth2 client secret |
+| `GOOGLE_OAUTH_REDIRECT_URI` | no | Fixed backend callback URI for native-app PKCE OAuth. Must match Google Console exactly. Defaults to auto-derived from request URL when empty. |
+| `OAUTH_ALLOWED_REDIRECT_SCHEMES` | no | URI scheme(s) accepted as `redirect_target` at `/google-api/login-url/` (e.g. `chrome-extension://`). |
+| `OAUTH_ALLOWED_REDIRECT_PREFIXES` | no | Lock OAuth redirects to specific extension IDs/prefixes. Empty = open public-client model. |
+| `CORS_ALLOWED_ORIGIN_SCHEMES` | no | Scheme-level CORS origins for native-app `fetch()` calls (e.g. `chrome-extension://`). |
 | `PRIVATE_API_SECRET` | yes | Shared secret for `X-Internal-Token` header |
 
 ### Auth Degradation Policy

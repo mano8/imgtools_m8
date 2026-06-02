@@ -229,6 +229,15 @@ GOOGLE_CLIENT_SECRET="your-client-secret"
 
 Redis is required for the OAuth code-exchange callback. This stack includes Redis, so OAuth works once credentials are set.
 
+For Chrome extension or native-app flows (PKCE), also uncomment the optional block in `auth.env`:
+
+```ini
+GOOGLE_OAUTH_REDIRECT_URI=https://yourdomain.com/user/google-auth/oauth-callback/
+OAUTH_ALLOWED_REDIRECT_SCHEMES=chrome-extension://
+# OAUTH_ALLOWED_REDIRECT_PREFIXES=chrome-extension://your-extension-id.../
+CORS_ALLOWED_ORIGIN_SCHEMES=chrome-extension://
+```
+
 ---
 
 ## Volumes
