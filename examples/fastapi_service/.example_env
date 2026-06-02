@@ -57,9 +57,12 @@ REFRESH_TOKEN_EXPIRE_MINUTES=3600
 # REFRESH_SECRET_KEY=changethis
 # REFRESH_TOKEN_ALGORITHM=HS256
 
-# Optional claim enforcement — must match auth_user_service if set:
-# TOKEN_ISSUER=https://auth.example.com
-# TOKEN_AUDIENCE=https://api.example.com
+# ── Token boundary claims (recommended for production) ────────────────────────
+# Must match auth_user_service TOKEN_ISSUER / TOKEN_AUDIENCE exactly.
+# When set, tokens with a different iss or aud claim are rejected.
+# In production with STRICT_PRODUCTION_MODE=true these become required (startup fatal).
+#TOKEN_ISSUER=https://auth.example.com
+#TOKEN_AUDIENCE=https://api.example.com
 
 # ── Token revocation (stateful mode only) ─────────────────────────────────────
 # Required when TOKEN_MODE=stateful. Must match auth_user_service PRIVATE_API_SECRET.

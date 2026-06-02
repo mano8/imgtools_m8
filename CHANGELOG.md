@@ -8,6 +8,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **JWT issuer/audience startup enforcement** — `check_config_health()` in `auth-sdk-m8` now
+  warns (or raises a fatal `ConfigurationError` in strict mode) when `ENVIRONMENT=production`
+  and `TOKEN_ISSUER` or `TOKEN_AUDIENCE` are not set. Without these claims, a token signed
+  with the same key in dev is valid in production (no boundary check). All 6 stack `auth.env`,
+  `api.env`, `auth.env.example`, `api.env.example`, `auth_user_service/.example_env`, and
+  `fastapi_service/.example_env` updated with commented-out `TOKEN_ISSUER`/`TOKEN_AUDIENCE`
+  entries and guidance.
+
+- **mypy type-checking in CI for `auth-sdk-m8`** — new `typecheck` job added to
+  `.github/workflows/CI.yaml` in `auth-sdk-m8`. Mirrors the gate already in `fa-auth-m8`.
+
 - **mypy type-checking in CI** — new `typecheck` job in `.github/workflows/CI.yaml` runs
   `mypy auth_user_service` and `mypy examples/fastapi_service` on every PR against `main`.
   Runs on Python 3.14 only (no matrix needed for static analysis).

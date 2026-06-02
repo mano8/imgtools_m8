@@ -54,6 +54,13 @@ TOKEN_MODE=stateful
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 REFRESH_TOKEN_EXPIRE_MINUTES=3600
 
+# ── Token boundary claims (recommended for production) ────────────────────────
+# Without these, a token signed with the same key is valid in any environment.
+# Set both to enable issuer/audience enforcement in jwt.decode().
+# In production with STRICT_PRODUCTION_MODE=true these become required (startup fatal).
+#TOKEN_ISSUER=https://auth.example.com
+#TOKEN_AUDIENCE=https://api.example.com
+
 # ── Bootstrap superuser ────────────────────────────────────────────────────────
 FIRST_SUPERUSER="changethis"
 FIRST_SUPERUSER_PASSWORD="changethis"
