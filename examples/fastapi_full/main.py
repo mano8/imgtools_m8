@@ -5,6 +5,7 @@ All wiring is handled by ``create_app``; this file only imports and connects.
 """
 
 from fastapi import APIRouter
+from fastapi.responses import Response
 from sqlmodel import select
 
 from fastapi_m8 import (
@@ -34,6 +35,14 @@ async def check_db() -> HealthCheckResult:
 
 api_router = APIRouter(prefix=settings.API_PREFIX)
 api_router.include_router(domain_router)
+
+if settings.METRICS_ENABLED:
+    from auth_sdk_m8.observability.metrics import render as _render_metrics  # noqa: PLC0415
+
+    @api_router.get("/metrics", include_in_schema=False)
+    def metrics_endpoint() -> Response:
+        data, content_type = _render_metrics()
+        return Response(content=data, media_type=content_type)
 
 app = create_app(
     settings,

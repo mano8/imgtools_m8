@@ -7,8 +7,8 @@ export PYTHONPATH=/opt/fastapi_full
 
 echo "Current working directory: $(pwd)"
 
-echo "Initialysing DB..."
-python -m fastapi_full.fastapi_pre_start || { echo "Failed to initialise DB"; exit 1; }
+echo "Waiting for DB..."
+fastapi-m8-prestart || { echo "Failed to reach DB"; exit 1; }
 
 # Run migrations
 echo "Run Migrations"
