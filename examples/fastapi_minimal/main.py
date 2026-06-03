@@ -1,6 +1,6 @@
 """Minimal fastapi-m8 consumer service.
 
-Bootstraps the entire app in three lines:
+Bootstraps the entire app in a few lines:
 
 1. Import settings, auth deps, and the domain router.
 2. Call ``create_app`` — CORS, health endpoint, lifespan are wired automatically.
@@ -9,7 +9,7 @@ Bootstraps the entire app in three lines:
 
 from fastapi import APIRouter
 
-from fastapi_m8 import create_app
+from fastapi_m8 import AppLifecycle, create_app
 
 from .core.config import settings
 from .core.deps import auth
@@ -23,5 +23,5 @@ app = create_app(
     api_router,
     service_name="example-minimal",
     service_version="1.0.0",
-    auth_deps=auth,
+    lifecycle=AppLifecycle(auth_deps=auth),
 )

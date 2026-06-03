@@ -18,4 +18,6 @@ auth: AuthDeps = build_auth_deps(settings)
 engine: DbEngine = create_db_engine(settings)
 
 CurrentUser = auth.CurrentUser
-SessionDep = Annotated[Session, Depends(engine.session_dep)]
+get_current_user = auth.get_current_user
+get_db = engine.session_dep
+SessionDep = Annotated[Session, Depends(get_db)]

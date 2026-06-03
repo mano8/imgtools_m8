@@ -32,7 +32,8 @@ class UserController:
                 If there is an error during the database operation.
         """
         if user_create.provider == AuthProviderType.PASSWORD:
-            assert user_create.password is not None  # enforced by UserCreate validator
+            if user_create.password is None:
+                raise ValueError("password is required for password-based registration")
             db_obj = User.model_validate(
                 user_create,
                 update={

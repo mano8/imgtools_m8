@@ -2,6 +2,7 @@
 
 import uuid
 
+import pytest
 
 from auth_user_service.db_models.users import UserCreate, UserUpdate
 from auth_user_service.services.users import UserController
@@ -47,6 +48,15 @@ class TestCreateUser:
         assert user.id is not None
         assert user.hashed_password is None
         assert user.oauth_user_id == user_create.oauth_user_id
+
+    def test_password_provider_missing_password_raises(self, db_session):
+        bad_create = UserCreate.model_construct(
+            email=f"bad_{uuid.uuid4().hex[:6]}@example.com",
+            password=None,
+            provider=AuthProviderType.PASSWORD,
+        )
+        with pytest.raises(ValueError, match="password is required"):
+            UserController.create_user(session=db_session, user_create=bad_create)
 
 
 class TestUpdateUser:

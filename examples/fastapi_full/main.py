@@ -27,7 +27,9 @@ async def check_db() -> HealthCheckResult:
             s.exec(select(1))
         return HealthCheckResult.from_bool("database", True)
     except Exception as exc:
-        return HealthCheckResult(name="database", status=HealthStatus.FAIL, error=str(exc))
+        return HealthCheckResult(
+            name="database", status=HealthStatus.FAIL, error=str(exc)
+        )
 
 
 api_router = APIRouter(prefix=settings.API_PREFIX)
