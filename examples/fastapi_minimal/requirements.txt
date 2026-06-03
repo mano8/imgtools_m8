@@ -1,0 +1,2 @@
+fastapi-m8>=1.0.0
+uvicorn[standard]>=0.34.0
