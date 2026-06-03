@@ -8,6 +8,7 @@ from auth_user_service.routes import (
     jwks,
     login,
     oauth_login,
+    private,
     profile,
     sessions,
     users,
@@ -24,3 +25,4 @@ api_router.include_router(oauth_login.router)
 api_router.include_router(google_auth.router)
 api_router.include_router(sessions.router)
 api_router.include_router(dashboard.router)
+api_router.include_router(private.router)
