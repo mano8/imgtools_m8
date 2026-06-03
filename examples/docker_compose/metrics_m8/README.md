@@ -33,7 +33,7 @@ Browser / Frontend
   Traefik :9000
        │
        ├──► /user/*      → auth_user_service :8000
-       └──► /fastapi/*   → fastapi_service :8000
+       └──► /fastapi/*   → fastapi_full :8000
                 │
        ┌────────┴────────┐
        ▼                 ▼
@@ -59,7 +59,7 @@ Browser / Frontend
 | prometheus | ubuntu/prometheus:3.11-24.04_stable | `127.0.0.1:9090` |
 | grafana | grafana/grafana:13.1.0-25530058790 | `127.0.0.1:3000` |
 | auth_user_service | local build | via Traefik at `/user` |
-| fastapi_service | local build | via Traefik at `/fastapi` |
+| fastapi_full | local build | via Traefik at `/fastapi` |
 
 ---
 
@@ -339,7 +339,7 @@ Also update the `Host` rules in the production config to match your actual FQDN.
 
 **Services fail to start immediately** — `auth_user_service` waits for PostgreSQL to pass
 its health check (`pg_isready`). PostgreSQL typically initialises in 10–20 s on first boot.
-`fastapi_service` then waits for `auth_user_service` to pass its own health check. Watch
+`fastapi_full` then waits for `auth_user_service` to pass its own health check. Watch
 the logs with `docker compose logs -f`.
 
 **`changethis` rejection on startup** — replace all `changethis` values in `.env`

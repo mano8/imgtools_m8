@@ -3,10 +3,10 @@ DashBoard routes
 """
 
 from fastapi import APIRouter
-from fastapi_service.app.deps import CurrentUser, SessionDep
+from fastapi_full.app.deps import CurrentUser, SessionDep
 from auth_sdk_m8.controllers.base import BaseController
-from fastapi_service.controllers.dashboard import DashboardController
-from fastapi_service.schemas.dashboard import RangeActivityType, UsersActivity
+from fastapi_full.controllers.dashboard import DashboardController
+from fastapi_full.schemas.dashboard import RangeActivityType, UsersActivity
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 # pylint: disable=broad-exception-caught, unused-argument

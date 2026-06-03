@@ -32,15 +32,29 @@ async def test_jti_status_non_stateful_returns_active() -> None:
 
 
 @pytest.mark.anyio
-async def test_jti_status_redis_unavailable_returns_active() -> None:
-    """Redis unavailable (None) in stateful mode → fail-open, returns active=True."""
+async def test_jti_status_redis_unavailable_fail_open_returns_active() -> None:
+    """Redis unavailable (None) in stateful + fail_open mode → active=True."""
     with patch("auth_user_service.routes.private.settings") as mock_cfg:
         mock_cfg.is_stateful = True
+        mock_cfg.effective_failure_mode.return_value = "fail_open"
         result = await check_jti_status(
             body=JtiStatusRequest(jti="some-jti"),
             redis=None,
         )
     assert result == JtiStatusResponse(active=True)
+
+
+@pytest.mark.anyio
+async def test_jti_status_redis_unavailable_fail_closed_returns_inactive() -> None:
+    """Redis unavailable (None) in stateful + fail_closed mode → active=False."""
+    with patch("auth_user_service.routes.private.settings") as mock_cfg:
+        mock_cfg.is_stateful = True
+        mock_cfg.effective_failure_mode.return_value = "fail_closed"
+        result = await check_jti_status(
+            body=JtiStatusRequest(jti="some-jti"),
+            redis=None,
+        )
+    assert result == JtiStatusResponse(active=False)
 
 
 @pytest.mark.anyio

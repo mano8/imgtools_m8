@@ -76,13 +76,16 @@ async def check_jti_status(
 
     Only meaningful when TOKEN_MODE=stateful. In hybrid/stateless modes no
     access token blacklist exists — returns active=True immediately.
-    Fail-open when Redis unavailable (matches ACCESS_REVOCATION_FAILURE_MODE default).
+    When Redis is unavailable the response honours ACCESS_REVOCATION_FAILURE_MODE:
+    fail_closed → active=False (token treated as revoked, consumer returns 503);
+    fail_open → active=True (token passes, legacy behaviour).
     Consumer services call this instead of accessing auth Redis directly.
     """
     if not settings.is_stateful:
         return JtiStatusResponse(active=True)
     if redis is None:
-        return JtiStatusResponse(active=True)
+        mode = settings.effective_failure_mode("access_revocation")
+        return JtiStatusResponse(active=(mode != "fail_closed"))
     from auth_sdk_m8.security import AccessTokenBlacklist  # noqa: PLC0415
 
     return JtiStatusResponse(

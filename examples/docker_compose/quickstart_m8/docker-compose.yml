@@ -119,15 +119,15 @@ services:
     networks:
       - m8_app_network
 
-  fastapi_service:
+  fastapi_full:
     build:
       context: ../../
-      dockerfile: ./fastapi_service/Dockerfile
+      dockerfile: ./fastapi_full/Dockerfile
     env_file:
       - ./api.env
     volumes:
-      - ../../fastapi_service:/opt/fastapi_service
-      - ./api.env:/opt/fastapi_service/.env:ro
+      - ../../fastapi_full:/opt/fastapi_full
+      - ./api.env:/opt/fastapi_full/.env:ro
       - ./shared_migrations:/opt/shared_migrations
     labels:
       - "traefik.enable=true"

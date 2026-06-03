@@ -2,7 +2,7 @@
 dm_model's helpers
 """
 
-from fastapi_service.core.config import settings
+from fastapi_full.core.config import settings
 
 
 def prefixed_tables(name: str) -> str:

@@ -17,8 +17,8 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from fastapi_service.core.config import settings
-import fastapi_service.db_models  # noqa: F401
+from fastapi_full.core.config import settings
+import fastapi_full.db_models  # noqa: F401
 
 # ---------------------------------------------------------------------
 # PYTHONPATH (Docker / monorepo safe)

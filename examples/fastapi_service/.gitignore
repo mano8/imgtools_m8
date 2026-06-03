@@ -1,4 +1,0 @@
-secrets/*
-__pycache__/
-alembic/versions/*
-.env*

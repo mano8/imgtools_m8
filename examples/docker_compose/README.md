@@ -52,7 +52,7 @@ Browser / Frontend
   Traefik :9000  ──────────────────────────────┐
        │                                        │
        ▼  /user/*                               ▼  /fastapi/*
-auth_user_service :8000            fastapi_service :8000
+auth_user_service :8000            fastapi_full :8000
        │                                        │
        └──────────┬─────────────────────────────┘
                   │
@@ -123,7 +123,7 @@ Each stack uses **two env files** for the application services. Copy the `.examp
 
 ```text
 auth.env      ← auth_user_service: algorithm, token mode, secrets, DB/Redis config, expiry
-api.env       ← fastapi_service: consumer role, token validation config, JWKS URI if RS256/ES256
+api.env       ← fastapi_full: consumer role, token validation config, JWKS URI if RS256/ES256
 ```
 
 Some stacks also use a shared `.env` file at the stack root for infrastructure variables (DB root password, Redis password) that are read directly by the database container's init script.

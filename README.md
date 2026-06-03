@@ -99,7 +99,7 @@ Five ready-to-run stacks are provided under [`examples/docker_compose/`](https:/
 
 **Start here →** [`quickstart_m8`](https://github.com/mano8/fa-auth-m8/tree/main/examples/docker_compose/quickstart_m8) for the fastest path to a running stack.
 
-All stacks include `healthcheck` probes and `restart: unless-stopped` on `auth_user_service` and `fastapi_service`. The consumer service waits for the auth service health check to pass (`service_healthy`) before starting.
+All stacks include `healthcheck` probes and `restart: unless-stopped` on `auth_user_service` and `fastapi_full`. The consumer service waits for the auth service health check to pass (`service_healthy`) before starting.
 
 ### Token modes at a glance
 
@@ -621,7 +621,7 @@ Endpoints under `/user/private/` are for inter-service calls only:
 
 ## Consumer Service Integration
 
-`examples/fastapi_service` is a reference implementation showing how a downstream microservice integrates with `auth_user_service` using `auth-sdk-m8`.
+`examples/fastapi_full` and `examples/fastapi_minimal` are reference implementations showing how a downstream microservice integrates with `auth_user_service` using `fastapi-m8` and `auth-sdk-m8`. `fastapi_full` demonstrates DB session, health checks, auth deps, and lifespan teardown; `fastapi_minimal` is the minimal three-step setup.
 
 `auth-sdk-m8` is a standard pip package — install it in any FastAPI consumer service:
 
@@ -660,10 +660,13 @@ INTROSPECTION_URL=http://auth_user_service:8000/user/private/v1/jti-status
 PRIVATE_API_SECRET=<same as auth service PRIVATE_API_SECRET>
 ```
 
-The `RemoteRevocationClient` in `examples/fastapi_service/core/revocation.py` handles
-the check asynchronously with configurable timeouts. It **fails-open** by default
-(network error → token treated as active). Set `fail_closed=True` to reject tokens
-when the endpoint is unreachable instead.
+`fastapi-m8`'s `build_auth_deps` wires `RemoteRevocationClient` automatically and honours
+`ACCESS_REVOCATION_FAILURE_MODE` from the consumer's settings. The **default is `fail_closed`**
+— any outage returns HTTP 503 rather than accepting a potentially-revoked token. Set
+`ACCESS_REVOCATION_FAILURE_MODE=fail_open` in `api.env` to restore availability-first behaviour,
+or `AUTH_STRICT_MODE=true` to force all failure-mode controls closed. The issuer's
+`/private/v1/jti-status` endpoint mirrors the same setting: Redis-unavailable returns
+`active=false` when `fail_closed` is effective.
 
 ### Issuer / audience enforcement (opt-in)
 
@@ -706,13 +709,13 @@ ruff check . --fix
 
 ```bash
 mypy auth_user_service --ignore-missing-imports
-mypy examples/fastapi_service --ignore-missing-imports
+mypy examples/fastapi_full --ignore-missing-imports
 ```
 
 ### Security scan
 
 ```bash
-bandit -r auth_user_service examples/fastapi_service --severity-level medium
+bandit -r auth_user_service examples/fastapi_full --severity-level medium
 ```
 
 ### Tests

@@ -36,7 +36,7 @@ Browser / Frontend
   Traefik :9000
        │ (app_net)
        ├──► /user/*      → auth_user_service :8000  (RS256 issuer)
-       └──► /fastapi/*   → fastapi_service :8000    (RS256 consumer via JWKS)
+       └──► /fastapi/*   → fastapi_full :8000    (RS256 consumer via JWKS)
 
   app_net ─── Traefik + auth + fastapi + Prometheus + Grafana
   data_net ── m8_db (PostgreSQL 16) + redis_cache (Redis 7.4)  [internal: true]
@@ -60,7 +60,7 @@ Two Docker networks isolate external-facing traffic from the data tier:
 
 ## Hardening baseline
 
-Applied to `auth_user_service` and `fastapi_service`:
+Applied to `auth_user_service` and `fastapi_full`:
 
 | Option | Value | Effect |
 | --- | --- | --- |
@@ -91,7 +91,7 @@ Auth degradation settings in `auth.env`:
 | prometheus | ubuntu/prometheus:3.11-24.04_stable | `127.0.0.1:9090` |
 | grafana | grafana/grafana:13.1.0 | `127.0.0.1:3000` |
 | auth_user_service | [tepochtli/fa-auth-m8:latest](https://hub.docker.com/r/tepochtli/fa-auth-m8) | via Traefik at `/user` |
-| fastapi_service | local build | via Traefik at `/fastapi` |
+| fastapi_full | local build | via Traefik at `/fastapi` |
 
 ---
 
@@ -152,7 +152,7 @@ bash init.sh
 docker compose up -d
 ```
 
-`auth_user_service` pulls from Docker Hub — no `--build` needed for it. Only `fastapi_service` is built locally.
+`auth_user_service` pulls from Docker Hub — no `--build` needed for it. Only `fastapi_full` is built locally.
 
 > **Pin for production:** replace `tepochtli/fa-auth-m8:latest` with a specific release tag
 > (e.g. `tepochtli/fa-auth-m8:0.9.0`) in `docker-compose.yml` to ensure reproducible deployments.
@@ -180,7 +180,7 @@ Pre-provisioned with a Prometheus datasource. Default credentials: `admin` / `fo
 
 ### Prometheus — `http://localhost:9090`
 
-Scrapes `auth_user_service` at `/user/metrics` and `fastapi_service` at `/fastapi/metrics`.
+Scrapes `auth_user_service` at `/user/metrics` and `fastapi_full` at `/fastapi/metrics`.
 Alert rules in `prometheus/alerts.yml` cover API key rate-limit ratios and flush latency.
 
 ---
@@ -366,7 +366,7 @@ Also update the `Host` rules in the production config to match your actual FQDN.
 
 **JWKS endpoint returns empty `keys` array** — the service started before the key files were mounted. Restart: `docker compose restart auth_user_service`.
 
-**Services fail to start immediately** — `auth_user_service` waits for PostgreSQL (`pg_isready`). PostgreSQL typically initialises in 10–20 s on first boot. `fastapi_service` then waits for `auth_user_service` to pass its own health check. Watch the logs with `docker compose logs -f`.
+**Services fail to start immediately** — `auth_user_service` waits for PostgreSQL (`pg_isready`). PostgreSQL typically initialises in 10–20 s on first boot. `fastapi_full` then waits for `auth_user_service` to pass its own health check. Watch the logs with `docker compose logs -f`.
 
 **`changethis` rejection on startup** — replace all `changethis` values in `.env`, `auth.env`, and `api.env`.
 

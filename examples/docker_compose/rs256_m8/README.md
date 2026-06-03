@@ -38,7 +38,7 @@ Browser / Frontend
   Traefik :9000
        │
        ├──► /user/*      → auth_user_service :8000  (RS256 issuer)
-       └──► /fastapi/*   → fastapi_service :8000    (RS256 consumer via JWKS)
+       └──► /fastapi/*   → fastapi_full :8000    (RS256 consumer via JWKS)
                 │
        ┌────────┴────────┐
        ▼                 ▼
@@ -57,7 +57,7 @@ The auth service holds the **private key** and issues signed tokens. The fastapi
 | m8_db | mariadb:12-ubi | `127.0.0.1:3306` |
 | redis_cache | redis:7.4-alpine | `127.0.0.1:6379` |
 | auth_user_service | local build | via Traefik at `/user` |
-| fastapi_service | local build | via Traefik at `/fastapi` |
+| fastapi_full | local build | via Traefik at `/fastapi` |
 
 ---
 

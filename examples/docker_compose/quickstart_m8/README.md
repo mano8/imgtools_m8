@@ -34,7 +34,7 @@ Browser / Frontend
   Traefik :9000
        │
        ├──► /user/*      → auth_user_service :8000
-       └──► /fastapi/*   → fastapi_service :8000
+       └──► /fastapi/*   → fastapi_full :8000
                 │
        ┌────────┴────────┐
        ▼                 ▼
@@ -53,7 +53,7 @@ Traefik is the single entry point. Both services run on the internal `m8_app_net
 | m8_db | mariadb:12-ubi | `127.0.0.1:3306` |
 | redis_cache | redis:7.4-alpine | `127.0.0.1:6379` |
 | auth_user_service | local build | via Traefik at `/user` |
-| fastapi_service | local build | via Traefik at `/fastapi` |
+| fastapi_full | local build | via Traefik at `/fastapi` |
 
 ---
 
@@ -305,7 +305,7 @@ Also update the `Host` rules in the production config to match your actual FQDN.
 
 ## Troubleshooting
 
-**Services fail to start immediately** — `auth_user_service` waits for MariaDB to pass its health check (MariaDB can take 20–30 s on first boot), then `fastapi_service` waits for `auth_user_service` to pass its own health check. Watch the logs with `docker compose logs -f`.
+**Services fail to start immediately** — `auth_user_service` waits for MariaDB to pass its health check (MariaDB can take 20–30 s on first boot), then `fastapi_full` waits for `auth_user_service` to pass its own health check. Watch the logs with `docker compose logs -f`.
 
 **`changethis` rejection on startup** — the service refuses to start if placeholder secrets are detected. Replace all `changethis` values in `auth.env`.
 

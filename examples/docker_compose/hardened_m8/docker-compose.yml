@@ -159,10 +159,10 @@ services:
       - app_net
       - data_net
 
-  fastapi_service:
+  fastapi_full:
     build:
       context: ../../
-      dockerfile: ./fastapi_service/Dockerfile
+      dockerfile: ./fastapi_full/Dockerfile
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -181,8 +181,8 @@ services:
     env_file:
       - ./api.env
     volumes:
-      - ../../fastapi_service:/opt/fastapi_service
-      - ./api.env:/opt/fastapi_service/.env:ro
+      - ../../fastapi_full:/opt/fastapi_full
+      - ./api.env:/opt/fastapi_full/.env:ro
       - ./shared_migrations:/opt/shared_migrations
     labels:
       - "traefik.enable=true"

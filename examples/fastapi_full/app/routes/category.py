@@ -5,9 +5,9 @@ from fastapi import APIRouter, HTTPException
 from sqlmodel import select
 from sqlmodel import func
 
-from fastapi_service.app.deps import CurrentUser, SessionDep
+from fastapi_full.app.deps import CurrentUser, SessionDep
 
-from fastapi_service.db_models.categories import (
+from fastapi_full.db_models.categories import (
     Category,
     CategoryCreate,
     CategoryUpdate,

@@ -1,1 +1,1 @@
-"""fastapi_service fastapi app api"""
+"""fastapi_full fastapi app api"""

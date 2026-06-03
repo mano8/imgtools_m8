@@ -17,8 +17,8 @@ scrape_configs:
       - targets:
           - auth_user_service:8000
 
-  - job_name: fastapi_service
+  - job_name: fastapi_full
     metrics_path: /fastapi/metrics
     static_configs:
       - targets:
-          - fastapi_service:8000
+          - fastapi_full:8000

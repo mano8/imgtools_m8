@@ -70,7 +70,7 @@ http:
     fastapi-service:
       loadBalancer:
         servers:
-          - url: "http://fastapi_service:8000"
+          - url: "http://fastapi_full:8000"
 
   middlewares:
     ip-allowlist:

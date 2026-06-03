@@ -6,8 +6,8 @@ from sqlmodel import CHAR, Column, Field, SQLModel
 from slugify import slugify
 
 from auth_sdk_m8.models.shared import TimestampMixin
-from fastapi_service.core.db_models import prefixed_tables
-from fastapi_service.core.config import settings
+from fastapi_full.core.db_models import prefixed_tables
+from fastapi_full.core.config import settings
 
 
 # ---------------------------------------------------------------

@@ -6,13 +6,13 @@ from datetime import datetime, timedelta
 from sqlalchemy import case, and_
 from sqlmodel import Session, select, func
 from auth_sdk_m8.controllers.base import BaseController
-from fastapi_service.core.deps import CurrentUser
-from fastapi_service.schemas.dashboard import (
+from fastapi_full.core.deps import CurrentUser
+from fastapi_full.schemas.dashboard import (
     ActivityStats,
     RangeActivityType,
     UsersActivity,
 )
-from fastapi_service.db_models.categories import Category
+from fastapi_full.db_models.categories import Category
 # pylint: disable=broad-exception-caught
 
 

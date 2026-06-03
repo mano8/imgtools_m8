@@ -94,7 +94,7 @@ Browser / Frontend
   Traefik :9000
        │
        ├──► /user/*      → auth_user_service :8000  (RS256 issuer + Vault client)
-       └──► /fastapi/*   → fastapi_service :8000    (RS256 consumer via JWKS)
+       └──► /fastapi/*   → fastapi_full :8000    (RS256 consumer via JWKS)
                 │
        ┌────────┴──────────────────────────┐
        ▼                                   ▼
@@ -132,7 +132,7 @@ auth_user_service reads secret/data/app → injects into CommonSettings
 | prometheus | ubuntu/prometheus:3.11-24.04_stable | `127.0.0.1:9090` |
 | grafana | grafana/grafana:13.1.0 | `127.0.0.1:3000` |
 | auth_user_service | [tepochtli/fa-auth-m8:latest](https://hub.docker.com/r/tepochtli/fa-auth-m8) | via Traefik at `/user` |
-| fastapi_service | local build | via Traefik at `/fastapi` |
+| fastapi_full | local build | via Traefik at `/fastapi` |
 
 ---
 
@@ -190,7 +190,7 @@ bash init.sh
 docker compose up -d
 ```
 
-`auth_user_service` uses a pre-built image from Docker Hub — no `--build` needed. Only `fastapi_service` is built locally.
+`auth_user_service` uses a pre-built image from Docker Hub — no `--build` needed. Only `fastapi_full` is built locally.
 
 **Startup order:**
 
@@ -198,7 +198,7 @@ docker compose up -d
 2. `vault_init` waits for Vault to be healthy, then writes `DB_PASSWORD` and `REDIS_PASSWORD` to `secret/data/app`, then exits 0.
 3. `m8_db` and `redis_cache` start in parallel.
 4. `auth_user_service` starts after `vault_init` completes AND `m8_db`/`redis_cache` are healthy. `VaultProvider` reads `secret/data/app` and injects secrets into settings.
-5. `fastapi_service` starts after `auth_user_service`.
+5. `fastapi_full` starts after `auth_user_service`.
 
 ---
 

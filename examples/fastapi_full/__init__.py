@@ -1,4 +1,4 @@
-"""fastapi_service fastapi app"""
+"""fastapi_full fastapi app"""
 
 __version__ = "0.9.1"
 

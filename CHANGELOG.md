@@ -6,6 +6,40 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased] — SecureAndAlign branch
 
+### Security
+
+- **`check_jti_status` honours `ACCESS_REVOCATION_FAILURE_MODE`** (`routes/private.py`).
+  When Redis is unavailable the issuer's JTI-status endpoint now reads
+  `settings.effective_failure_mode("access_revocation")`: `fail_closed` → returns
+  `active=False` (consumer treats token as revoked, returns 503); `fail_open` → returns
+  `active=True` (previous hard-coded behaviour). Matches the existing pattern in
+  `core/deps.py` and `routes/login.py`. Secured by the default change in `auth-sdk-m8 0.7.1`
+  (`ACCESS_REVOCATION_FAILURE_MODE` default flipped to `fail_closed`).
+
+### Changed
+
+- **`fastapi_service` example replaced by `fastapi_full` + `fastapi_minimal`** — the old
+  embedded template (`examples/fastapi_service/`) is deleted. Two maintained examples now
+  ship instead:
+  - `examples/fastapi_full/` — full-featured: DB session, health checks, auth deps, lifespan
+    teardown. Uses `fastapi-m8`'s `HealthConfig`/`AppLifecycle` API.
+  - `examples/fastapi_minimal/` — minimal three-step bootstrap.
+  Both examples call `create_app` with the published `HealthConfig`/`AppLifecycle` API
+  (the old flat-kwargs signature crashed at import).
+
+- **All 6 compose stacks repointed `fastapi_service → fastapi_full`** — service name, build
+  context, volumes, env mounts, Prometheus scrape targets (`fastapi_service:8000 →
+  fastapi_full:8000`), Traefik backends, and env file comments all updated. Auth degradation
+  policy matrix (`ACCESS_REVOCATION_FAILURE_MODE` opt-out + `AUTH_STRICT_MODE`) added to
+  each stack's `api.env` so operators can self-select their security/availability trade-off.
+
+- **`fastapi_full/Dockerfile` fixed** — CMD now uses the `fastapi-m8-prestart` console
+  script (`fastapi-m8-prestart && uvicorn fastapi_full.main:app`); previously pointed at
+  `./fastapi_service/scripts/docker_start.sh` which did not exist.
+
+- **`fastapi-m8` pin bumped to `>=1.1.0`** in both example `requirements_base.txt` files
+  — requires the version that honours `ACCESS_REVOCATION_FAILURE_MODE`.
+
 ### Added
 
 - **Docker base image pinned to digest** — both `auth_user_service/Dockerfile` and
