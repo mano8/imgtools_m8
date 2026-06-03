@@ -1,0 +1,18 @@
+Dockerfile
+/alembic/versions/*
+.env*
+secrets/*
+
+# Dev and test artefacts — not needed in the image
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+.git/
+.github/
+*.md

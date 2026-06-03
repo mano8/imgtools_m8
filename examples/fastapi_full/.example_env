@@ -1,0 +1,77 @@
+# Copy to .env and replace every "changethis" with real values.
+# Consumer service — validates tokens issued by auth_user_service.
+# Does NOT include auth-service-only settings (FIRST_SUPERUSER,
+# TOKENS_ENCRYPTION_KEY, key files).
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+DOMAIN=localhost
+ENVIRONMENT=local
+PROJECT_NAME=M8FastApi
+STACK_NAME=m8-fastapi-service
+
+# ── API & docs ────────────────────────────────────────────────────────────────
+API_PREFIX=/fastapi
+SET_OPEN_API=true
+SET_DOCS=true
+SET_REDOC=true
+
+# ── CORS / Frontend ───────────────────────────────────────────────────────────
+BACKEND_HOST=http://127.0.0.1:9000
+FRONTEND_HOST=http://localhost:5173
+BACKEND_CORS_ORIGINS=http://localhost,http://localhost:5173,http://localhost:9000,https://localhost,https://localhost:9000,https://localhost:5173
+
+# ── Service role & auth routing ───────────────────────────────────────────────
+# consumer = validates tokens only; never holds a private signing key
+AUTH_SERVICE_ROLE=consumer
+# Must match the API_PREFIX of auth_user_service (default: /user)
+AUTH_PREFIX=/user
+
+# ── Database ──────────────────────────────────────────────────────────────────
+SELECTED_DB=Mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=api_db
+DB_USER=changethis
+DB_PASSWORD=changethis
+
+# ── Token verification ────────────────────────────────────────────────────────
+# HS256 mode: share the same ACCESS_SECRET_KEY with auth_user_service
+ACCESS_SECRET_KEY=changethis
+REFRESH_SECRET_KEY=changethis
+ACCESS_TOKEN_ALGORITHM=HS256
+REFRESH_TOKEN_ALGORITHM=HS256
+
+# Must match auth_user_service TOKEN_MODE exactly:
+#   stateless — no revocation
+#   hybrid    — revocation for refresh tokens only (no introspection needed)
+#   stateful  — full revocation via HTTP introspection (requires INTROSPECTION_URL)
+TOKEN_MODE=stateful
+
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REFRESH_TOKEN_EXPIRE_MINUTES=3600
+
+# RS256 / ES256 asymmetric mode (comment out the HS256 block above):
+# ACCESS_TOKEN_ALGORITHM=RS256
+# JWKS_URI=http://auth_user_service:8000/user/.well-known/jwks.json
+# JWKS_CACHE_TTL_SECONDS=300
+# REFRESH_SECRET_KEY=changethis
+# REFRESH_TOKEN_ALGORITHM=HS256
+
+# ── Token boundary claims (recommended for production) ────────────────────────
+# Must match auth_user_service TOKEN_ISSUER / TOKEN_AUDIENCE exactly.
+# When set, tokens with a different iss or aud claim are rejected.
+# In production with STRICT_PRODUCTION_MODE=true these become required (startup fatal).
+#TOKEN_ISSUER=https://auth.example.com
+#TOKEN_AUDIENCE=https://api.example.com
+
+# ── Token revocation (stateful mode only) ─────────────────────────────────────
+# Required when TOKEN_MODE=stateful. Must match auth_user_service PRIVATE_API_SECRET.
+# The auth service exposes this endpoint on its Docker-internal network only.
+INTROSPECTION_URL=http://auth_user_service:8000/user/private/v1/jti-status
+PRIVATE_API_SECRET=changethis
+
+# ── Observability ─────────────────────────────────────────────────────────────
+# Master switch — false = zero overhead, /metrics endpoint not registered
+#METRICS_ENABLED=false
+# Comma-separated groups or "all": traffic | performance | reliability | health
+#METRICS_GROUPS=all

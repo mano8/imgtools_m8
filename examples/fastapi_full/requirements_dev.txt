@@ -1,0 +1,19 @@
+-r requirements_base.txt
+
+# Testing
+pytest>=9.0.3
+pytest-cov>=7.1.0
+coverage>=7.14.1
+
+# Debugging
+debugpy>=1.8.20
+
+# Linting / formatting / security
+ruff>=0.15.15
+bandit>=1.9.4
+mypy>=2.1.0
+
+# Build tools (optional but OK in dev)
+setuptools>=82.0.1
+wheel>=0.47.0
+build>=1.5.0

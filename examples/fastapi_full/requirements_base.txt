@@ -1,0 +1,30 @@
+fastapi-m8[db,postgres,mysql]>=1.0.0
+uvicorn>=0.48.0
+
+alembic>=1.18.4
+
+pydantic>=2.13.4
+pydantic_settings>=2.14.1
+
+tenacity>=9.1.4
+
+email-validator>=2.3.0
+
+bcrypt>=5.0.0
+
+python-multipart>=0.0.30
+itsdangerous>=2.2.0
+
+redis>=8.0.0
+
+python-slugify>=8.0.4
+
+jinja2>=3.1.6
+
+google-auth>=2.53.0
+
+# Optional observability (required when METRICS_ENABLED=true)
+prometheus-client>=0.25.0
+
+# DB drivers (ALL included → runtime choice)
+asyncpg>=0.31.0
