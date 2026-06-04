@@ -22,8 +22,8 @@ addopts = "--tb=short"
 
 [tool.coverage.run]
 source = ["imgtools_m8"]
-omit = ["tests/*", "tests/**/*"]
+omit = ["tests/*", "tests/**/*", "examples/*"]
 
 [tool.coverage.report]
-omit = ["tests/*", "tests/**/*"]
+omit = ["tests/*", "tests/**/*", "examples/*"]
 fail_under = 100
