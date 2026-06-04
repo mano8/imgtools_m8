@@ -4,8 +4,11 @@ MultiProcessImage unittest class.
 Use pytest package.
 """
 
+import multiprocessing
 import os
+from unittest.mock import MagicMock
 
+import imgtools_m8.multiprocess as _mp_mod
 from imgtools_m8.multiprocess import (
     MultiProcessImage,
     _init_worker,
@@ -232,3 +235,150 @@ class TestRunMultipleExtra:
         obj = _make_obj(source_path=os.path.join(HelperTest.get_source_path(), "good"))
         result = obj.run_multiple()
         assert result is False
+
+
+# ---------------------------------------------------------------------------
+# _system_resource_ok — lines 146, 148, 150-152, 156 via mock psutil
+# ---------------------------------------------------------------------------
+
+
+class TestSystemResourceOk:
+    def _make(self, **kwargs) -> MultiProcessImage:
+        return MultiProcessImage(
+            conf={
+                "source_path": HelperTest.get_source_path(),
+                "output_path": HelperTest.get_output_path(),
+                "output_options": [{"formats": [{"ext": "WEBP", "quality": 80}]}],
+            },
+            use_progress=False,
+            **kwargs,
+        )
+
+    def _mock_psutil(self, cpu: float = 10.0, mem: float = 10.0, disk: float = 10.0):
+        mock = MagicMock()
+        mock.cpu_percent.return_value = cpu
+        mock.virtual_memory.return_value = MagicMock(percent=mem)
+        mock.disk_usage.return_value = MagicMock(percent=disk)
+        return mock
+
+    def test_all_below_limits_returns_true(self, monkeypatch):
+        """Returns True when CPU, memory, and disk are all below thresholds."""
+        monkeypatch.setattr(_mp_mod, "PSUTIL_AVAILABLE", True)
+        monkeypatch.setattr(_mp_mod, "psutil", self._mock_psutil())
+        assert self._make()._system_resource_ok() is True
+
+    def test_high_cpu_returns_false(self, monkeypatch):
+        """Returns False when CPU percent exceeds max_cpu_percent (line 147)."""
+        monkeypatch.setattr(_mp_mod, "PSUTIL_AVAILABLE", True)
+        monkeypatch.setattr(_mp_mod, "psutil", self._mock_psutil(cpu=99.0))
+        assert self._make(max_cpu_percent=75)._system_resource_ok() is False
+
+    def test_high_memory_returns_false(self, monkeypatch):
+        """Returns False when memory percent exceeds max_mem_percent (line 149)."""
+        monkeypatch.setattr(_mp_mod, "PSUTIL_AVAILABLE", True)
+        monkeypatch.setattr(_mp_mod, "psutil", self._mock_psutil(mem=99.0))
+        assert self._make(max_mem_percent=80)._system_resource_ok() is False
+
+    def test_high_disk_returns_false(self, monkeypatch):
+        """Returns False when disk percent exceeds max_disk_percent (line 153)."""
+        monkeypatch.setattr(_mp_mod, "PSUTIL_AVAILABLE", True)
+        monkeypatch.setattr(_mp_mod, "psutil", self._mock_psutil(disk=99.0))
+        assert self._make(max_disk_percent=90)._system_resource_ok() is False
+
+
+# ---------------------------------------------------------------------------
+# run_multiple interrupted mid-batch — lines 226-227
+# ---------------------------------------------------------------------------
+
+
+class TestRunMultipleInterruptMidBatch:
+    def test_pool_terminated_on_mid_batch_interrupt(self, monkeypatch):
+        """pool.terminate() called when interrupted is set during batch loop."""
+        obj = MultiProcessImage(
+            conf={
+                "source_path": HelperTest.get_source_path(),
+                "output_path": HelperTest.get_output_path(),
+                "output_options": [{"formats": [{"ext": "WEBP", "quality": 80}]}],
+            },
+            use_progress=False,
+        )
+        obj.batch_size = 1  # ensure multiple iterations
+
+        terminated = []
+
+        class _InterruptAfterFirstBatch:
+            def __init__(self, *a, **kw):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+            def terminate(self):
+                terminated.append(True)
+
+            def starmap(self, func, tasks):
+                obj.interrupted.set()  # trigger after first batch
+                return [True] * len(tasks)
+
+        monkeypatch.setattr(multiprocessing, "Pool", _InterruptAfterFirstBatch)
+        result = obj.run_multiple()
+        assert result is False
+        assert terminated, "pool.terminate() should have been called"
+
+
+# ---------------------------------------------------------------------------
+# run_multiple with tqdm progress bar — lines 234, 240
+# ---------------------------------------------------------------------------
+
+
+class TestRunMultipleProgressBar:
+    def test_bar_update_and_close_called(self, monkeypatch):
+        """bar.update (line 234) and bar.close (line 240) are called when use_progress=True."""
+        bar_updates: list = []
+        bar_closed: list = []
+
+        class _FakeBar:
+            def update(self, n):
+                bar_updates.append(n)
+
+            def close(self):
+                bar_closed.append(True)
+
+        fake_bar = _FakeBar()
+
+        class _AllOkPool:
+            def __init__(self, *a, **kw):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+            def terminate(self):
+                pass
+
+            def starmap(self, func, tasks):
+                return [True] * len(tasks)
+
+        monkeypatch.setattr(multiprocessing, "Pool", _AllOkPool)
+        monkeypatch.setattr(_mp_mod, "tqdm", lambda total, desc, unit: fake_bar)
+
+        obj = MultiProcessImage(
+            conf={
+                "source_path": os.path.join(HelperTest.get_source_path(), "good"),
+                "output_path": HelperTest.get_output_path(),
+                "output_options": [{"formats": [{"ext": "WEBP", "quality": 80}]}],
+            },
+            use_progress=False,
+        )
+        obj.use_progress = True  # force progress bar on without needing real tqdm
+
+        result = obj.run_multiple()
+        assert result is True
+        assert bar_updates, "bar.update should have been called"
+        assert bar_closed, "bar.close should have been called"

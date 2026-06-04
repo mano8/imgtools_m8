@@ -4,6 +4,7 @@ ARG OPENCV_VERSION=4.13.0
 # Target SM version, e.g. 8.6 (RTX 30xx), 8.9 (RTX 40xx). Empty = auto-detect (slower build).
 ARG CUDA_ARCH_BIN=""
 
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git pkg-config \
     python3 python3-dev python3-pip python3-venv \
@@ -17,9 +18,9 @@ ENV VENV_PATH=/opt/venv
 ENV PATH="$VENV_PATH/bin:$PATH"
 RUN python3 -m venv $VENV_PATH
 
-RUN git clone --branch ${OPENCV_VERSION} --depth 1 \
+RUN git clone --branch "${OPENCV_VERSION}" --depth 1 \
       https://github.com/opencv/opencv.git /opt/opencv && \
-    git clone --branch ${OPENCV_VERSION} --depth 1 \
+    git clone --branch "${OPENCV_VERSION}" --depth 1 \
       https://github.com/opencv/opencv_contrib.git /opt/opencv_contrib && \
     cmake -S /opt/opencv -B /opt/opencv/build \
       -D CMAKE_BUILD_TYPE=Release \

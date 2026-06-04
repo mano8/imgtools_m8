@@ -11,7 +11,7 @@ from typing import Optional
 try:
     from cv2 import dnn_superres
 
-    CV2_AVAILABLE = True
+    CV2_AVAILABLE = True  # pragma: no cover
 except ImportError:  # pragma: no cover
     CV2_AVAILABLE = False
     dnn_superres = None  # type: ignore[assignment]

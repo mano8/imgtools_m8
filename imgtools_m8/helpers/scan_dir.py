@@ -272,9 +272,7 @@ class ScanDir:
             file_copy = file.copy()
 
             if format_size in result:
-                files_bucket = cast(
-                    List[FileListing], result[format_size]["files"]
-                )
+                files_bucket = cast(List[FileListing], result[format_size]["files"])
                 files_bucket.append(file_copy)
             else:
                 result[format_size] = {

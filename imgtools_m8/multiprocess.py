@@ -24,16 +24,16 @@ __version__ = "2.0.0"
 try:
     import psutil
 
-    PSUTIL_AVAILABLE = True
-except ImportError:  # pragma: no cover
+    PSUTIL_AVAILABLE = True  # pragma: no cover
+except ImportError:
     PSUTIL_AVAILABLE = False
     psutil = None  # type: ignore[assignment]
 
 try:
     from tqdm import tqdm
 
-    TQDM_AVAILABLE = True
-except ImportError:  # pragma: no cover
+    TQDM_AVAILABLE = True  # pragma: no cover
+except ImportError:
     TQDM_AVAILABLE = False
     tqdm = None  # type: ignore[assignment, misc]
 
