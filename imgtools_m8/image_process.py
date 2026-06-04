@@ -292,10 +292,14 @@ class ImageProcessing:
             return img.resize((w * factor, h * factor), Image.Resampling.BICUBIC)
         src = img.convert("RGB")  # pragma: no cover
         cv_img = cv2.cvtColor(np.array(src), cv2.COLOR_RGB2BGR)  # type: ignore[union-attr,call-overload]  # pragma: no cover
-        upscaled = self.expander.many_image_upscale(image=cv_img, nb_upscale=1)  # pragma: no cover
+        upscaled = self.expander.many_image_upscale(
+            image=cv_img, nb_upscale=1
+        )  # pragma: no cover
         result = Image.fromarray(cv2.cvtColor(upscaled, cv2.COLOR_BGR2RGB))  # type: ignore[call-overload,union-attr]  # pragma: no cover
         if img.mode == "RGBA":  # pragma: no cover
-            alpha = img.split()[3].resize(result.size, Image.Resampling.LANCZOS)  # pragma: no cover
+            alpha = img.split()[3].resize(
+                result.size, Image.Resampling.LANCZOS
+            )  # pragma: no cover
             result.putalpha(alpha)  # pragma: no cover
         return result  # pragma: no cover
 
@@ -319,7 +323,8 @@ class ImageProcessing:
             if isinstance(option.image_size, OutputSize):
                 if option.image_size.fixed_upscale is not None and self.has_expander():
                     working = self._dnn_upscale(  # pragma: no cover
-                        working, option.image_size.fixed_upscale  # pragma: no cover
+                        working,
+                        option.image_size.fixed_upscale,  # pragma: no cover
                     )  # pragma: no cover
                 else:
                     working = ImageProcessing._resize_to_fit(

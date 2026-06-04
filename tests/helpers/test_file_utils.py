@@ -40,7 +40,10 @@ class TestFileUtilsGetFileSizeStr:
 
     def test_oserror_path(self, monkeypatch):
         src = os.path.join(HelperTest.get_source_path(), "mar.jpg")
-        monkeypatch.setattr("imgtools_m8.helpers.file_utils.getsize", lambda _: (_ for _ in ()).throw(OSError("disk error")))
+        monkeypatch.setattr(
+            "imgtools_m8.helpers.file_utils.getsize",
+            lambda _: (_ for _ in ()).throw(OSError("disk error")),
+        )
         result = FileUtils.get_file_size_str(src)
         assert result == "Unable to determine file size"
 

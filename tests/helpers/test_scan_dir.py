@@ -166,9 +166,7 @@ class TestScanDir:
     def test_process_valid_file_item_invalid_image():
         """Test process_valid_file_item with a bad (non-image) file."""
         source_path = HelperTest.get_source_path()
-        result = ScanDir.process_valid_file_item(
-            root=source_path, file="bad_image.jpg"
-        )
+        result = ScanDir.process_valid_file_item(root=source_path, file="bad_image.jpg")
         assert result is None
 
     @staticmethod

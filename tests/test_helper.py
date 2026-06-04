@@ -164,7 +164,9 @@ class TestImageToolsHelper:
         )
         assert ImageToolsHelper.get_extension(path="img.tar.gz", ext_len=3) == ".tar.gz"
         assert ImageToolsHelper.get_extension(path="") == ""
-        assert ImageToolsHelper.get_extension(path="img.a.b.c.d", ext_len=4) == ".a.b.c.d"
+        assert (
+            ImageToolsHelper.get_extension(path="img.a.b.c.d", ext_len=4) == ".a.b.c.d"
+        )
 
     @staticmethod
     def test_get_image_size():

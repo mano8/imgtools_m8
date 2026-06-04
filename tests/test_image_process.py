@@ -371,19 +371,25 @@ class TestWriteImageToFormat:
     def test_rgba_saved_as_jpeg(self, output_path):
         img = Image.new("RGBA", (20, 20))
         fmt = JpegFormat(quality=80)
-        result = ImageProcessing._write_image_to_format(img, output_path, "test_rgba", fmt)
+        result = ImageProcessing._write_image_to_format(
+            img, output_path, "test_rgba", fmt
+        )
         assert result is True
 
     def test_cmyk_saved_as_png(self, output_path):
         img = Image.new("CMYK", (20, 20))
         fmt = PngFormat()
-        result = ImageProcessing._write_image_to_format(img, output_path, "test_cmyk", fmt)
+        result = ImageProcessing._write_image_to_format(
+            img, output_path, "test_cmyk", fmt
+        )
         assert result is True
 
     def test_write_failure_returns_false(self, output_path):
         img = Image.new("RGB", (10, 10))
         fmt = JpegFormat(quality=80)
-        result = ImageProcessing._write_image_to_format(img, "/bad/dir/path", "stem", fmt)
+        result = ImageProcessing._write_image_to_format(
+            img, "/bad/dir/path", "stem", fmt
+        )
         assert result is False
 
 
@@ -415,7 +421,10 @@ class TestProcessOutputOptionsNoOptions:
             }
         )
         img = Image.new("RGB", (50, 50))
-        assert obj.process_output_options(img, "test.jpg", HelperTest.get_output_path()) is False
+        assert (
+            obj.process_output_options(img, "test.jpg", HelperTest.get_output_path())
+            is False
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -494,7 +503,9 @@ class TestMiscGuards:
     def test_set_expander_with_model_conf(self):
         # Passing model_conf triggers lines 74 and _set_expander;
         # has_expander() call covers line 94
-        obj = ImageProcessing(conf=_conf(), model_conf={"model_name": "edsr", "scale": 2})
+        obj = ImageProcessing(
+            conf=_conf(), model_conf={"model_name": "edsr", "scale": 2}
+        )
         _ = obj.has_expander()  # exercise line 94
 
     def test_set_expander_early_return_for_empty_conf(self):

@@ -1,11 +1,11 @@
+# imgtools_m8
+
 [![Python package](https://github.com/mano8/imgtools_m8/actions/workflows/python-package.yml/badge.svg)](https://github.com/mano8/imgtools_m8/actions/workflows/python-package.yml)
 [![PyPI package](https://img.shields.io/pypi/v/imgtools_m8.svg)](https://pypi.org/project/imgtools_m8/)
 [![codecov](https://codecov.io/gh/mano8/imgtools_m8/branch/main/graph/badge.svg?token=0J31F62GB7)](https://codecov.io/gh/mano8/imgtools_m8)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/c401bed6812d4f9bb77bfaee16cf0abe)](https://www.codacy.com/gh/mano8/imgtools_m8/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=mano8/imgtools_m8&amp;utm_campaign=Badge_Grade)
 [![Downloads](https://static.pepy.tech/badge/imgtools-m8)](https://pepy.tech/project/imgtools-m8)
 [![Known Vulnerabilities](https://snyk.io/test/github/mano8/vedirect_m8/badge.svg)](https://snyk.io/test/github/mano8/imgtools_m8)
-
-## imgtools_m8
 
 Python image processing package for converting, downscaling, and optionally upscaling images using Pillow. DNN-based super-resolution upscaling (via OpenCV) is available as an optional extra.
 
@@ -289,6 +289,30 @@ obj = ImageProcessing(
     },
 )
 ```
+
+## Docker (CUDA-accelerated DNN upscaling)
+
+A `Dockerfile` is provided to build a CUDA-enabled image that compiles OpenCV
+from source with GPU support, enabling hardware-accelerated DNN upscaling.
+
+**Requirements:** Docker + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
+
+```bash
+# Build with defaults (CUDA 13.3 / Ubuntu 24.04 / OpenCV 4.13)
+docker build -t imgtools_m8 .
+
+# Target a specific GPU compute capability (much faster compile)
+docker build --build-arg CUDA_ARCH_BIN=8.9 -t imgtools_m8 .
+
+# Run with GPU access
+docker run --gpus all imgtools_m8 --help
+```
+
+Find your GPU's compute capability at [developer.nvidia.com/cuda-gpus](https://developer.nvidia.com/cuda-gpus):
+RTX 30xx → `8.6`, RTX 40xx → `8.9`, RTX 50xx → `10.0`.
+
+Build arguments (`OPENCV_VERSION`, `CUDA_ARCH_BIN`) are documented in `.env.example`.
+A `docker-compose.yml` for multi-volume GPU batch processing is in `docker_compose/imgtools_dev/`.
 
 ## Input/Output Example
 

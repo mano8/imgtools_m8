@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `Dockerfile` CUDA build upgraded to CUDA 13.3 / Ubuntu 24.04 / OpenCV 4.13;
+  `CUDA_ARCH_BIN` build-arg added for GPU-specific compile (e.g. `8.9` for RTX 40xx)
+- `.env.example` documenting `OPENCV_VERSION` and `CUDA_ARCH_BIN` build arguments
+- `.dockerignore` to exclude `tests/`, `build/`, `docs/` from the Docker build context
+- Docker section in README covering CUDA build, run, and compute-capability reference
+
+### Changed
+
+- Docker base image pinned by digest (`nvidia/cuda:13.3.0-cudnn-devel-ubuntu24.04`)
+- Dockerfile now uses a Python venv so pip deps and OpenCV bindings share one environment
+- `ENTRYPOINT` + `CMD ["--help"]` replacing the previous `command:` override
+
+### Fixed
+
+- `requirements.txt` re-encoded as UTF-8 (was UTF-16 LE, broke `pip install`
+  inside Docker)
+- Coverage scoped to the `imgtools_m8` package only; pytest and VS Code
+  reporter aligned
+- All `ruff`, `mypy`, and `bandit` errors resolved across the codebase
+
+### Build
+
+- Python 3.11–3.14 declared as supported range in `setup.cfg`
+- CI workflow split into independent jobs with SHA-pinned actions and
+  Dependabot config
+
+---
+
 ## [2.0.0] - 2026-05-29
 
 ### Breaking Changes
