@@ -6,9 +6,8 @@ Use pytest package.
 
 import os
 
-import cv2
+import numpy as np
 import pytest
-from ve_utils.utils import UType as Ut
 
 from imgtools_m8.core.exceptions import ImgToolsException
 from imgtools_m8.helper import ImageToolsHelper
@@ -171,9 +170,7 @@ class TestImageToolsHelper:
     @staticmethod
     def test_get_image_size():
         """Test get_image_size method"""
-        image = cv2.imread(
-            os.path.join(HelperTest.get_source_path(), "recien_llegado.jpg")
-        )
+        image = np.zeros((216, 340, 3), dtype=np.uint8)
         assert ImageToolsHelper.get_image_size(image) == (216, 340)
         assert ImageToolsHelper.get_image_size(None) is None
 
@@ -181,7 +178,7 @@ class TestImageToolsHelper:
     def test_get_package_models_path():
         """Test get_package_models_path method"""
         path = ImageToolsHelper.get_package_models_path()
-        assert Ut.is_str(path) and "models" in path
+        assert isinstance(path, str) and "models" in path
 
     @staticmethod
     def test_convert_size():

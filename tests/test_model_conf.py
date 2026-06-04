@@ -4,8 +4,6 @@ ModelConf unittest class.
 Use pytest package.
 """
 
-from ve_utils.utils import UType as Ut
-
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.helpers.model_conf import ModelConf, ScaleSelector
 
@@ -136,7 +134,7 @@ class TestModelConf:
         scale_list = ModelConf.get_model_scales_available(
             path=ImageToolsHelper.get_package_models_path(), model_name="edsr"
         )
-        assert Ut.is_list(scale_list, not_null=True) is True
+        assert isinstance(scale_list, list) and len(scale_list) > 0
         assert len(scale_list) == 3
         assert ModelConf.is_scale_in_list(scale_list=scale_list, scale=2) is True
         scale_list = ModelConf.get_model_scales_available(
