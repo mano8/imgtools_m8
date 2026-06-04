@@ -261,17 +261,19 @@ class ScanDir:
         for file in files:
             if not isinstance(file, dict):
                 continue
-            format_size = ImageUtils.get_image_format_type(file.pop("image_size"))
+
+            format_size = ImageUtils.get_image_format_type(file.get("image_size"))
             if format_size is None or format_size not in keys_size:
                 continue
+
+            file_copy = file.copy()
+
             if format_size in result:
-                group = result[format_size]
-                if isinstance(group.get("files"), list):
-                    group["files"].append(file)  # type: ignore[attr-defined]
+                result[format_size]["files"].append(file_copy)
             else:
                 result[format_size] = {
                     "root_dir": item_tree.get("root_dir"),
-                    "files": [file],
+                    "files": [file_copy],
                 }
         return result
 
@@ -292,17 +294,19 @@ class ScanDir:
         for file in files:
             if not isinstance(file, dict):
                 continue
-            ext = file.pop("image_format")
+
+            ext = file.get("image_format")
             if not isinstance(ext, str):
                 continue
+
+            file_copy = file.copy()
+
             if ext in result:
-                group = result[ext]
-                if isinstance(group.get("files"), list):
-                    group["files"].append(file)  # type: ignore[attr-defined]
+                result[ext]["files"].append(file_copy)
             else:
                 result[ext] = {
                     "root_dir": item_tree.get("root_dir"),
-                    "files": [file],
+                    "files": [file_copy],
                 }
         return result
 
