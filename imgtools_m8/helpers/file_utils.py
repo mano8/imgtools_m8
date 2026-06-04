@@ -10,7 +10,7 @@ Author: Eli Serra
 Copyright: Copyright 2020, Eli Serra
 Date: 2025-06-22
 """
-from os.path import isfile, splitext, getsize
+from os.path import getsize, isfile, splitext
 from typing import List, Optional
 
 from imgtools_m8.core.constants import VALID_IMAGE_EXTENSIONS

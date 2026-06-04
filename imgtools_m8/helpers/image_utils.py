@@ -10,11 +10,10 @@ Author: Your Name
 Date: 2025-06-22
 """
 
-from typing import Optional, Tuple, Union
-from PIL import Image, UnidentifiedImageError
 import logging
-from ve_utils.utils import UType as Ut
-from imgtools_m8.schemas.conf_schema import FormatConfig
+from typing import Optional, Tuple, Union
+
+from PIL import Image, UnidentifiedImageError
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -23,7 +22,6 @@ __license__ = "Apache Software License"
 __status__ = "Production"
 __version__ = "1.0.0"
 
-logging.basicConfig()
 logger = logging.getLogger("imgTools_m8")
 
 
@@ -337,23 +335,19 @@ class ImageUtils:
     @staticmethod
     def get_format_kwargs(
         output_format: str,
-        format_args: FormatConfig,
-    ) -> bool:
-        """
-        Get format-specific arguments for saving images.
-        """
-        result = None
-        if Ut.is_str(output_format)\
-                and isinstance(format_args, FormatConfig):
-            result = format_args.model_dump()
-        return result
+        format_args,
+    ) -> Optional[dict]:
+        """Get format-specific kwargs for PIL Image.save (excludes 'ext')."""
+        if isinstance(output_format, str) and format_args is not None:
+            return format_args.model_dump(exclude={'ext'})
+        return None
 
     @staticmethod
     def convert_image_format(
         filepath: str,
         output_path: str,
         output_format: str,
-        format_args: FormatConfig,
+        format_args,
     ) -> bool:
         """
         Convert an image to a different format and save it.
@@ -363,12 +357,12 @@ class ImageUtils:
             output_path (str): Path where converted image will be saved.
             output_format (str):
                 Format to convert to (e.g., "JPEG", "PNG", "WEBP", "GIF").
-            format_args (FormatConfig): Additional format-specific arguments.
+            format_args: Format-specific arguments (Pydantic model).
 
         Returns:
             bool: True if conversion succeeded, False otherwise.
         """
-        if not Ut.is_str(output_format):
+        if not isinstance(output_format, str):
             return False
         fmt = output_format.upper()
         if fmt not in {"JPEG", "PNG", "WEBP", "GIF"}:

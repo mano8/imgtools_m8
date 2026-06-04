@@ -4,7 +4,6 @@ imgtools_m8.core.constants module.
 # accepted img formats
 from enum import Enum
 
-
 VALID_IMAGE_EXTENSIONS = {
     ".bmp",
     ".gif",

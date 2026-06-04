@@ -3,7 +3,7 @@ import logging
 from enum import Enum
 from os import path as Path
 from typing import Optional
-from ve_utils.utils import UType as Ut
+
 from imgtools_m8.helper import ImageToolsHelper
 
 __author__ = "Eli Serra"
@@ -13,7 +13,6 @@ __license__ = "Apache Software License"
 __status__ = "Production"
 __version__ = "1.0.0"
 
-logging.basicConfig()
 logger = logging.getLogger("imgTools_m8")
 
 
@@ -237,9 +236,9 @@ class ModelConf:
                 scale=value):
             self.scale = value
             result = True
-        elif not Ut.is_int(value, mini=1) \
-                and set_default is True\
-                and Ut.is_list(scale_list, not_null=True):
+        elif not (isinstance(value, int) and value >= 1) \
+                and set_default is True \
+                and isinstance(scale_list, list) and scale_list:
             self.scale = scale_list[0]
             result = True
 
@@ -388,7 +387,7 @@ class ModelConf:
             >>> ModelConf.is_model_name('invalid_model')
             False
         """
-        return Ut.is_str(value) \
+        return isinstance(value, str) \
             and value in ModelConf.get_valid_model_names()
 
     @staticmethod
@@ -408,11 +407,11 @@ class ModelConf:
             >>> ModelConf.is_model_path('/invalid/path')
             False
         """
-        return Ut.is_str(value, not_null=True) \
+        return isinstance(value, str) and value \
             and Path.isdir(value)
 
     @staticmethod
-    def get_models_list(path: str) -> list:
+    def get_models_list(path: str) -> list[str]:
         """
         Get a list of model files from the specified path.
 
@@ -427,7 +426,7 @@ class ModelConf:
             ['model1.pb', 'model2.pb']
         """
         result = ImageToolsHelper.get_files_list(path, ext='.pb')
-        if Ut.is_list(result, not_null=True):
+        if isinstance(result, list) and result:
             result.sort()
         return result
 
@@ -451,16 +450,16 @@ class ModelConf:
             2
         """
         result = 0
-        if Ut.is_str(file_name, not_null=True):
+        if isinstance(file_name, str) and file_name:
             name, _ = ImageToolsHelper.cut_file_name(file_name)
-            result = Ut.get_int(name[-1:], default=0)
+            result = int(name[-1]) if name[-1:].isdigit() else 0
         return result
 
     @staticmethod
     def get_model_scales_available(
         path: str,
         model_name: str
-    ) -> Optional[list]:
+    ) -> Optional[list[int]]:
         """
         Get a list of available model scales for a given model name and path.
 
@@ -480,7 +479,7 @@ class ModelConf:
         """
         result, models = None, ModelConf.get_models_list(path)
         is_valid_model_name = ModelConf.is_model_name(model_name)
-        if Ut.is_list(models, not_null=True) \
+        if isinstance(models, list) and models \
                 and is_valid_model_name:
             result = []
             for file_name in models:
@@ -519,7 +518,7 @@ class ModelConf:
         """
         result, models = None, ModelConf.get_models_list(path)
         is_valid_model_name = ModelConf.is_model_name(model_name)
-        if Ut.is_list(models, not_null=True) \
+        if isinstance(models, list) and models \
                 and is_valid_model_name:
             for file_name in models:
                 if model_name in file_name.lower():
@@ -552,10 +551,10 @@ class ModelConf:
             >>> ModelConf.is_model_file_name('/path/to/models', 'edsr_x2.pb')
             True
         """
-        return Ut.is_str(file_name, not_null=True) \
+        return isinstance(file_name, str) and file_name \
             and ImageToolsHelper.get_extension(
                 path=file_name) == '.pb' \
-            and Ut.is_str(model_path, not_null=True) \
+            and isinstance(model_path, str) and model_path \
             and Path.isfile(
                 Path.join(model_path, file_name)
             )
@@ -579,8 +578,8 @@ class ModelConf:
             >>> ModelConf.is_scale_in_list([2, 3, 4], 3)
             True
         """
-        return Ut.is_list(scale_list, not_null=True) \
-            and Ut.is_int(scale, mini=2) \
+        return isinstance(scale_list, list) and scale_list \
+            and isinstance(scale, int) and scale >= 2 \
             and scale in scale_list
 
     @staticmethod

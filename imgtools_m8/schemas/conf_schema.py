@@ -3,9 +3,9 @@ Schemas for Pillow-compatible output format optimizations in imgtools_m8.
 """
 
 from typing import List, Literal, Optional, Union
-from typing_extensions import Annotated
 
 from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Annotated
 
 from imgtools_m8.core.constants import OutputFormatsEnum
 
@@ -46,7 +46,7 @@ class JpegFormat(BaseModel):
         return subsampling in JPEG_SUBSAMPLING_OPTIONS
 
     @model_validator(mode='after')
-    def check_constraints(self) -> 'OutputOptions':
+    def check_constraints(self) -> 'JpegFormat':
         """Ensure valid combination of size constraints."""
         nb_sampling = len(JPEG_SUBSAMPLING_OPTIONS)
         if not self.is_subsampling_valid(self.subsampling)\
@@ -250,7 +250,7 @@ class GlobalOutputOptions(BaseModel):
     )
 
     @model_validator(mode='after')
-    def check_constraints(self) -> 'OutputOptions':
+    def check_constraints(self) -> 'GlobalOutputOptions':
         """Ensure valid combination of size constraints and formats."""
 
         if not (
@@ -292,7 +292,7 @@ class ImageProcessingSchema(BaseModel):
     )
 
     @model_validator(mode='after')
-    def check_constraints(self) -> 'OutputOptions':
+    def check_constraints(self) -> 'ImageProcessingSchema':
         """Ensure valid constraints."""
         if self.flatten_output is True:
             self.include_subdirs = True
