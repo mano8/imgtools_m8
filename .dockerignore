@@ -1,0 +1,17 @@
+.git/
+.gitignore
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+docs/
+examples/
+*.md
+requirements-dev.txt
+.dockerignore

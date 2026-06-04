@@ -1,27 +1,27 @@
-# helper/image_utils needs cv2 built with CUDA and DNN support
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
+FROM nvidia/cuda:13.3.0-cudnn-devel-ubuntu24.04@sha256:5c9fb04c50d925fc6a97739ee66f00f95e611fca1c82e6e84d9f560d61f3280e
 
-ARG OPENCV_VERSION=4.7.0
+ARG OPENCV_VERSION=4.13.0
+# Target SM version, e.g. 8.6 (RTX 30xx), 8.9 (RTX 40xx). Empty = auto-detect (slower build).
+ARG CUDA_ARCH_BIN=""
 
-# install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake git pkg-config \
+    python3 python3-dev python3-pip python3-venv \
     libjpeg-dev libpng-dev libtiff-dev \
-    libopencv-dev libavcodec-dev libavformat-dev libswscale-dev \
+    libavcodec-dev libavformat-dev libswscale-dev \
     libv4l-dev libxvidcore-dev libx264-dev \
     libgtk-3-dev libatlas-base-dev gfortran \
   && rm -rf /var/lib/apt/lists/*
 
-# download and build OpenCV
-WORKDIR /opt
-RUN git clone --branch ${OPENCV_VERSION} --depth 1 \
-      https://github.com/opencv/opencv.git && \
-    git clone --branch ${OPENCV_VERSION} --depth 1 \
-      https://github.com/opencv/opencv_contrib.git
+ENV VENV_PATH=/opt/venv
+ENV PATH="$VENV_PATH/bin:$PATH"
+RUN python3 -m venv $VENV_PATH
 
-WORKDIR /opt/opencv
-RUN mkdir build && cd build && \
-    cmake \
+RUN git clone --branch ${OPENCV_VERSION} --depth 1 \
+      https://github.com/opencv/opencv.git /opt/opencv && \
+    git clone --branch ${OPENCV_VERSION} --depth 1 \
+      https://github.com/opencv/opencv_contrib.git /opt/opencv_contrib && \
+    cmake -S /opt/opencv -B /opt/opencv/build \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=/usr/local \
       -D OPENCV_EXTRA_MODULES_PATH=/opt/opencv_contrib/modules \
@@ -31,22 +31,20 @@ RUN mkdir build && cd build && \
       -D WITH_CUBLAS=1 \
       -D BUILD_opencv_python3=ON \
       -D PYTHON3_EXECUTABLE=$(which python3) \
+      -D PYTHON3_PACKAGES_PATH=$(python3 -c "import site; print(site.getsitepackages()[0])") \
       -D BUILD_EXAMPLES=OFF \
-      .. && \
-    make -j"$(nproc)" && \
-    make install && \
-    ldconfig
+      ${CUDA_ARCH_BIN:+-D CUDA_ARCH_BIN=${CUDA_ARCH_BIN}} && \
+    cmake --build /opt/opencv/build --parallel $(nproc) && \
+    cmake --install /opt/opencv/build && \
+    ldconfig && \
+    rm -rf /opt/opencv /opt/opencv_contrib
 
-# install your python dependencies
 WORKDIR /app
 COPY requirements.txt .
-RUN apt-get update && apt-get install -y python3-pip && \
-    pip3 install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# copy your code and models
 COPY . /app
+RUN pip install --no-cache-dir --no-deps .
 
-# expose a port if you have an API
-# EXPOSE 8000
-
-CMD ["python3", "-m", "imgtools_m8.main"]
+ENTRYPOINT ["python3", "-m", "imgtools_m8"]
+CMD ["--help"]
