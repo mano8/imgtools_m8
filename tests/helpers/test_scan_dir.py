@@ -121,7 +121,7 @@ class TestScanDir:
         result = ScanDir.get_dir_files_by_format_type(item_tree=files)
         assert isinstance(result, dict)
         assert isinstance(result.get("portrait"), dict)
-        assert len(result.get("portrait").get("files")) == 3
+        assert len(result.get("portrait").get("files")) == 4
         assert isinstance(result.get("landscape"), dict)
         assert len(result.get("landscape").get("files")) == 3
 
