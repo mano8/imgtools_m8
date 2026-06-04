@@ -1,3 +1,0 @@
-# docs/requirements.in — Sphinx build dependencies
-# Compile with: pip-compile docs/requirements.in -o docs/requirements.txt
-Sphinx>=7.4.0
