@@ -6,13 +6,18 @@ using Super-Resolution techniques.
 """
 import os
 from typing import Optional
-from cv2 import dnn_superres
-from numpy import ndarray
 
-from ve_utils.utils import UType as Ut
-from imgtools_m8.model_conf import ModelConf, ScaleSelector
+try:
+    from cv2 import dnn_superres
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    dnn_superres = None  # type: ignore[assignment]
+
+from imgtools_m8.core.exceptions import ImgToolsException
 from imgtools_m8.helper import ImageToolsHelper
-from imgtools_m8.exceptions import ImgToolsException
+from imgtools_m8.helpers.model_conf import ModelConf, ScaleSelector
+from imgtools_m8.schemas.upscaler_schema import UpscaleModelDict
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -32,7 +37,7 @@ class ImageExpander:
     using Super-Resolution techniques.
     """
     def __init__(self,
-                 model_conf: Optional[dict] = None,
+                 model_conf: Optional[UpscaleModelDict] = None,
                  ):
         """
         Initialize the ImageExpander instance.
@@ -81,10 +86,10 @@ class ImageExpander:
             >>> expander.has_model_conf()
             True
         """
-        return self.model_conf.is_ready()
+        return self.model_conf is not None and self.model_conf.is_ready()
 
     def set_model_conf(self,
-                       model_conf: Optional[dict] = None
+                       model_conf: Optional[UpscaleModelDict] = None
                        ) -> bool:
         """
         Set the model configuration for the ImageExpander.
@@ -111,7 +116,7 @@ class ImageExpander:
         model_name = 'edsr'
         scale = 2
         scale_selector = ScaleSelector.AUTO_SCALE
-        if Ut.is_dict(model_conf, not_null=True):
+        if isinstance(model_conf, dict) and model_conf:
 
             if ModelConf.is_model_path(model_conf.get('path')):
                 model_path = model_conf.get('path')
@@ -152,6 +157,11 @@ class ImageExpander:
             >>> expander = ImageExpander(model_config)
             >>> expander.init_sr()
         """
+        if not CV2_AVAILABLE:
+            raise ImgToolsException(
+                "DNN upscaling requires opencv-contrib-python. "
+                "Install with: pip install imgtools_m8[dnn]"
+            )
         self.sr = dnn_superres.DnnSuperResImpl_create()
 
     def load_model(self):
@@ -189,14 +199,14 @@ class ImageExpander:
                 test = True
         return test
 
-    def upscale_image(self, image: ndarray):
+    def upscale_image(self, image: object):
         """
         Upscale the input image using the loaded super-resolution model.
 
         :param image: The input image as a NumPy array.
 
         :return: The upscaled image.
-        :rtype: ndarray
+        :rtype: object
 
         Example:
             >>> model_config = {
@@ -206,7 +216,6 @@ class ImageExpander:
             }
             >>> expander = ImageExpander(model_config)
             >>> expander.load_model()
-            >>> # Load or create your input image as a NumPy array
             >>> input_image = ...
             >>> upscaled_image = expander.upscale_image(input_image)
         """
@@ -215,10 +224,10 @@ class ImageExpander:
         return image
 
     def many_image_upscale(self,
-                           image: ndarray,
+                           image: object,
                            nb_upscale: int,
                            scale: Optional[int] = None
-                           ) -> Optional[ndarray]:
+                           ) -> Optional[object]:
         """
         Upscale an image multiple times using the super-resolution model.
 
@@ -227,7 +236,7 @@ class ImageExpander:
         :param scale: The model scale to use.
 
         :return: The final upscaled image after multiple upscaling operations.
-        :rtype: ndarray or None
+        :rtype: object or None
 
         Example:
             >>> model_config = {
@@ -237,7 +246,6 @@ class ImageExpander:
             }
             >>> expander = ImageExpander(model_config)
             >>> expander.load_model()
-            >>> # Load or create your input image as a NumPy array
             >>> input_image = ...
             >>> final_upscaled_image = expander.many_image_upscale(
                 input_image,
@@ -245,14 +253,15 @@ class ImageExpander:
             )
         """
         max_upscale = 10
-        if image is not None\
-                and Ut.is_int(nb_upscale, mini=1, maxi=max_upscale):
+        if image is not None \
+                and isinstance(nb_upscale, int) \
+                and 1 <= nb_upscale <= max_upscale:
             is_scale = ModelConf.is_scale(
                 model_path=self.model_conf.model_path,
                 model_name=self.model_conf.model_name,
                 scale=scale
             )
-            if Ut.is_int(scale)\
+            if isinstance(scale, int) \
                     and not is_scale:
                 raise ImgToolsException(
                     "Fatal Error: Invalid model scale selected."

@@ -7,11 +7,12 @@ License: Apache 2 License
 Version: 1.0.0
 """
 import math
-import numpy as np
 from typing import Optional
-from ve_utils.utils import UType as Ut
+
+import numpy as np
+
+from imgtools_m8.core.exceptions import ImgToolsException
 from imgtools_m8.helper import ImageToolsHelper
-from imgtools_m8.exceptions import ImgToolsException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -46,7 +47,8 @@ class ModelScaleSelector:
         :return: True if upscaling is needed, False otherwise.
         :rtype: bool
 
-        :raises ImgToolsException: If the input size values are not valid integers or less than 1.
+        :raises ImgToolsException:
+            If the input size values are not valid integers or less than 1.
 
         Example:
             >>> ModelScaleSelector.need_upscale(
@@ -55,20 +57,20 @@ class ModelScaleSelector:
             >>> True
         """
         result = False
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
+        if not (isinstance(height, int) and height >= 1) \
+                or not (isinstance(width, int) and width >= 1):
             raise ImgToolsException(
                 "Error: Bad image size values."
             )
-        if Ut.is_int(fixed_width, mini=1) \
-                and Ut.is_int(fixed_height, mini=1) \
+        if isinstance(fixed_width, int) and fixed_width >= 1 \
+                and isinstance(fixed_height, int) and fixed_height >= 1 \
                 and fixed_width > width \
                 and fixed_height > height:
             result = True
-        elif Ut.is_int(fixed_height, mini=1) \
+        elif isinstance(fixed_height, int) and fixed_height >= 1 \
                 and fixed_height > height:
             result = True
-        elif Ut.is_int(fixed_width, mini=1) \
+        elif isinstance(fixed_width, int) and fixed_width >= 1 \
                 and fixed_width > width:
             result = True
         return result
@@ -103,24 +105,24 @@ class ModelScaleSelector:
             >>> 2
         """
         result = 0
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
+        if not (isinstance(height, int) and height >= 1) \
+                or not (isinstance(width, int) and width >= 1):
             raise ImgToolsException(
                 "Error: Bad image size values."
             )
-        if Ut.is_int(fixed_height) \
-                and Ut.is_int(fixed_width) \
+        if isinstance(fixed_height, int) \
+                and isinstance(fixed_width, int) \
                 and fixed_height > height \
                 and fixed_width > width:
             scale_w = math.ceil(fixed_width / width)
             scale_h = math.ceil(fixed_height / height)
             result = min(scale_w, scale_h)
 
-        elif Ut.is_int(fixed_width) \
+        elif isinstance(fixed_width, int) \
                 and fixed_width > width:
             result = math.ceil(fixed_width / width)
 
-        elif Ut.is_int(fixed_height) \
+        elif isinstance(fixed_height, int) \
                 and fixed_height > height:
             result = math.ceil(fixed_height / height)
         return result
@@ -160,13 +162,13 @@ class ModelScaleSelector:
             >>> 3
         """
         result = 0
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
+        if not (isinstance(height, int) and height >= 1) \
+                or not (isinstance(width, int) and width >= 1):
             raise ImgToolsException(
                 "Error: Bad image size values."
             )
 
-        if not Ut.is_int(model_scale, mini=1):
+        if not (isinstance(model_scale, int) and model_scale >= 1):
             raise ImgToolsException(
                 "Error: Bad model scale value. Must be > 0"
             )
@@ -184,7 +186,7 @@ class ModelScaleSelector:
     @staticmethod
     def get_best_scale_combinations(max_x_scale: int,
                                     available_scales: list,
-                                    ) -> list or None:
+                                    ) -> Optional[list]:
         """
         Get the best combinations of scaling factors for achieving the target upscale.
 
@@ -194,7 +196,7 @@ class ModelScaleSelector:
         :type available_scales: list
 
         :return: A list of best combinations of scaling factors, or None if not found.
-        :rtype: list or None
+        :rtype: Optional[list]
 
         Example:
             >>> max_x_scale = 3
@@ -203,8 +205,8 @@ class ModelScaleSelector:
             >>> [[3], [2, 1], [1, 1, 1]]
         """
         best_combination = None
-        if Ut.is_int(max_x_scale, mini=1) \
-                and Ut.is_list(available_scales, not_null=True):
+        if isinstance(max_x_scale, int) and max_x_scale >= 1 \
+                and isinstance(available_scales, list) and available_scales:
             total_combinations = ImageToolsHelper.find_all_combinations(
                 total=max_x_scale,
                 numbers=available_scales
@@ -263,11 +265,11 @@ class ModelScaleSelector:
             >>> ModelScaleSelector.set_scale_stats(x_scale, combination_key, combinations, actual_scale, last_scale)
             >>> (2, 1, 2, 3)
         """
-        if Ut.is_int(x_scale) \
-                and Ut.is_list(combinations, not_null=True) \
-                and Ut.is_int(combination_key) \
-                and Ut.is_int(actual_scale) \
-                and Ut.is_int(last_scale):
+        if isinstance(x_scale, int) \
+                and isinstance(combinations, list) and combinations \
+                and isinstance(combination_key, int) \
+                and isinstance(actual_scale, int) \
+                and isinstance(last_scale, int):
 
             nb_combination = len(combinations)
             if combination_key < nb_combination:
@@ -319,11 +321,11 @@ class ModelScaleSelector:
             )
         """
         result, stats = None, None
-        if Ut.is_list(x_scales, not_null=True) \
-                and Ut.is_list(combination, not_null=True):
+        if isinstance(x_scales, list) and x_scales \
+                and isinstance(combination, list) and combination:
             result = [[], [], [], []]
             max_loop, loop_counter = 20, 0
-            nb_combination, combination_key = len(combination), 0
+            combination_key = 0
             last_scale, actual_scale = 0, 0
             for key, x_scale in enumerate(x_scales):
                 if x_scale > 0 and x_scale > actual_scale:
@@ -413,8 +415,8 @@ class ModelScaleSelector:
             >>> ]
         """
         result = None
-        if Ut.is_list(x_scales, not_null=True) \
-                and Ut.is_list(possibilities, not_null=True):
+        if isinstance(x_scales, list) and x_scales \
+                and isinstance(possibilities, list) and possibilities:
             result = [[], [], [], []]
             for key, combination in enumerate(possibilities):
                 scale_stats, total_stats = ModelScaleSelector.get_scale_stats(
@@ -456,13 +458,13 @@ class ModelScaleSelector:
             >>> )
         """
         result, stats, best_combination = None, None, None
-        if Ut.is_list(x_scales, not_null=True) \
-                and Ut.is_list(possibilities, not_null=True):
+        if isinstance(x_scales, list) and x_scales \
+                and isinstance(possibilities, list) and possibilities:
             all_stats = ModelScaleSelector.get_scale_combination_stats(
                 x_scales=x_scales,
                 possibilities=possibilities
             )
-            if Ut.is_list(all_stats, not_null=True):
+            if isinstance(all_stats, list) and all_stats:
                 np_stats = np.array(all_stats)
                 min_stat = int(np.argmin(np_stats[1] + np_stats[2] + np_stats[3]))
                 key_sel = np_stats[0][min_stat]
@@ -523,9 +525,9 @@ class ModelScaleSelector:
             >>>     {'x_scale': 3, 'max_dif': 6, 'nb_scale': 1, 'scale': 3, 'actual_scale': 3, 'dif_scale': 0}
             >>> ]
         """
-        if Ut.is_list(stats, not_null=True) \
-                and Ut.is_list(scale_analytics, not_null=True) \
-                and Ut.is_list(scale_analytics[0], not_null=True):
+        if isinstance(stats, list) and stats \
+                and isinstance(scale_analytics, list) and scale_analytics \
+                and isinstance(scale_analytics[0], list) and scale_analytics[0]:
             nb_combination = len(scale_analytics[0])
             nb_stats = len(stats)
             if nb_combination == nb_stats:
@@ -620,18 +622,19 @@ class ModelScaleSelector:
             >>>     'total_scale': 5
             >>> }
         """
-
-        if Ut.is_dict(upscale_stats, not_null=True) \
-                and Ut.is_int(upscale_stats.get('max_x_scale'), mini=1) \
-                and Ut.is_list(upscale_stats.get('stats'), not_null=True) \
-                and Ut.is_list(available_scales, not_null=True):
+        if isinstance(upscale_stats, dict) and upscale_stats \
+                and isinstance(upscale_stats.get('max_x_scale'), int) \
+                and upscale_stats.get('max_x_scale') >= 1 \
+                and isinstance(upscale_stats.get('stats'), list) \
+                and upscale_stats.get('stats') \
+                and isinstance(available_scales, list) and available_scales:
             max_x_scale = upscale_stats.get('max_x_scale')
             best_combination = ModelScaleSelector.get_best_scale_combinations(
                 max_x_scale=max_x_scale,
                 available_scales=available_scales
             )
 
-            if Ut.is_list(best_combination, not_null=True):
+            if isinstance(best_combination, list) and best_combination:
 
                 x_scales = [x.get('x_scale') for x in upscale_stats.get('stats')]
                 combination, stats_apply, best_combination = ModelScaleSelector.scale_combination_analytics(
@@ -680,7 +683,7 @@ class ModelScaleSelector:
         """
         result = None
         if ImageToolsHelper.is_image_size(size) \
-                and Ut.is_list(output_formats, not_null=True):
+                and isinstance(output_formats, list) and output_formats:
             h, w = size
             result = {
                 'max_x_scale': 0,
@@ -714,8 +717,8 @@ class ModelScaleSelector:
         """
         result = None
         h, w = size
-        if Ut.is_list(output_formats, not_null=True) \
-                and Ut.is_int(model_scale, not_null=True):
+        if isinstance(output_formats, list) and output_formats \
+                and isinstance(model_scale, int):
             result = {
                 'max_x_scale': 0,
                 'max_upscale': 0,

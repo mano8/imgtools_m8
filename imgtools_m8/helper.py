@@ -1,13 +1,12 @@
 """
 A helper class for image processing operations.
 """
+import math
 import os
 import pathlib
-import math
 from typing import Optional, Union
-from numpy import ndarray
-from ve_utils.utils import UType as Ut
-from imgtools_m8.exceptions import ImgToolsException
+
+from imgtools_m8.core.exceptions import ImgToolsException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -23,9 +22,10 @@ class ImageToolsHelper:
     """
 
     @staticmethod
-    def find_best_combination(total: int,
-                              numbers: list
-                              ) -> list:
+    def find_best_combination(
+        total: int,
+        numbers: list
+    ) -> list:
         """
         Find the best combination of numbers to achieve the given total.
 
@@ -49,13 +49,13 @@ class ImageToolsHelper:
             )
             [5, 5]
         """
-        if not Ut.is_int(total, mini=0):
+        if not (isinstance(total, int) and total >= 0):
             raise ImgToolsException(
                 "Error: Unable to find the best combination, "
                 "'total' must be a non-negative integer."
             )
 
-        if not Ut.is_list(numbers, not_null=True):
+        if not (isinstance(numbers, list) and numbers):
             raise ImgToolsException(
                 "Error: Unable to find the best combination, "
                 "'numbers' must be a non-empty list."
@@ -99,13 +99,13 @@ class ImageToolsHelper:
                 total=5, numbers=[1, 2, 3])
             >>> [[1, 1, 1, 1, 1], [1, 1, 1, 2], [1, 2, 2], [1, 1, 3], [2, 3]]
         """
-        if not Ut.is_int(total, mini=0):
+        if not (isinstance(total, int) and total >= 0):
             raise ImgToolsException(
                 "Error: Unable to find combinations, "
                 "'total' must be a non-negative integer."
             )
 
-        if not Ut.is_list(numbers, not_null=True):
+        if not (isinstance(numbers, list) and numbers):
             raise ImgToolsException(
                 "Error: Unable to find combinations, "
                 "'numbers' must be a non-empty list."
@@ -145,12 +145,15 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.is_image_size(invalid_size)
             False
         """
-        return Ut.is_tuple(size) \
-            and Ut.is_int(size[0], mini=1) \
-            and Ut.is_int(size[1], mini=1)
+        return (
+            isinstance(size, tuple)
+            and len(size) >= 2
+            and isinstance(size[0], int) and size[0] >= 1
+            and isinstance(size[1], int) and size[1] >= 1
+        )
 
     @staticmethod
-    def get_image_size(image: ndarray) -> Optional[tuple]:
+    def get_image_size(image: object) -> Optional[tuple]:
         """
         Get the dimensions (height and width) of an image
         represented as a NumPy array.
@@ -242,20 +245,20 @@ class ImageToolsHelper:
             ['image1.jpg', 'image2.png', ...]
         """
         result = None
-        if Ut.is_str(path, not_null=True) \
+        if isinstance(path, str) and path \
                 and os.path.isdir(path):
             result = [
                 f
                 for f in os.listdir(path)
                 if os.path.isfile(os.path.join(path, f))
                 and (ext is None
-                     or (Ut.is_list(ext, not_null=True)
+                     or (isinstance(ext, list) and ext
                          and ImageToolsHelper.get_extension(f) in ext)
-                     or (Ut.is_str(ext, not_null=True)
+                     or (isinstance(ext, str) and ext
                          and ImageToolsHelper.get_extension(f) == ext)
                      )
                 and (content_name is None
-                     or (Ut.is_str(content_name, not_null=True)
+                     or (isinstance(content_name, str) and content_name
                          and content_name in f)
                      )
             ]
@@ -316,7 +319,7 @@ class ImageToolsHelper:
                 True
         """
         result = False
-        if Ut.is_str(ext, not_null=True):
+        if isinstance(ext, str) and ext:
             ext = ext.lower()
             result = ext in ImageToolsHelper.get_valid_images_ext()
         return result
@@ -362,8 +365,8 @@ class ImageToolsHelper:
         """
         name = None
         ext = ImageToolsHelper.get_extension(file_name, ext_len)
-        if Ut.is_str(file_name, not_null=True) \
-                and Ut.is_str(ext):
+        if isinstance(file_name, str) and file_name \
+                and isinstance(ext, str):
             name = file_name.replace(ext, '')
         return name, ext
 
@@ -387,8 +390,8 @@ class ImageToolsHelper:
             '.jpg'
         """
         ext = None
-        if Ut.is_str(path, not_null=True):
-            ext_len = Ut.get_int(ext_len, default=1)
+        if isinstance(path, str) and path:
+            ext_len = ext_len if isinstance(ext_len, int) else 1
             if ext_len == 1:
                 ext = pathlib.Path(path).suffix
             elif ext_len == 2:
