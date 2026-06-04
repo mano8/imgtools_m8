@@ -1,6 +1,7 @@
 """
 imgtools_m8.core.constants module.
 """
+
 # accepted img formats
 from enum import Enum
 
@@ -20,6 +21,7 @@ TRANSPARENT_FORMATS = {".png", ".webp", ".gif", ".tiff"}
 
 class OutputFormatsEnum(str, Enum):
     """Enumeration of supported output formats."""
+
     JPEG = "JPEG"
     WEBP = "WEBP"
     PNG = "PNG"

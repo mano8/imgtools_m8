@@ -3,6 +3,7 @@ ImageExpander unittest class.
 
 Use pytest package.
 """
+
 import os.path as _path
 
 import pytest

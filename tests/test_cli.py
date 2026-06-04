@@ -3,6 +3,7 @@ CLI (imgtools_m8.__main__) unittest class.
 
 Use pytest package.
 """
+
 import json
 import logging
 import multiprocessing
@@ -161,37 +162,56 @@ class TestBuildConf:
 class TestMain:
     def test_valid_single_file(self, output_path):
         src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
-        code = main([
-            "--source", src,
-            "--output", output_path,
-            "--format", "webp:80",
-            "--width", "50",
-        ])
+        code = main(
+            [
+                "--source",
+                src,
+                "--output",
+                output_path,
+                "--format",
+                "webp:80",
+                "--width",
+                "50",
+            ]
+        )
         assert code == 0
 
     def test_invalid_source_returns_1(self, output_path):
-        code = main([
-            "--source", "/nonexistent/path.jpg",
-            "--output", output_path,
-        ])
+        code = main(
+            [
+                "--source",
+                "/nonexistent/path.jpg",
+                "--output",
+                output_path,
+            ]
+        )
         assert code == 1
 
     def test_format_png_no_quality(self, output_path):
         src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
-        code = main([
-            "--source", src,
-            "--output", output_path,
-            "--format", "png",
-        ])
+        code = main(
+            [
+                "--source",
+                src,
+                "--output",
+                output_path,
+                "--format",
+                "png",
+            ]
+        )
         assert code == 0
 
     def test_debug_flag(self, output_path):
         src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
-        code = main([
-            "--source", src,
-            "--output", output_path,
-            "--debug",
-        ])
+        code = main(
+            [
+                "--source",
+                src,
+                "--output",
+                output_path,
+                "--debug",
+            ]
+        )
         assert code == 0
 
     def test_config_file(self, output_path, tmp_path):
@@ -208,12 +228,18 @@ class TestMain:
 
     def test_workers_mode(self, output_path):
         src = join(HelperTest.get_source_path(), "good")
-        code = main([
-            "--source", src,
-            "--output", output_path,
-            "--format", "webp:80",
-            "--workers", "1",
-        ])
+        code = main(
+            [
+                "--source",
+                src,
+                "--output",
+                output_path,
+                "--format",
+                "webp:80",
+                "--workers",
+                "1",
+            ]
+        )
         assert code == 0
 
     def test_processing_exception_returns_1(self, output_path, monkeypatch):
@@ -246,8 +272,13 @@ class TestConfigureLogging:
         monkeypatch.setattr(imgtools_m8, "_COLORAMA_AVAILABLE", True)
         formatter = imgtools_m8._ColorFormatter("%(message)s")
         record = logging.LogRecord(
-            name="test", level=logging.INFO,
-            pathname="", lineno=0, msg="hello", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=(),
+            exc_info=None,
         )
         output = formatter.format(record)
         assert "hello" in output
@@ -257,8 +288,13 @@ class TestConfigureLogging:
         monkeypatch.setattr(imgtools_m8, "_COLORAMA_AVAILABLE", False)
         formatter = imgtools_m8._ColorFormatter("%(message)s")
         record = logging.LogRecord(
-            name="test", level=logging.INFO,
-            pathname="", lineno=0, msg="hello", args=(), exc_info=None,
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="hello",
+            args=(),
+            exc_info=None,
         )
         output = formatter.format(record)
         assert "hello" in output

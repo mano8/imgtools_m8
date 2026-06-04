@@ -3,6 +3,7 @@ ImgTools_m8 Exceptions.
 
 This module contains custom exceptions used in the ImgTools_m8 package.
 """
+
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
 __deprecated__ = False

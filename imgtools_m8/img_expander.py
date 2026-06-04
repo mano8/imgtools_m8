@@ -4,11 +4,13 @@ Image Expander class
 This module provides a tool for expanding images
 using Super-Resolution techniques.
 """
+
 import os
 from typing import Optional
 
 try:
     from cv2 import dnn_superres
+
     CV2_AVAILABLE = True
 except ImportError:
     CV2_AVAILABLE = False
@@ -36,16 +38,18 @@ class ImageExpander:
     This class provides methods for expanding images
     using Super-Resolution techniques.
     """
-    def __init__(self,
-                 model_conf: Optional[UpscaleModelDict] = None,
-                 ):
+
+    def __init__(
+        self,
+        model_conf: Optional[UpscaleModelDict] = None,
+    ):
         """
         Initialize the ImageExpander instance.
 
         :param model_conf: Configuration for the Super-Resolution model.
         :type model_conf: dict, optional
         """
-        self.model_conf = None
+        self.model_conf: Optional[ModelConf] = None
         self.sr = None
         self.set_model_conf(model_conf)
 
@@ -66,8 +70,7 @@ class ImageExpander:
             >>> expander.is_ready()
             True
         """
-        return self.has_model_conf() \
-            and self.sr is not None
+        return self.has_model_conf() and self.sr is not None
 
     def has_model_conf(self) -> bool:
         """
@@ -88,9 +91,7 @@ class ImageExpander:
         """
         return self.model_conf is not None and self.model_conf.is_ready()
 
-    def set_model_conf(self,
-                       model_conf: Optional[UpscaleModelDict] = None
-                       ) -> bool:
+    def set_model_conf(self, model_conf: Optional[UpscaleModelDict] = None) -> bool:
         """
         Set the model configuration for the ImageExpander.
 
@@ -112,34 +113,39 @@ class ImageExpander:
             >>> expander.set_model_conf(model_config)
             True
         """
-        model_path = ImageToolsHelper.get_package_models_path()
-        model_name = 'edsr'
-        scale = 2
-        scale_selector = ScaleSelector.AUTO_SCALE
+        model_path: Optional[str] = ImageToolsHelper.get_package_models_path()
+        model_name: str = "edsr"
+        scale: int = 2
+        scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE
         if isinstance(model_conf, dict) and model_conf:
+            raw_path = model_conf.get("path")
+            if isinstance(raw_path, str) and ModelConf.is_model_path(raw_path):
+                model_path = raw_path
 
-            if ModelConf.is_model_path(model_conf.get('path')):
-                model_path = model_conf.get('path')
+            raw_name = model_conf.get("model_name")
+            if isinstance(raw_name, str) and ModelConf.is_model_name(raw_name):
+                model_name = raw_name
 
-            if ModelConf.is_model_name(model_conf.get('model_name')):
-                model_name = model_conf.get('model_name')
-
-            if ModelConf.is_scale(
-                    model_path=model_path,
-                    model_name=model_name,
-                    scale=model_conf.get('scale')):
-                scale = model_conf.get('scale')
+            raw_scale = model_conf.get("scale")
+            if isinstance(raw_scale, int) and ModelConf.is_scale(
+                model_path=model_path,
+                model_name=model_name,
+                scale=raw_scale,
+            ):
+                scale = raw_scale
                 scale_selector = ScaleSelector.FIXED_SCALE
 
-            if ModelConf.is_scale_selector(
-                    model_conf.get('scale_selector')):
-                scale_selector = model_conf.get('scale_selector')
+            raw_selector = model_conf.get("scale_selector")
+            if isinstance(raw_selector, ScaleSelector) and ModelConf.is_scale_selector(
+                raw_selector
+            ):
+                scale_selector = raw_selector
 
         self.model_conf = ModelConf(
             model_path=model_path,
             model_name=model_name,
             scale=scale,
-            scale_selector=scale_selector
+            scale_selector=scale_selector,
         )
         test = self.model_conf.is_ready()
         return test
@@ -185,16 +191,14 @@ class ImageExpander:
         test = False
         if self.has_model_conf():
             mod_path = os.path.join(
-                self.model_conf.get_path(),
-                self.model_conf.get_file_name()
+                self.model_conf.get_path(), self.model_conf.get_file_name()
             )
             if os.path.isfile(mod_path):
                 self.sr.readModel(mod_path)
                 # Set the desired model and scale
                 # to get correct pre- and post-processing
                 self.sr.setModel(
-                    self.model_conf.get_model_name(),
-                    self.model_conf.get_scale()
+                    self.model_conf.get_model_name(), self.model_conf.get_scale()
                 )
                 test = True
         return test
@@ -219,15 +223,13 @@ class ImageExpander:
             >>> input_image = ...
             >>> upscaled_image = expander.upscale_image(input_image)
         """
-        if image is not None:
+        if image is not None and self.sr is not None:
             image = self.sr.upsample(image)
         return image
 
-    def many_image_upscale(self,
-                           image: object,
-                           nb_upscale: int,
-                           scale: Optional[int] = None
-                           ) -> Optional[object]:
+    def many_image_upscale(
+        self, image: object, nb_upscale: int, scale: Optional[int] = None
+    ) -> Optional[object]:
         """
         Upscale an image multiple times using the super-resolution model.
 
@@ -253,22 +255,21 @@ class ImageExpander:
             )
         """
         max_upscale = 10
-        if image is not None \
-                and isinstance(nb_upscale, int) \
-                and 1 <= nb_upscale <= max_upscale:
+        if (
+            image is not None
+            and isinstance(nb_upscale, int)
+            and 1 <= nb_upscale <= max_upscale
+            and self.model_conf is not None
+        ):
             is_scale = ModelConf.is_scale(
                 model_path=self.model_conf.model_path,
                 model_name=self.model_conf.model_name,
-                scale=scale
+                scale=scale,
             )
-            if isinstance(scale, int) \
-                    and not is_scale:
-                raise ImgToolsException(
-                    "Fatal Error: Invalid model scale selected."
-                )
+            if isinstance(scale, int) and not is_scale:
+                raise ImgToolsException("Fatal Error: Invalid model scale selected.")
 
-            if is_scale \
-                    and self.model_conf.scale != scale:
+            if is_scale and self.model_conf.scale != scale:
                 self.model_conf.set_scale(scale)
                 if not self.is_ready():
                     self.init_sr()

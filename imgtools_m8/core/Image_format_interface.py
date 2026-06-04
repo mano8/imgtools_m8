@@ -1,5 +1,3 @@
-
-
 class ImageFormatInterface:
     """
     Interface for image format handling in image processing tools.
@@ -21,5 +19,4 @@ class ImageFormatInterface:
         """
         Get the format of the current image.
         """
-        raise NotImplementedError(
-            "get_image_format method must be implemented.")
+        raise NotImplementedError("get_image_format method must be implemented.")

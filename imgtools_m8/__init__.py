@@ -1,4 +1,5 @@
 """ImgTools_m8 init logger entry."""
+
 import logging
 
 __author__ = "Eli Serra"
@@ -18,10 +19,10 @@ except ImportError:
     colorama = None  # type: ignore[assignment]
 
 _LEVEL_COLORS = {
-    logging.DEBUG: "\033[36m",     # cyan
-    logging.INFO: "\033[32m",      # green
-    logging.WARNING: "\033[33m",   # yellow
-    logging.ERROR: "\033[31m",     # red
+    logging.DEBUG: "\033[36m",  # cyan
+    logging.INFO: "\033[32m",  # green
+    logging.WARNING: "\033[33m",  # yellow
+    logging.ERROR: "\033[31m",  # red
     logging.CRITICAL: "\033[35m",  # magenta
 }
 _RESET = "\033[0m"

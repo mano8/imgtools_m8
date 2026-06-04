@@ -3,6 +3,7 @@ ImageProcessing unittest class.
 
 Use pytest package.
 """
+
 import os
 from os.path import join
 
@@ -61,9 +62,7 @@ class TestImageProcessingGuards:
         assert _obj().has_conf() is True
 
     def test_has_input_file(self):
-        obj = _obj(
-            source_path=join(HelperTest.get_source_path(), "cat1", "mar.jpg")
-        )
+        obj = _obj(source_path=join(HelperTest.get_source_path(), "cat1", "mar.jpg"))
         assert obj.has_input_file() is True
 
     def test_has_input_dir(self):
@@ -100,9 +99,7 @@ class TestOutputStem:
         assert stem == "photo_800x600"
 
     def test_subpath(self):
-        stem = ImageProcessing._get_output_stem(
-            "/some/dir/image.png", (100, 200)
-        )
+        stem = ImageProcessing._get_output_stem("/some/dir/image.png", (100, 200))
         assert stem == "image_100x200"
 
 
@@ -114,9 +111,7 @@ class TestGetOutputSubdir:
         assert result == output_path
 
     def test_no_subdirs(self, output_path):
-        result = ImageProcessing._get_output_subdir(
-            output_path, None, flatten=False
-        )
+        result = ImageProcessing._get_output_subdir(output_path, None, flatten=False)
         assert result == output_path
 
     def test_with_subdirs(self, output_path):
@@ -181,9 +176,7 @@ class TestResizeToFit:
 
 class TestProcessFile:
     def test_valid_jpeg(self):
-        obj = _obj(
-            source_path=join(HelperTest.get_source_path(), "cat1", "mar.jpg")
-        )
+        obj = _obj(source_path=join(HelperTest.get_source_path(), "cat1", "mar.jpg"))
         assert (
             obj.process_file(
                 source_path=obj.conf.source_path,
@@ -205,9 +198,7 @@ class TestProcessFile:
     def test_multiple_formats(self, output_path):
         obj = ImageProcessing(
             conf={
-                "source_path": join(
-                    HelperTest.get_source_path(), "cat1", "mar.jpg"
-                ),
+                "source_path": join(HelperTest.get_source_path(), "cat1", "mar.jpg"),
                 "output_path": output_path,
                 "output_options": [
                     {
@@ -223,9 +214,7 @@ class TestProcessFile:
         )
         assert (
             obj.process_file(
-                source_path=join(
-                    HelperTest.get_source_path(), "cat1", "mar.jpg"
-                ),
+                source_path=join(HelperTest.get_source_path(), "cat1", "mar.jpg"),
                 info={"name": "mar.jpg"},
             )
             is True
@@ -239,9 +228,7 @@ class TestRun:
             conf={
                 "source_path": src,
                 "output_path": output_path,
-                "output_options": [
-                    {"formats": [{"ext": "WEBP", "quality": 80}]}
-                ],
+                "output_options": [{"formats": [{"ext": "WEBP", "quality": 80}]}],
             }
         )
         assert obj.run() is True
@@ -251,9 +238,7 @@ class TestRun:
             conf={
                 "source_path": join(HelperTest.get_source_path(), "good"),
                 "output_path": output_path,
-                "output_options": [
-                    {"formats": [{"ext": "JPEG", "quality": 80}]}
-                ],
+                "output_options": [{"formats": [{"ext": "JPEG", "quality": 80}]}],
             }
         )
         assert obj.run() is True
@@ -263,9 +248,7 @@ class TestRun:
             conf={
                 "source_path": "/nonexistent/path",
                 "output_path": output_path,
-                "output_options": [
-                    {"formats": [{"ext": "WEBP", "quality": 80}]}
-                ],
+                "output_options": [{"formats": [{"ext": "WEBP", "quality": 80}]}],
             }
         )
         assert obj.run() is False
@@ -276,9 +259,7 @@ class TestRun:
                 "source_path": HelperTest.get_source_path(),
                 "output_path": output_path,
                 "include_subdirs": True,
-                "output_options": [
-                    {"formats": [{"ext": "WEBP", "quality": 80}]}
-                ],
+                "output_options": [{"formats": [{"ext": "WEBP", "quality": 80}]}],
             }
         )
         assert obj.run() is True

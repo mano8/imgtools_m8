@@ -1,4 +1,5 @@
 """Shared pytest fixtures for imgtools_m8 tests."""
+
 import os
 
 import pytest

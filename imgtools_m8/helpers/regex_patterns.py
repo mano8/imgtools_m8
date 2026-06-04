@@ -1,4 +1,5 @@
 """hw_proxy pydentic shemas module"""
+
 import re
 
 # pylint: disable=line-too-long
@@ -13,6 +14,7 @@ class ValidationConstants:
     host/domain names, URLs, paths, project names,
     slugs, passwords, secret keys, and MySQL names.
     """
+
     #: Matches a host/domain (e.g., "localhost",
     # an IPv4 address with an optional port,
     # or a standard domain)
@@ -43,11 +45,15 @@ class ValidationConstants:
     # including at least one lowercase letter,
     #: one uppercase letter, one digit,
     # and one special character, and excludes spaces.
-    PASSWORD_REGEX: re.Pattern = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_])(?!.*\s).{8,}$")
+    PASSWORD_REGEX: re.Pattern = re.compile(
+        r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_])(?!.*\s).{8,}$"
+    )
     #: Validates that a secret key is at least 32 characters
     # long and includes mixed-case letters,
     #: digits, and special characters.
-    SECRET_KEY_REGEX: re.Pattern = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[-_])[A-Za-z\d\-_]{32,}$")
+    SECRET_KEY_REGEX: re.Pattern = re.compile(
+        r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[-_])[A-Za-z\d\-_]{32,}$"
+    )
     #: Matches MySQL names (database and user names),
     # which may only contain letters, digits, and underscores.
     MYSQL_NAME_REGEX: re.Pattern = re.compile(r"^[A-Za-z0-9_]+$")
@@ -72,4 +78,4 @@ class ValidationConstants:
         Returns:
             Cleaned text without control or zero-width chars.
         """
-        return cls.CONTROL_CHAR_PATTERN.sub('', text)
+        return cls.CONTROL_CHAR_PATTERN.sub("", text)

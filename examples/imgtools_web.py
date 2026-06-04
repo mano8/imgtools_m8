@@ -8,6 +8,7 @@ Usage:
     python examples/imgtools_web.py --source ./images --output ./out
     python examples/imgtools_web.py  # uses examples/source and examples/output
 """
+
 import argparse
 import sys
 from os import path

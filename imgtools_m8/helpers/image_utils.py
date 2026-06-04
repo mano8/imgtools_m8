@@ -83,9 +83,7 @@ class ImageUtils:
             return None
 
     @staticmethod
-    def get_image_format_type(
-        image_size: Tuple[int, int]
-    ) -> Optional[str]:
+    def get_image_format_type(image_size: Tuple[int, int]) -> Optional[str]:
         """
         Determine the image format type based on its dimensions.
 
@@ -115,8 +113,8 @@ class ImageUtils:
         filepath: str,
         image_size: bool = True,
         image_format: bool = True,
-        is_valid: bool = True
-    ) -> Optional[Tuple[int, int]]:
+        is_valid: bool = True,
+    ) -> Optional[dict]:
         """
         Retrieve various metadata about an image file.
         Args:
@@ -131,36 +129,33 @@ class ImageUtils:
             Optional[dict]: Dictionary with image metadata if requested,
                 or None if no metadata requested or file is invalid.
         """
-        result = None
+        result: Optional[dict] = None
         try:
-            if image_size is True\
-                    or is_valid is True:
+            if image_size is True or is_valid is True:
                 result = {}
                 with Image.open(filepath) as img:
                     if image_size is True:
-                        result['image_size'] = img.size
+                        result["image_size"] = img.size
                     if image_format is True:
-                        result['image_format'] = img.format
+                        result["image_format"] = img.format
                     if is_valid is True:
-                        result['is_valid'] = img.verify() is None
+                        img.verify()
+                        result["is_valid"] = True
         except (IOError, UnidentifiedImageError):
-            if image_size is True\
-                    or is_valid is True:
+            if image_size is True or is_valid is True:
                 result = {}
                 if image_size is True:
-                    result['image_size'] = None
+                    result["image_size"] = None
                 if image_format is True:
-                    result['image_format'] = None
+                    result["image_format"] = None
                 if is_valid is True:
-                    result['is_valid'] = False
+                    result["is_valid"] = False
             else:
                 result = None
         return result
 
     @staticmethod
-    def is_valid_dimension(
-        dim: Union[int, float]
-    ) -> bool:
+    def is_valid_dimension(dim: Union[int, float]) -> bool:
         """
         Check if the provided size is a valid tuple of two positive numbers.
 
@@ -173,9 +168,7 @@ class ImageUtils:
         return isinstance(dim, (int, float)) and dim > 0
 
     @staticmethod
-    def is_valid_size(
-        size: Tuple[float, float]
-    ) -> bool:
+    def is_valid_size(size: Tuple[float, float]) -> bool:
         """
         Check if the provided size is a valid tuple of two positive numbers.
 
@@ -185,8 +178,11 @@ class ImageUtils:
         Returns:
             bool: True if size is valid, False otherwise.
         """
-        return isinstance(size, tuple) and len(size) == 2\
+        return (
+            isinstance(size, tuple)
+            and len(size) == 2
             and all(ImageUtils.is_valid_dimension(dim) for dim in size)
+        )
 
     @staticmethod
     def get_new_scale(
@@ -246,13 +242,12 @@ class ImageUtils:
 
         logger.error("No fixed dimensions provided for scaling.")
         raise ValueError(
-            "At least one of fixed_width or fixed_height must be provided.")
+            "At least one of fixed_width or fixed_height must be provided."
+        )
 
     @staticmethod
     def get_center_crop_box(
-        size: Tuple[float, float],
-        target_width: float,
-        target_height: float
+        size: Tuple[float, float], target_width: float, target_height: float
     ) -> Tuple[int, int, int, int]:
         """
         Calculate crop box (left, upper, right, lower) to crop image centered
@@ -275,9 +270,7 @@ class ImageUtils:
 
         if not ImageUtils.is_valid_size((target_width, target_height)):
             logger.error(
-                "Invalid crop target size: %s x %s",
-                target_width,
-                target_height
+                "Invalid crop target size: %s x %s", target_width, target_height
             )
             raise ValueError("Invalid crop target size provided.")
 
@@ -287,7 +280,10 @@ class ImageUtils:
             logger.error(
                 "Crop target size exceeds original image size: "
                 "original (%s x %s), target (%s x %s)",
-                orig_width, orig_height, target_width, target_height
+                orig_width,
+                orig_height,
+                target_width,
+                target_height,
             )
             raise ValueError("Crop target size exceeds original image size.")
 
@@ -321,13 +317,13 @@ class ImageUtils:
             bool: True if resize and save succeeded, False otherwise.
         """
         try:
-            with Image.open(filepath) as img:
+            with Image.open(filepath) as src:
                 if maintain_aspect_ratio:
-                    img.thumbnail((max_width, max_height))
+                    src.thumbnail((max_width, max_height))
+                    src.save(output_path)
                 else:
-                    img = img.resize((max_width, max_height))
-
-                img.save(output_path)
+                    resized = src.resize((max_width, max_height))
+                    resized.save(output_path)
             return True
         except (IOError, UnidentifiedImageError):
             return False
@@ -339,7 +335,7 @@ class ImageUtils:
     ) -> Optional[dict]:
         """Get format-specific kwargs for PIL Image.save (excludes 'ext')."""
         if isinstance(output_format, str) and format_args is not None:
-            return format_args.model_dump(exclude={'ext'})
+            return format_args.model_dump(exclude={"ext"})
         return None
 
     @staticmethod
@@ -368,20 +364,20 @@ class ImageUtils:
         if fmt not in {"JPEG", "PNG", "WEBP", "GIF"}:
             return False
         try:
-            with Image.open(filepath) as img:
-                save_kwargs = ImageUtils.get_format_kwargs(
-                    output_format=output_format,
-                    format_args=format_args
+            with Image.open(filepath) as src:
+                save_kwargs = (
+                    ImageUtils.get_format_kwargs(
+                        output_format=output_format, format_args=format_args
+                    )
+                    or {}
                 )
                 if fmt in {"JPEG", "JPG"}:
-                    img = img.convert("RGB")
-                elif fmt in {"PNG", "WEBP"} and img.mode not in {"RGBA", "LA"}:
-                    img = img.convert("RGBA")
-                img.save(
-                    output_path,
-                    format=output_format.upper(),
-                    **save_kwargs
-                )
+                    out = src.convert("RGB")
+                elif fmt in {"PNG", "WEBP"} and src.mode not in {"RGBA", "LA"}:
+                    out = src.convert("RGBA")
+                else:
+                    out = src
+                out.save(output_path, format=output_format.upper(), **save_kwargs)
             return True
         except (IOError, UnidentifiedImageError, ValueError):
             return False

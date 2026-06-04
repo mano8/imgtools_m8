@@ -7,6 +7,7 @@ Usage:
     imgtools --source ./images --output ./out --workers 4
     imgtools --source ./images --output ./out --config ./conf.json
 """
+
 import argparse
 import json
 import logging
@@ -100,42 +101,81 @@ def _make_parser() -> argparse.ArgumentParser:
     p.add_argument("--output", "-o", required=True, help="Output directory")
 
     resize = p.add_argument_group("resize")
-    resize.add_argument("--width", "-W", type=int, metavar="N",
-                        help="Fixed output width (keeps aspect ratio)")
-    resize.add_argument("--height", "-H", type=int, metavar="N",
-                        help="Fixed output height (keeps aspect ratio)")
-    resize.add_argument("--size", type=int, metavar="N",
-                        help="Constrain longest side to N pixels")
-    resize.add_argument("--downscale", type=int, metavar="N",
-                        help="Divide dimensions by N (2-10)")
-    resize.add_argument("--upscale", type=int, metavar="N",
-                        help="Multiply dimensions by N (2-10); DNN when [dnn] installed")
-    resize.add_argument("--allow-upscale", dest="allow_upscale", action="store_true",
-                        help="Allow upscaling with width/height/size constraints")
+    resize.add_argument(
+        "--width",
+        "-W",
+        type=int,
+        metavar="N",
+        help="Fixed output width (keeps aspect ratio)",
+    )
+    resize.add_argument(
+        "--height",
+        "-H",
+        type=int,
+        metavar="N",
+        help="Fixed output height (keeps aspect ratio)",
+    )
+    resize.add_argument(
+        "--size", type=int, metavar="N", help="Constrain longest side to N pixels"
+    )
+    resize.add_argument(
+        "--downscale", type=int, metavar="N", help="Divide dimensions by N (2-10)"
+    )
+    resize.add_argument(
+        "--upscale",
+        type=int,
+        metavar="N",
+        help="Multiply dimensions by N (2-10); DNN when [dnn] installed",
+    )
+    resize.add_argument(
+        "--allow-upscale",
+        dest="allow_upscale",
+        action="store_true",
+        help="Allow upscaling with width/height/size constraints",
+    )
 
     out = p.add_argument_group("output")
-    out.add_argument("--format", "-f", action="append", metavar="EXT[:QUALITY]",
-                     help="Output format, repeatable (default: webp:80)")
-    out.add_argument("--max-bytes", dest="max_bytes", type=int, metavar="N",
-                     help="Hard byte ceiling per output file")
+    out.add_argument(
+        "--format",
+        "-f",
+        action="append",
+        metavar="EXT[:QUALITY]",
+        help="Output format, repeatable (default: webp:80)",
+    )
+    out.add_argument(
+        "--max-bytes",
+        dest="max_bytes",
+        type=int,
+        metavar="N",
+        help="Hard byte ceiling per output file",
+    )
 
     scan = p.add_argument_group("source scanning")
-    scan.add_argument("--subdirs", action="store_true",
-                      help="Scan subdirectories recursively")
-    scan.add_argument("--flatten", action="store_true",
-                      help="Write all outputs flat (no subdir mirroring)")
+    scan.add_argument(
+        "--subdirs", action="store_true", help="Scan subdirectories recursively"
+    )
+    scan.add_argument(
+        "--flatten",
+        action="store_true",
+        help="Write all outputs flat (no subdir mirroring)",
+    )
 
     run = p.add_argument_group("processing")
     cpu_max = max(1, multiprocessing.cpu_count() - 1)
     run.add_argument(
-        "--workers", type=int, metavar="N",
+        "--workers",
+        type=int,
+        metavar="N",
         help=(
             f"Use multiprocessing with N workers (max {cpu_max} on this machine). "
             "Omit for single-process mode."
         ),
     )
-    run.add_argument("--config", metavar="PATH",
-                     help="Load full conf dict from a JSON file (overrides other flags)")
+    run.add_argument(
+        "--config",
+        metavar="PATH",
+        help="Load full conf dict from a JSON file (overrides other flags)",
+    )
     run.add_argument("--debug", action="store_true", help="Enable debug logging")
     return p
 

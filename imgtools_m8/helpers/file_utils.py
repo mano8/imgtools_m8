@@ -10,6 +10,7 @@ Author: Eli Serra
 Copyright: Copyright 2020, Eli Serra
 Date: 2025-06-22
 """
+
 from os.path import getsize, isfile, splitext
 from typing import List, Optional
 
@@ -18,6 +19,7 @@ from imgtools_m8.core.constants import VALID_IMAGE_EXTENSIONS
 
 class FileUtils:
     """File and image file utility static methods."""
+
     @staticmethod
     def get_valid_image_extensions() -> List[str]:
         """
@@ -44,8 +46,7 @@ class FileUtils:
 
     @staticmethod
     def is_valid_image_file(
-        filepath: str,
-        valid_extensions: Optional[List[str]] = None
+        filepath: str, valid_extensions: Optional[List[str]] = None
     ) -> bool:
         """
         Check if file has a valid image extension.
@@ -63,10 +64,7 @@ class FileUtils:
         return FileUtils.get_file_extension(filepath) in valid_extensions
 
     @staticmethod
-    def convert_size(
-        size_bytes: int,
-        decimal_places: int = 2
-    ) -> str:
+    def convert_size(size_bytes: int, decimal_places: int = 2) -> str:
         """
         Convert size in bytes to a human-readable string.
 
@@ -91,10 +89,7 @@ class FileUtils:
         return f"{size:.{decimal_places}f} {units[index]}"
 
     @staticmethod
-    def get_file_size_str(
-        filepath: str,
-        decimal_places: int = 2
-    ) -> str:
+    def get_file_size_str(filepath: str, decimal_places: int = 2) -> str:
         """
         Get human-readable file size for a given file path.
 
@@ -115,9 +110,7 @@ class FileUtils:
             return "Unable to determine file size"
 
     @staticmethod
-    def read_file_as_bytes(
-        filepath: str
-    ) -> Optional[bytes]:
+    def read_file_as_bytes(filepath: str) -> Optional[bytes]:
         """
         Read the contents of a file as bytes.
 
@@ -134,10 +127,7 @@ class FileUtils:
             return None
 
     @staticmethod
-    def write_bytes_to_file(
-        filepath: str,
-        data: bytes
-    ) -> bool:
+    def write_bytes_to_file(filepath: str, data: bytes) -> bool:
         """
         Write bytes data to a file.
 

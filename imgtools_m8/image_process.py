@@ -1,9 +1,10 @@
 """imagetools_m8 main module."""
+
 import io
 import logging
 import os
 from os.path import basename, isdir, isfile, join, splitext
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from PIL import Image, UnidentifiedImageError
 from pydantic import TypeAdapter
@@ -17,6 +18,9 @@ from imgtools_m8.schemas.conf_schema import (
     OutputSize,
 )
 
+if TYPE_CHECKING:
+    from imgtools_m8.img_expander import ImageExpander
+
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
 __deprecated__ = False
@@ -28,12 +32,11 @@ try:
     import cv2
     import numpy as np
 
-    from imgtools_m8.img_expander import CV2_AVAILABLE, ImageExpander
+    from imgtools_m8.img_expander import CV2_AVAILABLE
 
     DNN_AVAILABLE = CV2_AVAILABLE
 except ImportError:
     DNN_AVAILABLE = False
-    ImageExpander = None  # type: ignore[assignment]
     cv2 = None  # type: ignore[assignment]
     np = None  # type: ignore[assignment]
 
@@ -66,7 +69,7 @@ class ImageProcessing:
             model_conf (Optional[dict]): DNN upscaling model configuration.
         """
         self.conf = TypeAdapter(ImageProcessingSchema).validate_python(conf)
-        self.expander = None
+        self.expander: Optional["ImageExpander"] = None
         if model_conf is not None:
             self._set_expander(model_conf)
 
@@ -88,17 +91,15 @@ class ImageProcessing:
 
     def has_expander(self) -> bool:
         """Check if DNN expander is loaded and ready."""
-        return (
-            DNN_AVAILABLE
-            and self.expander is not None
-            and self.expander.is_ready()
-        )
+        return DNN_AVAILABLE and self.expander is not None and self.expander.is_ready()
 
     def _set_expander(self, model_conf: dict) -> bool:
         """Initialize and load the DNN upscaling model."""
         if not (DNN_AVAILABLE and isinstance(model_conf, dict) and model_conf):
             return False
-        self.expander = ImageExpander(model_conf=model_conf)
+        from imgtools_m8.img_expander import ImageExpander as _IE
+
+        self.expander = _IE(model_conf=model_conf)  # type: ignore[arg-type]
         if not self.expander.has_model_conf():
             return False
         self.expander.init_sr()
@@ -176,10 +177,7 @@ class ImageProcessing:
             new_w = max(1, round(w * ratio))
             new_h = max(1, round(h * ratio))
 
-        elif (
-            image_size.fixed_width is not None
-            and image_size.fixed_height is not None
-        ):
+        elif image_size.fixed_width is not None and image_size.fixed_height is not None:
             new_w, new_h = ImageProcessing._fit_within_box(
                 w, h, image_size.fixed_width, image_size.fixed_height, allow_upscale
             )
@@ -284,26 +282,20 @@ class ImageProcessing:
             )
             return True
         except (IOError, OSError, ValueError) as exc:
-            logger.warning(
-                "[ImageProcessing] Failed to write %s: %s", out_path, exc
-            )
+            logger.warning("[ImageProcessing] Failed to write %s: %s", out_path, exc)
             return False
 
     def _dnn_upscale(self, img: Image.Image, factor: int) -> Image.Image:
         """Upscale image using DNN model, falling back to PIL bicubic."""
-        if not self.has_expander():
+        if not self.has_expander() or self.expander is None:
             w, h = img.size
-            return img.resize(
-                (w * factor, h * factor), Image.Resampling.BICUBIC
-            )
+            return img.resize((w * factor, h * factor), Image.Resampling.BICUBIC)
         src = img.convert("RGB")
-        cv_img = cv2.cvtColor(np.array(src), cv2.COLOR_RGB2BGR)
+        cv_img = cv2.cvtColor(np.array(src), cv2.COLOR_RGB2BGR)  # type: ignore[union-attr,call-overload]
         upscaled = self.expander.many_image_upscale(image=cv_img, nb_upscale=1)
-        result = Image.fromarray(cv2.cvtColor(upscaled, cv2.COLOR_BGR2RGB))
+        result = Image.fromarray(cv2.cvtColor(upscaled, cv2.COLOR_BGR2RGB))  # type: ignore[call-overload,union-attr]
         if img.mode == "RGBA":
-            alpha = img.split()[3].resize(
-                result.size, Image.Resampling.LANCZOS
-            )
+            alpha = img.split()[3].resize(result.size, Image.Resampling.LANCZOS)
             result.putalpha(alpha)
         return result
 
@@ -318,14 +310,14 @@ class ImageProcessing:
             return False
 
         result = False
-        for option in self.conf.output_options:
+        output_options = self.conf.output_options
+        if not isinstance(output_options, list):
+            return False
+        for option in output_options:
             working = image
 
-            if self.has_image_sizes(option):
-                if (
-                    option.image_size.fixed_upscale is not None
-                    and self.has_expander()
-                ):
+            if isinstance(option.image_size, OutputSize):
+                if option.image_size.fixed_upscale is not None and self.has_expander():
                     working = self._dnn_upscale(
                         working, option.image_size.fixed_upscale
                     )
@@ -375,9 +367,7 @@ class ImageProcessing:
                     output_dir=output_dir,
                 )
         except (IOError, OSError, UnidentifiedImageError) as exc:
-            logger.warning(
-                "[ImageProcessing] Cannot open %s: %s", source_path, exc
-            )
+            logger.warning("[ImageProcessing] Cannot open %s: %s", source_path, exc)
             return False
 
     def process_directory(self) -> bool:
@@ -395,13 +385,20 @@ class ImageProcessing:
 
         result = False
         for _fmt, group in ordered.items():
-            root_dir = group.get("root_dir", self.conf.source_path)
-            for file_data in group.get("files", []):
+            raw_root = group.get("root_dir")
+            root_dir: str = (
+                raw_root if isinstance(raw_root, str) else self.conf.source_path
+            )
+            raw_files = group.get("files")
+            files_iter = raw_files if isinstance(raw_files, list) else []
+            for file_data in files_iter:
+                if not isinstance(file_data, dict):
+                    continue
                 name = file_data.get("name", "")
                 sub_dirs = file_data.get("sub_dirs")
                 full_path = (
                     join(root_dir, *sub_dirs, name)
-                    if sub_dirs
+                    if isinstance(sub_dirs, list) and sub_dirs
                     else join(root_dir, name)
                 )
                 if self.process_file(source_path=full_path, info=file_data):
@@ -414,12 +411,10 @@ class ImageProcessing:
             return False
         os.makedirs(self.conf.output_path, exist_ok=True)
         if self.has_input_file():
-            info = ScanDir.get_file_item_info(self.conf.source_path) or {}
+            info: dict = ScanDir.get_file_item_info(self.conf.source_path) or {}
             info["name"] = basename(self.conf.source_path)
             info.setdefault("sub_dirs", None)
-            return self.process_file(
-                source_path=self.conf.source_path, info=info
-            )
+            return self.process_file(source_path=self.conf.source_path, info=info)
         if self.has_input_dir():
             return self.process_directory()
         logger.error(
@@ -440,7 +435,7 @@ class ImageProcessing:
         output_option: Optional[OutputOptions] = None,
     ) -> bool:
         """Check if output_option has a valid image_size constraint."""
-        return ImageProcessing.has_output_option(output_option) and isinstance(
+        return isinstance(output_option, OutputOptions) and isinstance(
             output_option.image_size, OutputSize
         )
 
@@ -450,7 +445,7 @@ class ImageProcessing:
     ) -> bool:
         """Check if output_option has a positive max_byte_size."""
         return (
-            ImageProcessing.has_output_option(output_option)
+            isinstance(output_option, OutputOptions)
             and output_option.max_byte_size is not None
             and output_option.max_byte_size > 0
         )
@@ -460,7 +455,7 @@ class ImageProcessing:
         output_option: Optional[OutputOptions] = None,
     ) -> bool:
         """Check if output_option has a formats list."""
-        return ImageProcessing.has_output_option(output_option) and isinstance(
+        return isinstance(output_option, OutputOptions) and isinstance(
             output_option.formats, list
         )
 

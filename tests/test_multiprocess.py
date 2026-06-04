@@ -3,6 +3,7 @@ MultiProcessImage unittest class.
 
 Use pytest package.
 """
+
 import os
 
 from imgtools_m8.multiprocess import MultiProcessImage
@@ -39,9 +40,7 @@ class TestMultiProcessImage:
 
     def test_run_multiple_valid_source(self):
         """Processing a directory of valid images returns True."""
-        obj = _make_obj(
-            source_path=os.path.join(HelperTest.get_source_path(), "good")
-        )
+        obj = _make_obj(source_path=os.path.join(HelperTest.get_source_path(), "good"))
         assert obj.run_multiple() is True
 
     def test_run_multiple_no_images(self):
@@ -51,9 +50,7 @@ class TestMultiProcessImage:
 
     def test_collect_file_tasks_valid_source(self):
         """Tasks are collected for valid image directories."""
-        obj = _make_obj(
-            source_path=os.path.join(HelperTest.get_source_path(), "good")
-        )
+        obj = _make_obj(source_path=os.path.join(HelperTest.get_source_path(), "good"))
         tasks = obj._collect_file_tasks()
         assert isinstance(tasks, list)
         assert len(tasks) >= 1

@@ -1,4 +1,5 @@
 """Model Configuration class"""
+
 import logging
 from enum import Enum
 from os import path as Path
@@ -24,6 +25,7 @@ class ScaleSelector(Enum):
         AUTO_SCALE (int): Represents automatic scale selection.
         FIXED_SCALE (int): Represents fixed scale selection.
     """
+
     AUTO_SCALE = 0
     FIXED_SCALE = 1
 
@@ -38,12 +40,14 @@ class ModelConf:
         scale (int): The scale of the model.
         scale_selector (ScaleSelector): The scale selection strategy.
     """
-    def __init__(self,
-                 model_path: Optional[str] = None,
-                 model_name: Optional[str] = None,
-                 scale: Optional[int] = None,
-                 scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE
-                 ):
+
+    def __init__(
+        self,
+        model_path: Optional[str] = None,
+        model_name: Optional[str] = None,
+        scale: Optional[int] = None,
+        scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE,
+    ):
         """
         Initialize the ModelConf instance.
 
@@ -56,10 +60,10 @@ class ModelConf:
         :param scale_selector: The scale selection strategy.
         :type scale_selector: ScaleSelector, optional
         """
-        self.model_name = None
-        self.model_path = None
-        self.scale = None
-        self.scale_selector = ScaleSelector.AUTO_SCALE
+        self.model_name: Optional[str] = None
+        self.model_path: Optional[str] = None
+        self.scale: Optional[int] = None
+        self.scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE
         self.set_model_path(model_path)
         self.set_model_name(model_name)
         self.set_scale(scale)
@@ -81,9 +85,7 @@ class ModelConf:
             >>> conf.is_ready()
             True
         """
-        return self.has_model_path() \
-            and self.has_model_name() \
-            and self.has_scale()
+        return self.has_model_path() and self.has_model_name() and self.has_scale()
 
     def has_model_path(self) -> bool:
         """
@@ -99,7 +101,7 @@ class ModelConf:
         """
         return ModelConf.is_model_path(self.model_path)
 
-    def set_model_path(self, value: str) -> bool:
+    def set_model_path(self, value: Optional[str]) -> bool:
         """
         Set the model path.
 
@@ -121,12 +123,12 @@ class ModelConf:
             result = True
         return result
 
-    def get_path(self) -> str:
+    def get_path(self) -> Optional[str]:
         """
         Get the model path.
 
         :return: The model path.
-        :rtype: str
+        :rtype: Optional[str]
 
         Example:
             >>> conf = ModelConf(model_path='path/to/model')
@@ -149,7 +151,7 @@ class ModelConf:
         """
         return ModelConf.is_model_name(self.model_name)
 
-    def set_model_name(self, value: str) -> bool:
+    def set_model_name(self, value: Optional[str]) -> bool:
         """
         Set the model name.
 
@@ -171,12 +173,12 @@ class ModelConf:
             result = True
         return result
 
-    def get_model_name(self) -> str:
+    def get_model_name(self) -> Optional[str]:
         """
         Get the model name.
 
         :return: The model name.
-        :rtype: str
+        :rtype: Optional[str]
 
         Example:
             >>> conf = ModelConf(model_name='model_name')
@@ -198,16 +200,10 @@ class ModelConf:
             True
         """
         return ModelConf.is_scale(
-            model_path=self.model_path,
-            model_name=self.model_name,
-            scale=self.scale
+            model_path=self.model_path, model_name=self.model_name, scale=self.scale
         )
 
-    def set_scale(
-        self,
-        value: Optional[int],
-        set_default: bool = True
-    ) -> bool:
+    def set_scale(self, value: Optional[int], set_default: bool = True) -> bool:
         """
         Set the model scale.
 
@@ -228,28 +224,28 @@ class ModelConf:
         result = False
         self.scale = None
         scale_list = ModelConf.get_model_scales_available(
-            path=self.model_path,
-            model_name=self.model_name
+            path=self.model_path, model_name=self.model_name
         )
-        if ModelConf.is_scale_in_list(
-                scale_list=scale_list,
-                scale=value):
+        if ModelConf.is_scale_in_list(scale_list=scale_list, scale=value):
             self.scale = value
             result = True
-        elif not (isinstance(value, int) and value >= 1) \
-                and set_default is True \
-                and isinstance(scale_list, list) and scale_list:
+        elif (
+            not (isinstance(value, int) and value >= 1)
+            and set_default is True
+            and isinstance(scale_list, list)
+            and scale_list
+        ):
             self.scale = scale_list[0]
             result = True
 
         return result
 
-    def get_scale(self) -> int:
+    def get_scale(self) -> Optional[int]:
         """
         Get the model scale.
 
         :return: The model scale.
-        :rtype: int
+        :rtype: Optional[int]
 
         Example:
             >>> conf = ModelConf(scale=2)
@@ -292,7 +288,7 @@ class ModelConf:
             True
         """
         result = False
-        self.scale_selector = 0
+        self.scale_selector = ScaleSelector.AUTO_SCALE
         if ModelConf.is_scale_selector(value):
             self.scale_selector = value
             result = True
@@ -312,7 +308,7 @@ class ModelConf:
         """
         return self.scale_selector
 
-    def get_available_scales(self) -> list:
+    def get_available_scales(self) -> Optional[list[int]]:
         """
         Get a list of available scales for the model.
 
@@ -328,16 +324,15 @@ class ModelConf:
             [2, 3, 4]
         """
         return ModelConf.get_model_scales_available(
-            path=self.model_path,
-            model_name=self.model_name
+            path=self.model_path, model_name=self.model_name
         )
 
-    def get_file_name(self) -> str:
+    def get_file_name(self) -> Optional[str]:
         """
         Get the model file name based on configuration.
 
         :return: The model file name.
-        :rtype: str
+        :rtype: Optional[str]
 
         Example:
             >>> conf = ModelConf(
@@ -349,9 +344,7 @@ class ModelConf:
             'edsr_x2'
         """
         return ModelConf.get_model_file_name(
-            path=self.model_path,
-            model_name=self.model_name,
-            scale=self.scale
+            path=self.model_path, model_name=self.model_name, scale=self.scale
         )
 
     @staticmethod
@@ -366,17 +359,15 @@ class ModelConf:
             >>> ModelConf.get_valid_model_names()
             ['edsr', 'espcn', 'fsrcnn', 'lapsrn']
         """
-        return [
-            'edsr', 'espcn', 'fsrcnn', 'lapsrn'
-        ]
+        return ["edsr", "espcn", "fsrcnn", "lapsrn"]
 
     @staticmethod
-    def is_model_name(value: str) -> bool:
+    def is_model_name(value: Optional[str]) -> bool:
         """
         Check if a given value is a valid model name.
 
         :param value: The value to be checked.
-        :type value: str
+        :type value: Optional[str]
 
         :return: True if the value is a valid model name, False otherwise.
         :rtype: bool
@@ -387,16 +378,15 @@ class ModelConf:
             >>> ModelConf.is_model_name('invalid_model')
             False
         """
-        return isinstance(value, str) \
-            and value in ModelConf.get_valid_model_names()
+        return isinstance(value, str) and value in ModelConf.get_valid_model_names()
 
     @staticmethod
-    def is_model_path(value: str) -> bool:
+    def is_model_path(value: Optional[str]) -> bool:
         """
         Check if a given value is a valid model path.
 
         :param value: The value to be checked.
-        :type value: str
+        :type value: Optional[str]
 
         :return: True if the value is a valid model path, False otherwise.
         :rtype: bool
@@ -407,25 +397,24 @@ class ModelConf:
             >>> ModelConf.is_model_path('/invalid/path')
             False
         """
-        return isinstance(value, str) and value \
-            and Path.isdir(value)
+        return isinstance(value, str) and bool(value) and Path.isdir(value)
 
     @staticmethod
-    def get_models_list(path: str) -> list[str]:
+    def get_models_list(path: Optional[str]) -> Optional[list[str]]:
         """
         Get a list of model files from the specified path.
 
         :param path: The path to the directory containing model files.
-        :type path: str
+        :type path: Optional[str]
 
         :return: A list of model file names.
-        :rtype: list
+        :rtype: Optional[list[str]]
 
         Example:
             >>> ModelConf.get_models_list('/path/to/models')
             ['model1.pb', 'model2.pb']
         """
-        result = ImageToolsHelper.get_files_list(path, ext='.pb')
+        result = ImageToolsHelper.get_files_list(path or "", ext=".pb")
         if isinstance(result, list) and result:
             result.sort()
         return result
@@ -457,16 +446,15 @@ class ModelConf:
 
     @staticmethod
     def get_model_scales_available(
-        path: str,
-        model_name: str
+        path: Optional[str], model_name: Optional[str]
     ) -> Optional[list[int]]:
         """
         Get a list of available model scales for a given model name and path.
 
         :param path: The path to the directory containing model files.
-        :type path: str
+        :type path: Optional[str]
         :param model_name: The model name.
-        :type model_name: str
+        :type model_name: Optional[str]
 
         :return:
             A list of available model scales,
@@ -477,10 +465,15 @@ class ModelConf:
             >>> ModelConf.get_model_scales_available('/path/to/models', 'edsr')
             [1, 2, 3]
         """
-        result, models = None, ModelConf.get_models_list(path)
+        result: Optional[list[int]] = None
+        models = ModelConf.get_models_list(path)
         is_valid_model_name = ModelConf.is_model_name(model_name)
-        if isinstance(models, list) and models \
-                and is_valid_model_name:
+        if (
+            isinstance(models, list)
+            and models
+            and is_valid_model_name
+            and isinstance(model_name, str)
+        ):
             result = []
             for file_name in models:
                 if model_name in file_name.lower():
@@ -493,19 +486,18 @@ class ModelConf:
         return result
 
     @staticmethod
-    def get_model_file_name(path: str,
-                            model_name: str,
-                            scale: int
-                            ) -> Optional[str]:
+    def get_model_file_name(
+        path: Optional[str], model_name: Optional[str], scale: Optional[int]
+    ) -> Optional[str]:
         """
         Get the model file name for a specific model name and scale.
 
         :param path: The path to the directory containing model files.
-        :type path: str
+        :type path: Optional[str]
         :param model_name: The model name.
-        :type model_name: str
+        :type model_name: Optional[str]
         :param scale: The desired model scale.
-        :type scale: int
+        :type scale: Optional[int]
 
         :return:
             The model file name matching the model name and scale,
@@ -516,24 +508,25 @@ class ModelConf:
             >>> ModelConf.get_model_file_name('/path/to/models', 'edsr', 2)
             'edsr_x2.pb'
         """
-        result, models = None, ModelConf.get_models_list(path)
+        result: Optional[str] = None
+        models = ModelConf.get_models_list(path)
         is_valid_model_name = ModelConf.is_model_name(model_name)
-        if isinstance(models, list) and models \
-                and is_valid_model_name:
+        if (
+            isinstance(models, list)
+            and models
+            and is_valid_model_name
+            and isinstance(model_name, str)
+        ):
             for file_name in models:
                 if model_name in file_name.lower():
                     model_scale = ModelConf.get_model_scale(file_name)
                     if scale == model_scale:
                         result = file_name
                         break
-        else:
-            result = None
         return result
 
     @staticmethod
-    def is_model_file_name(model_path: Optional[str],
-                           file_name: Optional[str]
-                           ) -> bool:
+    def is_model_file_name(model_path: Optional[str], file_name: Optional[str]) -> bool:
         """
         Check if a given file name is a valid model file name.
 
@@ -551,25 +544,24 @@ class ModelConf:
             >>> ModelConf.is_model_file_name('/path/to/models', 'edsr_x2.pb')
             True
         """
-        return isinstance(file_name, str) and file_name \
-            and ImageToolsHelper.get_extension(
-                path=file_name) == '.pb' \
-            and isinstance(model_path, str) and model_path \
-            and Path.isfile(
-                Path.join(model_path, file_name)
-            )
+        return (
+            isinstance(file_name, str)
+            and bool(file_name)
+            and ImageToolsHelper.get_extension(path=file_name) == ".pb"
+            and isinstance(model_path, str)
+            and bool(model_path)
+            and Path.isfile(Path.join(model_path, file_name))
+        )
 
     @staticmethod
-    def is_scale_in_list(scale_list: list,
-                         scale: int
-                         ) -> bool:
+    def is_scale_in_list(scale_list: Optional[list[int]], scale: Optional[int]) -> bool:
         """
         Check if a given scale is present in the provided scale list.
 
         :param scale_list: A list of available scales.
-        :type scale_list: list
+        :type scale_list: Optional[list[int]]
         :param scale: The scale to check.
-        :type scale: int
+        :type scale: Optional[int]
 
         :return: True if the scale is in the list, False otherwise.
         :rtype: bool
@@ -578,24 +570,29 @@ class ModelConf:
             >>> ModelConf.is_scale_in_list([2, 3, 4], 3)
             True
         """
-        return isinstance(scale_list, list) and scale_list \
-            and isinstance(scale, int) and scale >= 2 \
+        return (
+            isinstance(scale_list, list)
+            and bool(scale_list)
+            and isinstance(scale, int)
+            and scale >= 2
             and scale in scale_list
+        )
 
     @staticmethod
-    def is_scale(model_path: str,
-                 model_name: str,
-                 scale: int,
-                 ) -> bool:
+    def is_scale(
+        model_path: Optional[str],
+        model_name: Optional[str],
+        scale: Optional[int],
+    ) -> bool:
         """
         Check if a given scale is valid for the specified model path and name.
 
         :param model_path: The path to the directory containing model files.
-        :type model_path: str
+        :type model_path: Optional[str]
         :param model_name: The model name.
-        :type model_name: str
+        :type model_name: Optional[str]
         :param scale: The scale to check.
-        :type scale: int
+        :type scale: Optional[int]
 
         :return:
             True if the scale is valid for the model path and name,
@@ -606,16 +603,10 @@ class ModelConf:
             >>> ModelConf.is_scale('/path/to/models', 'edsr', 2)
             True
         """
-        result = False
         scale_list = ModelConf.get_model_scales_available(
-            path=model_path,
-            model_name=model_name
+            path=model_path, model_name=model_name
         )
-        if ModelConf.is_scale_in_list(
-                scale_list=scale_list,
-                scale=scale):
-            result = True
-        return result
+        return ModelConf.is_scale_in_list(scale_list=scale_list, scale=scale)
 
     @staticmethod
     def is_scale_selector(value: ScaleSelector) -> bool:

@@ -7,6 +7,7 @@ They follow PEP8/flake8 (max line length 79) and Google style docstrings.
 
 import pytest
 from pydantic import ValidationError
+
 from imgtools_m8.schemas import conf_schema
 
 # pylint: disable=redefined-outer-name, no-member
@@ -56,9 +57,7 @@ class TestJpegFormat:
     )
     def test_quality_valid(self, quality, expected):
         """Test valid JPEG quality values."""
-        fmt = conf_schema.JpegFormat(
-            quality=quality
-        )
+        fmt = conf_schema.JpegFormat(quality=quality)
         assert fmt.quality == expected
 
     @pytest.mark.parametrize("quality", [0, 101, -5])
@@ -67,9 +66,7 @@ class TestJpegFormat:
         with pytest.raises(ValidationError):
             conf_schema.JpegFormat(quality=quality)
 
-    @pytest.mark.parametrize(
-        "subsampling", [0, 1, 2, "4:4:4", "4:2:2", "4:2:0"]
-    )
+    @pytest.mark.parametrize("subsampling", [0, 1, 2, "4:4:4", "4:2:2", "4:2:0"])
     def test_subsampling_valid(self, subsampling):
         """Test valid subsampling values."""
         fmt = conf_schema.JpegFormat(subsampling=subsampling)
@@ -174,9 +171,7 @@ class TestAvifFormat:
     )
     def test_quality_valid(self, quality, expected):
         """Test valid AVIF quality values."""
-        fmt = conf_schema.AvifFormat(
-            quality=quality
-        )
+        fmt = conf_schema.AvifFormat(quality=quality)
         assert fmt.quality == expected
 
     @pytest.mark.parametrize("quality", [0, 101, -1])
@@ -248,8 +243,7 @@ class TestOutputOptions:
         size = conf_schema.OutputSize(fixed_width=100)
         fmt = conf_schema.JpegFormat(quality=80)
         out = conf_schema.OutputOptions(
-            image_size=size, allow_upscale=True,
-            max_byte_size=5000, formats=[fmt]
+            image_size=size, allow_upscale=True, max_byte_size=5000, formats=[fmt]
         )
         assert out.image_size.fixed_width == 100
         assert out.allow_upscale is True
@@ -344,9 +338,7 @@ class TestImageProcessingSchema:
         out = conf_schema.OutputOptions(image_size=size)
 
         cfg = conf_schema.ImageProcessingSchema(
-            source_path="input.jpg",
-            output_path="out/",
-            output_options=[out]
+            source_path="input.jpg", output_path="out/", output_options=[out]
         )
         assert cfg.source_path == "input.jpg"
         assert cfg.output_path == "out/"
@@ -362,9 +354,7 @@ class TestImageProcessingSchema:
         out = conf_schema.GlobalOutputOptions(formats=[avif_format])
 
         cfg = conf_schema.ImageProcessingSchema(
-            source_path="input.jpg",
-            output_path="out/",
-            global_options=out
+            source_path="input.jpg", output_path="out/", global_options=out
         )
         assert cfg.source_path == "input.jpg"
         assert cfg.output_path == "out/"

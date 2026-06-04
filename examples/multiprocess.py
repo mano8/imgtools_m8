@@ -8,6 +8,7 @@ Usage:
     python examples/multiprocess.py --source ./images --output ./out
     python examples/multiprocess.py --source ./images --output ./out --workers 4
 """
+
 import argparse
 import sys
 
@@ -24,13 +25,15 @@ __version__ = "2.0.0"
 
 def parse_args(args):
     """Parse source / output / workers / debug arguments."""
-    p = argparse.ArgumentParser(
-        description="imgtools_m8 multiprocess pipeline example"
-    )
+    p = argparse.ArgumentParser(description="imgtools_m8 multiprocess pipeline example")
     p.add_argument("--source", required=True, help="Source file or directory")
     p.add_argument("--output", required=True, help="Output directory")
-    p.add_argument("--workers", type=int, default=None,
-                   help="Number of worker processes (default: auto)")
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of worker processes (default: auto)",
+    )
     p.add_argument("--debug", action="store_true", help="Show debug output")
     return p.parse_args(args)
 
@@ -48,21 +51,36 @@ if __name__ == "__main__":
                 {
                     "image_size": {"fixed_width": 2500},
                     "formats": [
-                        {"ext": "JPEG", "quality": 95, "progressive": True, "optimize": True},
+                        {
+                            "ext": "JPEG",
+                            "quality": 95,
+                            "progressive": True,
+                            "optimize": True,
+                        },
                         {"ext": "WEBP", "quality": 80},
                     ],
                 },
                 {
                     "image_size": {"fixed_width": 1920},
                     "formats": [
-                        {"ext": "JPEG", "quality": 95, "progressive": True, "optimize": True},
+                        {
+                            "ext": "JPEG",
+                            "quality": 95,
+                            "progressive": True,
+                            "optimize": True,
+                        },
                         {"ext": "WEBP", "quality": 80},
                     ],
                 },
                 {
                     "image_size": {"fixed_width": 1280},
                     "formats": [
-                        {"ext": "JPEG", "quality": 95, "progressive": True, "optimize": True},
+                        {
+                            "ext": "JPEG",
+                            "quality": 95,
+                            "progressive": True,
+                            "optimize": True,
+                        },
                         {"ext": "WEBP", "quality": 80},
                     ],
                 },

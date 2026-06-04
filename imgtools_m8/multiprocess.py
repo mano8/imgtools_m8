@@ -1,6 +1,7 @@
 """
 ImgTools_m8 multiprocessing class with system resource monitoring.
 """
+
 import logging
 import multiprocessing
 import os
@@ -43,9 +44,7 @@ _worker_processor: Optional[ImageProcessing] = None
 def _init_worker(conf_dict: dict, model_conf_dict: Optional[dict]) -> None:
     """Initialize per-worker ImageProcessing instance; suppress SIGINT."""
     global _worker_processor
-    _worker_processor = ImageProcessing(
-        conf=conf_dict, model_conf=model_conf_dict
-    )
+    _worker_processor = ImageProcessing(conf=conf_dict, model_conf=model_conf_dict)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
@@ -54,9 +53,7 @@ def _process_one_file(source_path: str, file_data: dict) -> bool:
     if _worker_processor is None:
         return False
     try:
-        return _worker_processor.process_file(
-            source_path=source_path, info=file_data
-        )
+        return _worker_processor.process_file(source_path=source_path, info=file_data)
     except Exception as exc:
         logging.getLogger("imgTools_m8").exception(
             "Worker error on %s: %s", source_path, exc
@@ -120,9 +117,7 @@ class MultiProcessImage:
                 )
             self.num_processes = min(max(1, num_processes), safe_max)
         else:
-            self.num_processes = max(
-                1, int(cpu_total * (user_cpu_percent / 100.0))
-            )
+            self.num_processes = max(1, int(cpu_total * (user_cpu_percent / 100.0)))
 
         signal.signal(signal.SIGINT, self._handle_signal)
         try:
@@ -165,15 +160,22 @@ class MultiProcessImage:
             return []
         tasks: List[Tuple[str, dict]] = []
         for _fmt, group in ordered.items():
-            root_dir = group.get(
-                "root_dir", self._processor.conf.source_path
+            raw_root = group.get("root_dir")
+            root_dir: str = (
+                raw_root
+                if isinstance(raw_root, str)
+                else self._processor.conf.source_path
             )
-            for file_data in group.get("files", []):
+            raw_files = group.get("files")
+            files_iter = raw_files if isinstance(raw_files, list) else []
+            for file_data in files_iter:
+                if not isinstance(file_data, dict):
+                    continue
                 name = file_data.get("name", "")
                 sub_dirs = file_data.get("sub_dirs")
                 full_path = (
                     join(root_dir, *sub_dirs, name)
-                    if sub_dirs
+                    if isinstance(sub_dirs, list) and sub_dirs
                     else join(root_dir, name)
                 )
                 tasks.append((full_path, file_data))

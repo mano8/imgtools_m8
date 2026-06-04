@@ -1,10 +1,11 @@
 """
 A helper class for image processing operations.
 """
+
 import math
 import os
 import pathlib
-from typing import Optional, Union
+from typing import Optional, Protocol, Tuple, Union
 
 from imgtools_m8.core.exceptions import ImgToolsException
 
@@ -16,16 +17,19 @@ __status__ = "Production"
 __version__ = "1.0.0"
 
 
+class _HasShape(Protocol):
+    """Protocol for objects exposing a .shape attribute (e.g. numpy arrays)."""
+
+    shape: Tuple[int, ...]
+
+
 class ImageToolsHelper:
     """
-        A helper class for image processing operations.
+    A helper class for image processing operations.
     """
 
     @staticmethod
-    def find_best_combination(
-        total: int,
-        numbers: list
-    ) -> list:
+    def find_best_combination(total: int, numbers: list[int]) -> Optional[list[int]]:
         """
         Find the best combination of numbers to achieve the given total.
 
@@ -60,24 +64,27 @@ class ImageToolsHelper:
                 "Error: Unable to find the best combination, "
                 "'numbers' must be a non-empty list."
             )
-        dp = [None] * (total + 1)
+        dp: list[list[int] | None] = [None] * (total + 1)
         dp[0] = []
 
         for current_total in range(1, total + 1):
             for num in numbers:
-                if current_total - num >= 0\
-                        and dp[current_total - num] is not None:
-                    is_range = dp[current_total] is None\
-                        or len(
-                            dp[current_total - num]
-                        ) + 1 < len(dp[current_total])
-                    if is_range:
-                        dp[current_total] = dp[current_total - num] + [num]
+                prev_idx = current_total - num
+                if prev_idx < 0 or dp[prev_idx] is None:
+                    continue
+                prev = dp[prev_idx]
+                if prev is None:
+                    continue
+                curr = dp[current_total]
+                if curr is None or len(prev) + 1 < len(curr):
+                    dp[current_total] = prev + [num]
 
         return dp[total]
 
     @staticmethod
-    def find_all_combinations(total: int, numbers: list) -> list:
+    def find_all_combinations(
+        total: int, numbers: list[int]
+    ) -> Optional[list[list[int]]]:
         """
         Find all combinations of numbers that add up to the given total.
 
@@ -110,18 +117,20 @@ class ImageToolsHelper:
                 "Error: Unable to find combinations, "
                 "'numbers' must be a non-empty list."
             )
-        dp = [None] * (total + 1)
+        dp: list[list[list[int]] | None] = [None] * (total + 1)
         dp[0] = [[]]
 
         for current_total in range(1, total + 1):
-            all_combinations = []
+            all_combinations: list[list[int]] = []
             for num in numbers:
-                if current_total - num >= 0\
-                        and dp[current_total - num] is not None:
-                    for combination in dp[current_total - num]:
-                        new_combination = combination + [num]
-                        all_combinations.append(new_combination)
-
+                prev_idx = current_total - num
+                if prev_idx < 0 or dp[prev_idx] is None:
+                    continue
+                prev = dp[prev_idx]
+                if prev is None:
+                    continue
+                for combination in prev:
+                    all_combinations.append(combination + [num])
             dp[current_total] = all_combinations
 
         return dp[total]
@@ -148,18 +157,20 @@ class ImageToolsHelper:
         return (
             isinstance(size, tuple)
             and len(size) >= 2
-            and isinstance(size[0], int) and size[0] >= 1
-            and isinstance(size[1], int) and size[1] >= 1
+            and isinstance(size[0], int)
+            and size[0] >= 1
+            and isinstance(size[1], int)
+            and size[1] >= 1
         )
 
     @staticmethod
-    def get_image_size(image: object) -> Optional[tuple]:
+    def get_image_size(image: Optional[_HasShape]) -> Optional[tuple]:
         """
         Get the dimensions (height and width) of an image
         represented as a NumPy array.
 
         :param image: The image as a NumPy array.
-        :type image: numpy.ndarray
+        :type image: numpy.ndarray or None
 
         :return:
             The image dimensions as a tuple (height, width),
@@ -174,10 +185,9 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.get_image_size(None)
         None
         """
-        size = None
         if image is not None:
-            size = image.shape[:2]
-        return size
+            return image.shape[:2]
+        return None
 
     @staticmethod
     def get_package_models_path() -> Optional[str]:
@@ -193,10 +203,10 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.get_package_models_path()
         '/path/to/package/models'
         """
-        return os.path.join(os.path.dirname(__file__), 'models')
+        return os.path.join(os.path.dirname(__file__), "models")
 
     @staticmethod
-    def get_images_list(path: str) -> list:
+    def get_images_list(path: str) -> Optional[list]:
         """
         Get a list of image files from the specified path.
 
@@ -211,15 +221,15 @@ class ImageToolsHelper:
             ['/path/to/images/image1.jpg', '/path/to/images/image2.png', ...]
         """
         return ImageToolsHelper.get_files_list(
-            path,
-            ext=ImageToolsHelper.get_valid_images_ext()
+            path, ext=ImageToolsHelper.get_valid_images_ext()
         )
 
     @staticmethod
-    def get_files_list(path: str,
-                       ext: Optional[Union[str, list]] = None,
-                       content_name: Optional[str] = None
-                       ) -> Optional[list]:
+    def get_files_list(
+        path: str,
+        ext: Optional[Union[str, list]] = None,
+        content_name: Optional[str] = None,
+    ) -> Optional[list]:
         """
         Get a list of files from the specified path,
         with optional filtering by extensions and content name.
@@ -245,22 +255,32 @@ class ImageToolsHelper:
             ['image1.jpg', 'image2.png', ...]
         """
         result = None
-        if isinstance(path, str) and path \
-                and os.path.isdir(path):
+        if isinstance(path, str) and path and os.path.isdir(path):
             result = [
                 f
                 for f in os.listdir(path)
                 if os.path.isfile(os.path.join(path, f))
-                and (ext is None
-                     or (isinstance(ext, list) and ext
-                         and ImageToolsHelper.get_extension(f) in ext)
-                     or (isinstance(ext, str) and ext
-                         and ImageToolsHelper.get_extension(f) == ext)
-                     )
-                and (content_name is None
-                     or (isinstance(content_name, str) and content_name
-                         and content_name in f)
-                     )
+                and (
+                    ext is None
+                    or (
+                        isinstance(ext, list)
+                        and ext
+                        and ImageToolsHelper.get_extension(f) in ext
+                    )
+                    or (
+                        isinstance(ext, str)
+                        and ext
+                        and ImageToolsHelper.get_extension(f) == ext
+                    )
+                )
+                and (
+                    content_name is None
+                    or (
+                        isinstance(content_name, str)
+                        and content_name
+                        and content_name in f
+                    )
+                )
             ]
         return result
 
@@ -277,14 +297,28 @@ class ImageToolsHelper:
             ['.bmp', '.dib', '.jpg', '.jpeg', '.jpe', '.jp2', '.png', ...]
         """
         return [
-            '.bmp', '.dib',
-            '.jpg', '.jpeg', '.jpe',
-            '.jp2', '.png', '.webp',
-            '.avif', '.pbm', '.pgm',
-            '.ppm', '.pxm', '.pnm',
-            '.pfm', '.sr', '.ras',
-            '.tiff', '.tif', '.exr',
-            '.hdr', '.pic'
+            ".bmp",
+            ".dib",
+            ".jpg",
+            ".jpeg",
+            ".jpe",
+            ".jp2",
+            ".png",
+            ".webp",
+            ".avif",
+            ".pbm",
+            ".pgm",
+            ".ppm",
+            ".pxm",
+            ".pnm",
+            ".pfm",
+            ".sr",
+            ".ras",
+            ".tiff",
+            ".tif",
+            ".exr",
+            ".hdr",
+            ".pic",
         ]
 
     @staticmethod
@@ -299,9 +333,7 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.get_valid_jpg_ext()
             ['.jpg', '.jpeg', '.jpe', '.jp2']
         """
-        return [
-            '.jpg', '.jpeg', '.jpe', '.jp2'
-        ]
+        return [".jpg", ".jpeg", ".jpe", ".jp2"]
 
     @staticmethod
     def is_valid_image_ext(ext: str) -> bool:
@@ -365,9 +397,8 @@ class ImageToolsHelper:
         """
         name = None
         ext = ImageToolsHelper.get_extension(file_name, ext_len)
-        if isinstance(file_name, str) and file_name \
-                and isinstance(ext, str):
-            name = file_name.replace(ext, '')
+        if isinstance(file_name, str) and file_name and isinstance(ext, str):
+            name = file_name.replace(ext, "")
         return name, ext
 
     @staticmethod
@@ -389,21 +420,18 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.get_extension("image.jpg")
             '.jpg'
         """
-        ext = None
-        if isinstance(path, str) and path:
-            ext_len = ext_len if isinstance(ext_len, int) else 1
-            if ext_len == 1:
-                ext = pathlib.Path(path).suffix
-            elif ext_len == 2:
-                ext_list = pathlib.Path(path).suffixes[-2:]
-                ext = "".join(ext_list)
-            elif ext_len == 3:
-                ext_list = pathlib.Path(path).suffixes[-3:]
-                ext = "".join(ext_list)
-            else:
-                ext = "".join(pathlib.Path(path).suffixes)
-            ext = ext.lower()
-        return ext
+        if not (isinstance(path, str) and path):
+            return ""
+        ext_len = ext_len if isinstance(ext_len, int) else 1
+        if ext_len == 1:
+            ext = pathlib.Path(path).suffix
+        elif ext_len == 2:
+            ext = "".join(pathlib.Path(path).suffixes[-2:])
+        elif ext_len == 3:
+            ext = "".join(pathlib.Path(path).suffixes[-3:])
+        else:
+            ext = "".join(pathlib.Path(path).suffixes)
+        return ext.lower()
 
     @staticmethod
     def convert_size(size_bytes):
@@ -447,7 +475,5 @@ class ImageToolsHelper:
         """
         result = ""
         if os.path.isfile(source_path):
-            result = ImageToolsHelper.convert_size(
-                os.path.getsize(source_path)
-            )
+            result = ImageToolsHelper.convert_size(os.path.getsize(source_path))
         return result
