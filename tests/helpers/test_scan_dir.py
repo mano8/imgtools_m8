@@ -113,15 +113,27 @@ class TestScanDir:
 
     @staticmethod
     def test_get_dir_files_by_format_type():
-        """Test get_dir_files_by_format_type method"""
+        """Test get_dir_files_by_format_type method.
+
+        Fixtures resolve deterministically to 4 portrait (``mar.jpg``)
+        and 3 landscape images. Nulling one portrait image's size must
+        exclude it from the grouping, leaving 3 portrait + 3 landscape.
+        """
         files = ScanDir.get_files_list_from_tree(
             source_path=HelperTest.get_source_path()
         )
-        files["files"][0].update({"image_size": None})
+        # Null a specific portrait image by name so the assertion does not
+        # depend on filesystem walk order (scan_tree is now deterministic).
+        target = next(
+            item
+            for item in files["files"]
+            if item["name"] == "mar.jpg" and item["sub_dirs"] is None
+        )
+        target.update({"image_size": None})
         result = ScanDir.get_dir_files_by_format_type(item_tree=files)
         assert isinstance(result, dict)
         assert isinstance(result.get("portrait"), dict)
-        assert len(result.get("portrait").get("files")) == 4
+        assert len(result.get("portrait").get("files")) == 3
         assert isinstance(result.get("landscape"), dict)
         assert len(result.get("landscape").get("files")) == 3
 

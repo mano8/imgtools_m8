@@ -83,7 +83,9 @@ class ImageUtils:
             return None
 
     @staticmethod
-    def get_image_format_type(image_size: Tuple[int, int]) -> Optional[str]:
+    def get_image_format_type(
+        image_size: Optional[Tuple[int, int]],
+    ) -> Optional[str]:
         """
         Determine the image format type based on its dimensions.
 
@@ -95,7 +97,7 @@ class ImageUtils:
                 or None if size is invalid.
         """
         result = None
-        if ImageUtils.is_valid_size(image_size) is False:
+        if image_size is None or ImageUtils.is_valid_size(image_size) is False:
             return None
 
         width, height = image_size
@@ -168,7 +170,7 @@ class ImageUtils:
         return isinstance(dim, (int, float)) and dim > 0
 
     @staticmethod
-    def is_valid_size(size: Tuple[float, float]) -> bool:
+    def is_valid_size(size: Optional[Tuple[float, float]]) -> bool:
         """
         Check if the provided size is a valid tuple of two positive numbers.
 

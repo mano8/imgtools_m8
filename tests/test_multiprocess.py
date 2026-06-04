@@ -42,8 +42,32 @@ def _make_obj(source_path: str) -> MultiProcessImage:
 class TestMultiProcessImage:
     """MultiProcessImage unittest class."""
 
-    def test_run_multiple_valid_source(self):
-        """Processing a directory of valid images returns True."""
+    def test_run_multiple_valid_source(self, monkeypatch):
+        """run_multiple returns True when pool processes all tasks successfully.
+
+        Monkeypatches multiprocessing.Pool so no subprocesses are spawned —
+        real Pool startup forks OpenCV-imported threads and deadlocks in
+        container CI environments.
+        """
+        import multiprocessing as mp_mod
+
+        class _AllOkPool:
+            def __init__(self, *a, **kw):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                pass
+
+            def terminate(self):
+                pass
+
+            def starmap(self, func, tasks):
+                return [True] * len(tasks)
+
+        monkeypatch.setattr(mp_mod, "Pool", _AllOkPool)
         obj = _make_obj(source_path=os.path.join(HelperTest.get_source_path(), "good"))
         assert obj.run_multiple() is True
 

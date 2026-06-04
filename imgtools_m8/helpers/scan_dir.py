@@ -7,7 +7,7 @@ Class-based utility module for images source directory scanning.
 import logging
 from os import listdir, walk
 from os.path import isdir, isfile, join, sep
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 
 from imgtools_m8.helpers.file_utils import FileUtils
 from imgtools_m8.helpers.image_utils import ImageUtils
@@ -149,7 +149,10 @@ class ScanDir:
                 - number of subdirectories
         """
         if isinstance(source_path, str) and source_path and isdir(source_path):
-            for root, _, files in walk(source_path):
+            for root, walk_dirs, files in walk(source_path):
+                # Sort in place so directory descent and file order are
+                # deterministic across filesystems (os.walk order is OS-defined).
+                walk_dirs.sort()
                 dirs, nb_sub_dirs = ScanDir.get_path_directory_list(
                     source_path=source_path, root=root
                 )
@@ -160,7 +163,7 @@ class ScanDir:
                         max_depth,
                     )
                     continue
-                for file in files:
+                for file in sorted(files):
                     yield root, file, dirs, nb_sub_dirs
 
     @staticmethod
@@ -269,7 +272,10 @@ class ScanDir:
             file_copy = file.copy()
 
             if format_size in result:
-                result[format_size]["files"].append(file_copy)
+                files_bucket = cast(
+                    List[FileListing], result[format_size]["files"]
+                )
+                files_bucket.append(file_copy)
             else:
                 result[format_size] = {
                     "root_dir": item_tree.get("root_dir"),
@@ -302,7 +308,8 @@ class ScanDir:
             file_copy = file.copy()
 
             if ext in result:
-                result[ext]["files"].append(file_copy)
+                files_bucket = cast(List[FileListing], result[ext]["files"])
+                files_bucket.append(file_copy)
             else:
                 result[ext] = {
                     "root_dir": item_tree.get("root_dir"),

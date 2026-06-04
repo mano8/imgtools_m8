@@ -6,6 +6,7 @@ import logging
 import multiprocessing
 import os
 import signal
+import threading
 import time
 from os.path import join
 from typing import List, Optional, Tuple
@@ -104,7 +105,6 @@ class MultiProcessImage:
         self.sleep_on_throttle = sleep_on_throttle
         self.use_progress = use_progress and TQDM_AVAILABLE
         self.batch_size = batch_size
-        self.interrupted = multiprocessing.Event()
 
         cpu_total = multiprocessing.cpu_count()
         safe_max = max(1, cpu_total - 1)  # always leave one core for the OS
@@ -117,7 +117,16 @@ class MultiProcessImage:
                 )
             self.num_processes = min(max(1, num_processes), safe_max)
         else:
-            self.num_processes = max(1, int(cpu_total * (user_cpu_percent / 100.0)))
+            self.num_processes = min(
+                max(1, int(cpu_total * (user_cpu_percent / 100.0))),
+                safe_max,
+            )
+
+        # threading.Event (not multiprocessing.Event) because interrupted is
+        # only accessed in the parent process; using the mp variant triggers
+        # fork() in multi-threaded contexts (pytest-cov, OpenCV) causing
+        # deadlocks.
+        self.interrupted = threading.Event()
 
         signal.signal(signal.SIGINT, self._handle_signal)
         try:
@@ -190,6 +199,8 @@ class MultiProcessImage:
         """
         if not self._processor.has_conf():  # pragma: no cover
             return False  # pragma: no cover
+        if self.interrupted.is_set():
+            return False
         os.makedirs(self._processor.conf.output_path, exist_ok=True)
         tasks = self._collect_file_tasks()
         if not tasks:
