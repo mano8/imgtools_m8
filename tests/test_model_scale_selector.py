@@ -6,7 +6,7 @@ Use pytest package.
 import pytest
 from imgtools_m8.helper import ImageToolsHelper
 from imgtools_m8.model_scale_selector import ModelScaleSelector
-from imgtools_m8.exceptions import ImgToolsException
+from imgtools_m8.core.exceptions import ImgToolsException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"

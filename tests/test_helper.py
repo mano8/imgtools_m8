@@ -9,7 +9,7 @@ import pytest
 from .helper import HelperTest
 from ve_utils.utils import UType as Ut
 from imgtools_m8.helper import ImageToolsHelper
-from imgtools_m8.exceptions import ImgToolsException
+from imgtools_m8.core.exceptions import ImgToolsException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -105,7 +105,7 @@ class TestImageToolsHelper:
         """Test get_files_list method"""
         sources = HelperTest.get_source_path()
         files = ImageToolsHelper.get_files_list(sources)
-        assert len(files) == 6
+        assert len(files) == 7
         files = ImageToolsHelper.get_files_list(sources, ext='.jpg')
         assert len(files) == 4
         files = ImageToolsHelper.get_files_list(sources, ext=['.jpg', '.txt'])

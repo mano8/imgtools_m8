@@ -4,7 +4,7 @@ ModelConf unittest class.
 Use pytest package.
 """
 from ve_utils.utils import UType as Ut
-from imgtools_m8.model_conf import ModelConf, ScaleSelector
+from imgtools_m8.helpers.model_conf import ModelConf, ScaleSelector
 from imgtools_m8.helper import ImageToolsHelper
 
 __author__ = "Eli Serra"
