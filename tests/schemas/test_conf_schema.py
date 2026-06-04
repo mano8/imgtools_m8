@@ -370,3 +370,10 @@ class TestImageProcessingSchema:
                 source_path="input.jpg",
                 output_path="out/",
             )
+
+
+class TestGlobalOutputOptions:
+    def test_invalid_no_fields_set(self):
+        """GlobalOutputOptions requires at least one of max_byte_size or formats."""
+        with pytest.raises(ValueError):
+            conf_schema.GlobalOutputOptions()

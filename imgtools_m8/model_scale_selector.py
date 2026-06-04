@@ -218,6 +218,7 @@ class ModelScaleSelector:
             and isinstance(available_scales, list)
             and available_scales
         ):
+            best_combination = []
             total_combinations = ImageToolsHelper.find_all_combinations(
                 total=max_x_scale, numbers=available_scales
             )

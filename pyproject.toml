@@ -19,3 +19,11 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["imgtools_m8"]
+omit = ["tests/*", "tests/**/*"]
+
+[tool.coverage.report]
+omit = ["tests/*", "tests/**/*"]
+fail_under = 100

@@ -14,7 +14,7 @@ try:
 
     colorama.init(autoreset=True)
     _COLORAMA_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover
     _COLORAMA_AVAILABLE = False
     colorama = None  # type: ignore[assignment]
 

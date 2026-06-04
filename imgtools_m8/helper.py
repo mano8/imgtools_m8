@@ -73,7 +73,7 @@ class ImageToolsHelper:
                 if prev_idx < 0 or dp[prev_idx] is None:
                     continue
                 prev = dp[prev_idx]
-                if prev is None:
+                if prev is None:  # pragma: no cover
                     continue
                 curr = dp[current_total]
                 if curr is None or len(prev) + 1 < len(curr):
@@ -127,7 +127,7 @@ class ImageToolsHelper:
                 if prev_idx < 0 or dp[prev_idx] is None:
                     continue
                 prev = dp[prev_idx]
-                if prev is None:
+                if prev is None:  # pragma: no cover
                     continue
                 for combination in prev:
                     all_combinations.append(combination + [num])

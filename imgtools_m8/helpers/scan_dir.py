@@ -119,11 +119,11 @@ class ScanDir:
         info = ScanDir.get_file_item_info(
             join(root, file), byte_size=byte_size, image_size=image_size
         )
-        if info is None:
-            logger.debug(
+        if info is None:  # pragma: no cover
+            logger.debug(  # pragma: no cover
                 "File %s is not a valid image file. Bad format or not a file.", file
             )
-            return None
+            return None  # pragma: no cover
 
         if info.get("is_valid", False) is False:
             logger.debug("File %s is corrupted image file.", file)

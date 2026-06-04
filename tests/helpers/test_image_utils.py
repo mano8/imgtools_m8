@@ -4,11 +4,14 @@ ImageToolsHelper unittest class.
 Use pytest package.
 """
 
+import os
 from os.path import join
 
 import pytest
+from PIL import Image
 
 from imgtools_m8.helpers.image_utils import ImageUtils
+from imgtools_m8.schemas.conf_schema import JpegFormat
 
 from ..helper import HelperTest
 
@@ -46,7 +49,7 @@ class TestImageUtils:
         source_path = HelperTest.get_source_path()
         image_format = ImageUtils.get_image_format(join(source_path, "cat1", "mar.jpg"))
         assert image_format == "JPEG"
-        image_format = ImageUtils.get_image_size(join(source_path, "cat1", "mar.exe"))
+        image_format = ImageUtils.get_image_format(join(source_path, "cat1", "mar.exe"))
         assert image_format is None
 
     @pytest.mark.parametrize(
@@ -209,3 +212,100 @@ class TestImageUtils:
             ImageUtils.get_new_scale(
                 size=size, fixed_width=fixed_width, fixed_height=fixed_height
             )
+
+
+class TestGetCenterCropBox:
+    def test_valid_crop(self):
+        box = ImageUtils.get_center_crop_box((200, 100), 100, 50)
+        left, upper, right, lower = box
+        assert right - left == 100
+        assert lower - upper == 50
+
+    def test_invalid_original_size(self):
+        with pytest.raises(ValueError):
+            ImageUtils.get_center_crop_box((0, 0), 50, 50)
+
+    def test_invalid_target_size(self):
+        with pytest.raises(ValueError):
+            ImageUtils.get_center_crop_box((200, 100), 0, 50)
+
+    def test_target_exceeds_original(self):
+        with pytest.raises(ValueError):
+            ImageUtils.get_center_crop_box((100, 100), 200, 50)
+
+
+class TestResizeImage:
+    def test_resize_with_aspect_ratio(self, tmp_path):
+        src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
+        dest = str(tmp_path / "out.jpg")
+        result = ImageUtils.resize_image(src, dest, 50, 50, maintain_aspect_ratio=True)
+        assert result is True
+        assert os.path.isfile(dest)
+
+    def test_resize_without_aspect_ratio(self, tmp_path):
+        src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
+        dest = str(tmp_path / "out.jpg")
+        result = ImageUtils.resize_image(src, dest, 50, 50, maintain_aspect_ratio=False)
+        assert result is True
+
+    def test_invalid_path_returns_false(self, tmp_path):
+        result = ImageUtils.resize_image(
+            "/nonexistent.jpg", str(tmp_path / "out.jpg"), 50, 50
+        )
+        assert result is False
+
+
+class TestGetFormatKwargs:
+    def test_returns_dict_for_valid(self):
+        fmt = JpegFormat(quality=80)
+        result = ImageUtils.get_format_kwargs("JPEG", fmt)
+        assert isinstance(result, dict)
+        assert "quality" in result
+
+    def test_returns_none_for_none_args(self):
+        assert ImageUtils.get_format_kwargs("JPEG", None) is None
+
+
+class TestConvertImageFormat:
+    def test_convert_to_webp(self, tmp_path):
+        # Use format_args=None to avoid None PIL kwargs issue
+        src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
+        dest = str(tmp_path / "out.webp")
+        assert ImageUtils.convert_image_format(src, dest, "WEBP", None) is True
+        assert os.path.isfile(dest)
+
+    def test_convert_to_png(self, tmp_path):
+        # Use format_args=None; RGB→PNG conversion hits line 375 (RGBA conversion)
+        src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
+        dest = str(tmp_path / "out.png")
+        assert ImageUtils.convert_image_format(src, dest, "PNG", None) is True
+
+    def test_convert_rgba_to_jpeg(self, tmp_path):
+        # RGBA → JPEG hits line 375 (src.convert("RGB"))
+        src = str(tmp_path / "rgba.png")
+        Image.new("RGBA", (20, 20)).save(src)
+        dest = str(tmp_path / "out.jpg")
+        assert ImageUtils.convert_image_format(src, dest, "JPEG", None) is True
+
+    def test_invalid_format_returns_false(self, tmp_path):
+        src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
+        dest = str(tmp_path / "out.bmp")
+        fmt = JpegFormat()
+        assert ImageUtils.convert_image_format(src, dest, "BMP", fmt) is False
+
+    def test_invalid_format_type_returns_false(self, tmp_path):
+        src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
+        dest = str(tmp_path / "out.jpg")
+        assert ImageUtils.convert_image_format(src, dest, 123, None) is False
+
+    def test_convert_rgba_to_png_no_mode_conversion(self, tmp_path):
+        # RGBA source → PNG: mode already in {"RGBA"} → else branch (out = src)
+        src = str(tmp_path / "rgba.png")
+        Image.new("RGBA", (20, 20)).save(src)
+        dest = str(tmp_path / "out.png")
+        assert ImageUtils.convert_image_format(src, dest, "PNG", None) is True
+
+    def test_invalid_source_returns_false(self, tmp_path):
+        dest = str(tmp_path / "out.jpg")
+        fmt = JpegFormat(quality=80)
+        assert ImageUtils.convert_image_format("/bad.jpg", dest, "JPEG", fmt) is False

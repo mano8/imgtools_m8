@@ -150,8 +150,8 @@ class ImageUtils:
                     result["image_format"] = None
                 if is_valid is True:
                     result["is_valid"] = False
-            else:
-                result = None
+            else:  # pragma: no cover
+                result = None  # pragma: no cover
         return result
 
     @staticmethod

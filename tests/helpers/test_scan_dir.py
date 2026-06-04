@@ -161,3 +161,51 @@ class TestScanDir:
             include_subdirs=False,
         )
         assert result is None
+
+    @staticmethod
+    def test_process_valid_file_item_invalid_image():
+        """Test process_valid_file_item with a bad (non-image) file."""
+        source_path = HelperTest.get_source_path()
+        result = ScanDir.process_valid_file_item(
+            root=source_path, file="bad_image.jpg"
+        )
+        assert result is None
+
+    @staticmethod
+    def test_get_files_list_from_dir_file_not_found(monkeypatch):
+        """Cover the FileNotFoundError branch in get_files_list_from_dir."""
+
+        def _boom(_):
+            raise FileNotFoundError("gone")
+
+        monkeypatch.setattr("imgtools_m8.helpers.scan_dir.listdir", _boom)
+        result = ScanDir.get_files_list_from_dir(
+            source_path=HelperTest.get_source_path()
+        )
+        assert isinstance(result, dict)
+
+    @staticmethod
+    def test_get_dir_files_by_format_type_invalid_inputs():
+        """Cover None/non-dict/missing-files branches in get_dir_files_by_format_type."""
+        assert ScanDir.get_dir_files_by_format_type(None) is None
+        assert ScanDir.get_dir_files_by_format_type({"no_files": []}) is None
+        result = ScanDir.get_dir_files_by_format_type(
+            {"files": [None, {"image_size": None}, {"image_size": (100, 100)}]}
+        )
+        assert isinstance(result, dict)
+
+    @staticmethod
+    def test_get_dir_files_by_ext_invalid_inputs():
+        """Cover None/non-dict/missing-files branches in get_dir_files_by_ext."""
+        assert ScanDir.get_dir_files_by_ext(None) is None
+        assert ScanDir.get_dir_files_by_ext({"no_files": []}) is None
+        result = ScanDir.get_dir_files_by_ext(
+            {"files": [None, {"image_format": None}, {"image_format": "JPEG"}]}
+        )
+        assert isinstance(result, dict)
+
+    @staticmethod
+    def test_get_ordered_files_invalid_source():
+        """Cover None return branch when source is invalid."""
+        result = ScanDir.get_ordered_files(source_path="/nonexistent")
+        assert result is None

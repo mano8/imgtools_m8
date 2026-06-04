@@ -12,7 +12,7 @@ try:
     from cv2 import dnn_superres
 
     CV2_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover
     CV2_AVAILABLE = False
     dnn_superres = None  # type: ignore[assignment]
 

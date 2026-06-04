@@ -68,3 +68,11 @@ class TestImageExpander:
         ) != ImageToolsHelper.get_image_size(resized)
         with pytest.raises(ImgToolsException):
             self.obj.many_image_upscale(image=image, nb_upscale=1, scale=-3)
+
+    def test_init_sr_raises_when_cv2_unavailable(self, monkeypatch):
+        """init_sr should raise when CV2_AVAILABLE is False."""
+        import imgtools_m8.img_expander as expander_mod
+
+        monkeypatch.setattr(expander_mod, "CV2_AVAILABLE", False)
+        with pytest.raises(ImgToolsException):
+            self.obj.init_sr()
