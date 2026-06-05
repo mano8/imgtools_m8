@@ -11,6 +11,7 @@ import os
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from imgtools_m8 import __version__
 from imgtools_m8.helper import ImageToolsHelper
 
 __author__ = "Eli Serra"
@@ -18,12 +19,15 @@ __copyright__ = "Copyright 2020, Eli Serra"
 __deprecated__ = False
 __license__ = "Apache Software License"
 __status__ = "Production"
-__version__ = "2.0.0"
 
-RELEASE_TAG = "v2.0.0"
+# The release tag tracks the package version so the downloader, the git release
+# tag, and the publish workflow's asset upload (`gh release upload <tag>`) always
+# line up. Tag every release `v{__version__}` and the model URLs resolve for free.
+RELEASE_TAG = f"v{__version__}"
 BASE_URL = f"https://github.com/mano8/imgtools_m8/releases/download/{RELEASE_TAG}"
 
-# Real SHA256 digests are filled in Phase C2 (Sonnet); placeholders for now.
+# SHA256 digests must match the assets/models/opencv/*.pb files uploaded to the
+# release; the downloader verifies every fetch against these.
 MODEL_REGISTRY: dict[str, dict[str, list[dict[str, str]]]] = {
     "opencv": {
         "edsr": [

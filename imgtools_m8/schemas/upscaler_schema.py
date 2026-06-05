@@ -2,7 +2,7 @@
 
 from typing import Literal, Optional, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import TypedDict
 
 from imgtools_m8.helpers.regex_patterns import ValidationConstants
@@ -31,11 +31,7 @@ class UpscaleModelType(BaseModel):
     )
     scale: Optional[int] = Field(None, ge=1, le=8, description="Upscaler scale factor.")
 
-    class Config:
-        """Pydantic Config"""
-
-        extra = "forbid"
-        frozen = True
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     def to_dict(self) -> UpscaleModelDict:
         """Convert to dictionary."""
