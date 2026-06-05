@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `process_image(bytes) -> list[VariantResult]` storage-agnostic in-memory API
 - `imgtools download-models` CLI; DNN models fetched on demand and SHA256-verified
 - `IMGTOOLS_M8_MODELS_DIR` env override for model location
 - `ModelNotFoundError` raised with a download hint when a required model is absent
