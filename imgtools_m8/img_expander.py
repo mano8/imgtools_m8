@@ -93,7 +93,7 @@ class ImageExpander:
 
     @staticmethod
     def _resolve_scale_conf(
-        model_conf: dict,
+        model_conf: "UpscaleModelDict",
         model_path: Optional[str],
         model_name: str,
         scale: int,

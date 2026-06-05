@@ -235,7 +235,11 @@ class ImageToolsHelper:
         """Return True if file_name contains content_name (or content_name is None)."""
         if content_name is None:
             return True
-        return isinstance(content_name, str) and bool(content_name) and content_name in file_name
+        return (
+            isinstance(content_name, str)
+            and bool(content_name)
+            and content_name in file_name
+        )
 
     @staticmethod
     def get_files_list(

@@ -199,15 +199,21 @@ class ImageProcessing:
             f = image_size.fixed_downscale
             return max(1, w // f), max(1, h // f)
         if image_size.fixed_size is not None:
-            return ImageProcessing._compute_fixed_size(w, h, image_size.fixed_size, allow_upscale)
+            return ImageProcessing._compute_fixed_size(
+                w, h, image_size.fixed_size, allow_upscale
+            )
         if image_size.fixed_width is not None:
             if image_size.fixed_height is not None:
                 return ImageProcessing._fit_within_box(
                     w, h, image_size.fixed_width, image_size.fixed_height, allow_upscale
                 )
-            return ImageProcessing._compute_fixed_width(w, h, image_size.fixed_width, allow_upscale)
+            return ImageProcessing._compute_fixed_width(
+                w, h, image_size.fixed_width, allow_upscale
+            )
         if image_size.fixed_height is not None:
-            return ImageProcessing._compute_fixed_height(w, h, image_size.fixed_height, allow_upscale)
+            return ImageProcessing._compute_fixed_height(
+                w, h, image_size.fixed_height, allow_upscale
+            )
         return None
 
     @staticmethod

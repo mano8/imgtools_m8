@@ -116,8 +116,10 @@ class ModelScaleSelector:
         """
         if not _is_valid_pos_int(height) or not _is_valid_pos_int(width):
             raise ImgToolsException("Error: Bad image size values.")
-        if ModelScaleSelector._both_dims_need_upscale(height, width, fixed_height, fixed_width):
-            return min(math.ceil(fixed_width / width), math.ceil(fixed_height / height))  # type: ignore[arg-type]
+        if ModelScaleSelector._both_dims_need_upscale(
+            height, width, fixed_height, fixed_width
+        ):
+            return min(math.ceil(fixed_width / width), math.ceil(fixed_height / height))  # type: ignore[arg-type, operator]
         if isinstance(fixed_width, int) and fixed_width > width:
             return math.ceil(fixed_width / width)
         if isinstance(fixed_height, int) and fixed_height > height:
@@ -669,7 +671,9 @@ class ModelScaleSelector:
         """
         if not isinstance(upscale_stats, dict) or not upscale_stats:
             return upscale_stats  # pragma: no cover
-        if not ModelScaleSelector._is_valid_upscale_stats_input(upscale_stats, available_scales):
+        if not ModelScaleSelector._is_valid_upscale_stats_input(
+            upscale_stats, available_scales
+        ):
             return upscale_stats  # pragma: no cover
         max_x_scale_val = upscale_stats.get("max_x_scale")
         stats_val = upscale_stats.get("stats")
@@ -679,7 +683,11 @@ class ModelScaleSelector:
         )
         if not isinstance(best_combination, list) or not best_combination:
             return upscale_stats  # pragma: no cover
-        ModelScaleSelector._apply_scale_analytics(upscale_stats, stats_val, best_combination)  # type: ignore[arg-type]
+        ModelScaleSelector._apply_scale_analytics(
+            upscale_stats,
+            stats_val,  # type: ignore[arg-type]
+            best_combination,
+        )
         return upscale_stats
 
     @staticmethod
