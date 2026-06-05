@@ -7,6 +7,8 @@ import os
 import pathlib
 from typing import Optional, Protocol, Tuple, Union
 
+import platformdirs
+
 from imgtools_m8.core.exceptions import ImgToolsException
 
 __author__ = "Eli Serra"
@@ -184,20 +186,47 @@ class ImageToolsHelper:
         return None
 
     @staticmethod
-    def get_package_models_path() -> Optional[str]:
+    def get_default_models_path(segment: str = "opencv") -> str:
         """
-        Get the path to the package models' directory.
+        Resolve the default directory holding super-resolution models.
 
-        :return:
-            The path to the package models' directory,
-            or None if not found.
-        :rtype: Optional[str]
+        Resolution order (cv2-independent):
+
+        1. ``IMGTOOLS_M8_MODELS_DIR`` environment override → ``{env}/{segment}``.
+        2. The platform user cache dir, when it already holds the models.
+        3. The co-located ``assets/models/{segment}`` source tree
+           (editable / source installs).
+        4. Otherwise the platform user cache dir (pure wheel installs).
+
+        :param segment: Backend sub-directory (e.g. ``"opencv"``).
+        :type segment: str
+
+        :return: Absolute path to the resolved models directory.
+        :rtype: str
 
         Example:
-            >>> ImageToolsHelper.get_package_models_path()
-        '/path/to/package/models'
+            >>> ImageToolsHelper.get_default_models_path()
+            '/home/user/.cache/imgtools_m8/models/opencv'
         """
-        return os.path.join(os.path.dirname(__file__), "models")
+        env_dir = os.environ.get("IMGTOOLS_M8_MODELS_DIR")
+        if env_dir:
+            return os.path.join(env_dir, segment)
+
+        cache_dir = os.path.join(
+            platformdirs.user_cache_dir("imgtools_m8", appauthor=False),
+            "models",
+            segment,
+        )
+        if os.path.isdir(cache_dir):
+            return cache_dir
+
+        source_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "assets", "models", segment
+        )
+        if os.path.isdir(source_dir):
+            return source_dir
+
+        return cache_dir
 
     @staticmethod
     def get_images_list(path: str) -> Optional[list]:

@@ -13,7 +13,13 @@ import pytest
 
 import imgtools_m8
 from imgtools_m8 import configure_logging
-from imgtools_m8.__main__ import _build_conf, _build_image_size, _parse_format, main
+from imgtools_m8.__main__ import (
+    _build_conf,
+    _build_image_size,
+    _parse_format,
+    _select_models,
+    main,
+)
 
 from .helper import HelperTest
 
@@ -338,3 +344,96 @@ class TestNumProcessesGuard:
         obj = self._make(user_cpu_percent=50)
         expected = max(1, int(cpu_total * 0.5))
         assert obj.num_processes == expected
+
+
+# ---------------------------------------------------------------------------
+# _select_models
+# ---------------------------------------------------------------------------
+
+
+class TestSelectModels:
+    def test_no_filter_selects_all(self):
+        assert len(_select_models(None, None)) == 3
+
+    def test_backend_filter_miss(self):
+        assert _select_models("nope", None) == []
+
+    def test_model_filter_miss(self):
+        assert _select_models(None, "nope") == []
+
+    def test_backend_and_model_hit(self):
+        selected = _select_models("opencv", "edsr")
+        assert {filename for _, filename, _ in selected} == {
+            "EDSR_x2.pb",
+            "EDSR_x3.pb",
+            "EDSR_x4.pb",
+        }
+
+
+# ---------------------------------------------------------------------------
+# download-models subcommand + back-compat routing
+# ---------------------------------------------------------------------------
+
+
+class TestDownloadModelsCommand:
+    def test_all_downloads_and_reports_ok(self, tmp_path, monkeypatch, capsys):
+        from imgtools_m8.helpers import model_downloader
+
+        monkeypatch.setattr(
+            model_downloader, "get_dest_dir", lambda backend: str(tmp_path)
+        )
+        seen = []
+
+        def _fake_download(filename, sha256, dest_dir):
+            seen.append(filename)
+            return join(dest_dir, filename)
+
+        monkeypatch.setattr(model_downloader, "download_model", _fake_download)
+        code = main(["download-models", "--all"])
+        assert code == 0
+        assert len(seen) == 3
+        out = capsys.readouterr().out
+        assert "EDSR_x2.pb" in out and "ok" in out
+
+    def test_download_failure_returns_1(self, tmp_path, monkeypatch, capsys):
+        from imgtools_m8.helpers import model_downloader
+
+        monkeypatch.setattr(
+            model_downloader, "get_dest_dir", lambda backend: str(tmp_path)
+        )
+
+        def _boom(filename, sha256, dest_dir):
+            raise ValueError("bad digest")
+
+        monkeypatch.setattr(model_downloader, "download_model", _boom)
+        code = main(["download-models", "--backend", "opencv"])
+        assert code == 1
+        assert "FAILED" in capsys.readouterr().out
+
+    def test_no_filter_errors(self):
+        assert main(["download-models"]) == 1
+
+    def test_unknown_backend_selects_nothing(self):
+        assert main(["download-models", "--backend", "nope"]) == 1
+
+
+class TestBackCompatRouting:
+    def test_source_output_routes_to_process(self, output_path, monkeypatch):
+        from imgtools_m8 import image_process
+
+        called = {}
+
+        def _fake_run(self):
+            called["ran"] = True
+            return True
+
+        monkeypatch.setattr(image_process.ImageProcessing, "run", _fake_run)
+        src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
+        code = main(["--source", src, "--output", output_path])
+        assert code == 0
+        assert called.get("ran") is True
+
+    def test_help_token_is_not_prepended(self):
+        with pytest.raises(SystemExit) as exc:
+            main(["--help"])
+        assert exc.value.code == 0

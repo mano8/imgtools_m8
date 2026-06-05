@@ -4,6 +4,7 @@ ImageExpander unittest class.
 Use pytest package.
 """
 
+import os
 import os.path as _path
 from unittest.mock import MagicMock
 
@@ -17,6 +18,13 @@ from imgtools_m8.helpers.model_conf import ScaleSelector
 from imgtools_m8.img_expander import ImageExpander
 
 from .helper import HelperTest
+
+_REPO_MODELS = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "assets",
+    "models",
+    "opencv",
+)
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -42,7 +50,7 @@ class TestImageExpander:
         assert (
             self.obj.set_model_conf(
                 {
-                    "path": ImageToolsHelper.get_package_models_path(),
+                    "path": _REPO_MODELS,
                     "model_name": "edsr",
                     "scale": 2,
                     "scale_selector": ScaleSelector.AUTO_SCALE,
@@ -55,7 +63,7 @@ class TestImageExpander:
         assert (
             self.obj.set_model_conf(
                 {
-                    "path": ImageToolsHelper.get_package_models_path(),
+                    "path": _REPO_MODELS,
                     "scale": 4,
                 }
             )

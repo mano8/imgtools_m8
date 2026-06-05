@@ -30,3 +30,13 @@ class SettingInvalidException(ImgToolsException):
     or configuration provided to ImgTools_m8
     is invalid or does not match the expected value or type.
     """
+
+
+class ModelNotFoundError(ImgToolsException):
+    """
+    Exception for a missing super-resolution model file.
+
+    Raised when DNN upscaling is requested but the resolved model
+    file is absent on disk. The message hints at running
+    ``imgtools download-models`` to fetch the models.
+    """

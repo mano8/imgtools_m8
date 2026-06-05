@@ -112,7 +112,7 @@ class ImageExpander:
         model_conf: Optional[UpscaleModelDict],
     ) -> tuple:
         """Extract (model_path, model_name, scale, scale_selector) from a conf dict."""
-        model_path: Optional[str] = ImageToolsHelper.get_package_models_path()
+        model_path: Optional[str] = ImageToolsHelper.get_default_models_path()
         model_name: str = "edsr"
         scale: int = 2
         scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE

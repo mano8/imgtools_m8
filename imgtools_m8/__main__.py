@@ -14,8 +14,11 @@ import logging
 import multiprocessing
 import sys
 from typing import Optional
+from urllib.error import URLError
 
 from imgtools_m8 import configure_logging
+from imgtools_m8.helper import ImageToolsHelper
+from imgtools_m8.helpers.model_downloader import MODEL_REGISTRY
 
 logger = logging.getLogger("imgTools_m8")
 
@@ -178,6 +181,9 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     run.add_argument("--debug", action="store_true", help="Enable debug logging")
 
 
+_KNOWN_COMMANDS = ("process", "download-models")
+
+
 def _make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="imgtools",
@@ -187,20 +193,77 @@ def _make_parser() -> argparse.ArgumentParser:
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    p.add_argument("--source", "-s", required=True, help="Source file or directory")
-    p.add_argument("--output", "-o", required=True, help="Output directory")
-    _add_resize_args(p)
-    _add_output_args(p)
-    _add_run_args(p)
+    sub = p.add_subparsers(dest="command", required=True)
+
+    proc = sub.add_parser(
+        "process",
+        help="Convert, resize, and batch-process images (default).",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    proc.add_argument("--source", "-s", required=True, help="Source file or directory")
+    proc.add_argument("--output", "-o", required=True, help="Output directory")
+    _add_resize_args(proc)
+    _add_output_args(proc)
+    _add_run_args(proc)
+
+    dl = sub.add_parser(
+        "download-models",
+        help="Download super-resolution models for [dnn] upscaling.",
+    )
+    dl.add_argument("--backend", help="Only this backend (e.g. opencv)")
+    dl.add_argument("--model", help="Only this model (e.g. edsr)")
+    dl.add_argument("--all", action="store_true", help="Download every known model")
+    dl.add_argument("--debug", action="store_true", help="Enable debug logging")
     return p
 
 
-def main(argv: Optional[list] = None) -> int:
-    """CLI entry point. Returns 0 on success, 1 on failure."""
-    parser = _make_parser()
-    args = parser.parse_args(argv)
-    configure_logging(args.debug)
+def _select_models(
+    backend: Optional[str], model: Optional[str]
+) -> list[tuple[str, str, str]]:
+    """Flatten MODEL_REGISTRY to (backend, filename, sha256), applying filters."""
+    selected: list[tuple[str, str, str]] = []
+    for be, models in MODEL_REGISTRY.items():
+        if backend and be != backend:
+            continue
+        for name, entries in models.items():
+            if model and name != model:
+                continue
+            selected.extend((be, e["filename"], e["sha256"]) for e in entries)
+    return selected
 
+
+def _run_download(args: argparse.Namespace) -> int:
+    """Handle the `download-models` subcommand. Returns 0 on success, 1 otherwise."""
+    from imgtools_m8.helpers import model_downloader as downloader
+
+    if not args.all and args.backend is None and args.model is None:
+        logger.error("Specify --all, --backend, or --model.")
+        return 1
+
+    backend = None if args.all else args.backend
+    model = None if args.all else args.model
+    selected = _select_models(backend, model)
+    if not selected:
+        logger.error("No models match the given filters.")
+        return 1
+
+    ok = True
+    for be, filename, sha256 in selected:
+        dest_dir = downloader.get_dest_dir(be)
+        try:
+            path = downloader.download_model(filename, sha256, dest_dir)
+            size = ImageToolsHelper.get_string_file_size(path)
+            status = "ok"
+        except (URLError, OSError, ValueError) as exc:
+            size = ""
+            status = f"FAILED ({exc})"
+            ok = False
+        print(f"{filename} · {size} · {status}")
+    return 0 if ok else 1
+
+
+def _run_process(args: argparse.Namespace) -> int:
+    """Handle the `process` subcommand. Returns 0 on success, 1 otherwise."""
     conf = _build_conf(args)
 
     try:
@@ -226,6 +289,23 @@ def main(argv: Optional[list] = None) -> int:
     else:
         logger.error("Processing completed with errors.")
     return 0 if ok else 1
+
+
+def main(argv: Optional[list] = None) -> int:
+    """CLI entry point. Returns 0 on success, 1 on failure."""
+    raw = list(sys.argv[1:]) if argv is None else list(argv)
+    # Back-compat: default to the `process` subcommand so the historical
+    # `imgtools --source … --output …` invocation keeps working.
+    if raw and raw[0] not in _KNOWN_COMMANDS and raw[0] not in ("-h", "--help"):
+        raw = ["process", *raw]
+
+    parser = _make_parser()
+    args = parser.parse_args(raw)
+    configure_logging(args.debug)
+
+    if args.command == "download-models":
+        return _run_download(args)
+    return _run_process(args)
 
 
 if __name__ == "__main__":  # pragma: no cover

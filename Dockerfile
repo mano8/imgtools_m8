@@ -44,6 +44,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY assets/models /app/assets/models
+ENV IMGTOOLS_M8_MODELS_DIR=/app/assets/models
+
 COPY . /app
 RUN pip install --no-cache-dir --no-deps . && \
     useradd --no-create-home --uid 1000 appuser && \

@@ -10,6 +10,7 @@ from PIL import Image, UnidentifiedImageError
 from pydantic import TypeAdapter
 
 from imgtools_m8.helpers.file_utils import FileUtils
+from imgtools_m8.helpers.model_conf import ModelConf
 from imgtools_m8.helpers.scan_dir import ScanDir
 from imgtools_m8.schemas.conf_schema import (
     FormatsList,
@@ -98,6 +99,12 @@ class ImageProcessing:
         if not (DNN_AVAILABLE and isinstance(model_conf, dict) and model_conf):
             return False
         from imgtools_m8.img_expander import ImageExpander as _IE  # pragma: no cover
+
+        # cv2-free readiness check: fail fast with a download hint when the
+        # requested model file is absent (resolved from the intended conf,
+        # independent of ModelConf's is_model_path gating).
+        path, name, scale, _ = _IE._parse_model_conf(model_conf)  # type: ignore[arg-type]  # pragma: no cover
+        ModelConf.ensure_model_available(path, name, scale)  # pragma: no cover
 
         self.expander = _IE(model_conf=model_conf)  # type: ignore[arg-type]  # pragma: no cover
         if not self.expander.has_model_conf():  # pragma: no cover
