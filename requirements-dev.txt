@@ -14,7 +14,7 @@ debugpy>=1.8.20
 
 # Linting / formatting / security
 ruff>=0.11.0
-bandit>=1.9.0
+bandit>=1.9.4
 mypy>=2.1.0
 types-colorama>=0.4.15
 types-psutil>=7.2.2
