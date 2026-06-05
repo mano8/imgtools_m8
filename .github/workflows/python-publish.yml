@@ -37,7 +37,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: gh release upload "${{ github.ref_name }}" assets/models/opencv/*.pb --clobber
     - name: Publish package
-      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
       with:
         user: __token__
         password: ${{ secrets.PYPI_API_TOKEN }}
