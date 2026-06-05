@@ -392,6 +392,32 @@ class TestWriteImageToFormat:
         )
         assert result is False
 
+    def test_written_file_is_byte_identical_to_direct_encode(self, output_path):
+        # O5: _write_image_to_format now writes _encode_to_bytes' buffer to disk.
+        # The persisted file must be byte-identical to a direct PIL encode with the
+        # same colour conversion + save kwargs (the pre-extraction behavior).
+        from io import BytesIO
+
+        src = join(HelperTest.get_source_path(), "cat1", "mar.jpg")
+        with Image.open(src) as img:
+            img.load()
+            fmt = JpegFormat(quality=70, optimize=True)
+            assert ImageProcessing._write_image_to_format(
+                img, output_path, "byte_identical", fmt
+            )
+            # Replicate the original direct-save logic independently.
+            working = ImageProcessing._convert_color_mode(img, "JPEG")
+            kwargs = {
+                k: v
+                for k, v in fmt.model_dump(exclude={"ext"}).items()
+                if v is not None
+            }
+            buf = BytesIO()
+            working.save(buf, format="JPEG", **kwargs)
+        with open(join(output_path, "byte_identical.jpg"), "rb") as fh:
+            on_disk = fh.read()
+        assert on_disk == buf.getvalue()
+
 
 # ---------------------------------------------------------------------------
 # _dnn_upscale fallback (no DNN available)

@@ -268,6 +268,29 @@ switches from single-process (`ImageProcessing`) to multiprocess
 (`MultiProcessImage`); the worker count is clamped to `cpu_count - 1`
 to avoid saturating the system.
 
+## In-memory API
+
+Process images without any file I/O using `process_image`:
+
+```python
+from imgtools_m8 import process_image
+
+with open("photo.jpg", "rb") as f:
+    src_bytes = f.read()
+
+results = process_image(
+    src_bytes,
+    [{"image_size": {"fixed_width": 200}, "formats": [{"ext": "WEBP", "quality": 80}]}],
+)
+
+for r in results:
+    print(r.name, r.width, r.height, r.size_bytes)
+    # write r.data to a file or upload directly
+```
+
+`process_image` returns a `list[VariantResult]`; each result carries `name`, `data` (raw bytes),
+`width`, `height`, `size_bytes`, and `format`. No disk paths required.
+
 ## DNN upscaling note
 
 When `opencv-contrib-python` is not installed, `fixed_upscale` falls back to PIL bicubic scaling.
@@ -331,11 +354,12 @@ A `docker-compose.yml` for multi-volume GPU batch processing is in `docker_compo
 ## Input/Output Example
 
 ### Input Image
+
 The source file is 340×216 px.
-<div align="center">
-  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/sources_test/recien_llegado.jpg" alt="Recien Llegado @Cezar llañez" width="340" height="216" />
-  <p>Recien llegado by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a></p>
-</div>
+
+![Recien Llegado @Cezar llañez](https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/sources_test/recien_llegado.jpg)
+
+*Recien llegado by [@Cezar yañez](https://www.ichingmaestrodelosespiritus.com/)*
 
 ## License
 

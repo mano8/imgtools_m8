@@ -75,3 +75,9 @@ def configure_logging(debug: bool = False) -> None:
     logger.addHandler(handler)
 
     logger.debug("Logger ready. debug=%s colorama=%s", debug, _COLORAMA_AVAILABLE)
+
+
+from imgtools_m8.image_process import process_image  # noqa: E402
+from imgtools_m8.results import VariantResult  # noqa: E402
+
+__all__ = ["process_image", "VariantResult", "configure_logging"]
