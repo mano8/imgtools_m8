@@ -27,9 +27,18 @@ BASE_URL = f"https://github.com/mano8/imgtools_m8/releases/download/{RELEASE_TAG
 MODEL_REGISTRY: dict[str, dict[str, list[dict[str, str]]]] = {
     "opencv": {
         "edsr": [
-            {"filename": "EDSR_x2.pb", "sha256": "TODO_SHA256_x2"},
-            {"filename": "EDSR_x3.pb", "sha256": "TODO_SHA256_x3"},
-            {"filename": "EDSR_x4.pb", "sha256": "TODO_SHA256_x4"},
+            {
+                "filename": "EDSR_x2.pb",
+                "sha256": "585623221baa070279a0d1e7e113a4c3faba0f318ca7fdd9a65d9afc0763d9b4",
+            },
+            {
+                "filename": "EDSR_x3.pb",
+                "sha256": "3baa3740fdb8ee9c52f1a41d69fa74cb9feef0fa9bfeec24f0ee58b928068e9a",
+            },
+            {
+                "filename": "EDSR_x4.pb",
+                "sha256": "dd35ce3cae53ecee2d16045e08a932c3e7242d641bb65cb971d123e06904347f",
+            },
         ],
     },
 }

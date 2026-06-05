@@ -271,11 +271,25 @@ to avoid saturating the system.
 ## DNN upscaling note
 
 When `opencv-contrib-python` is not installed, `fixed_upscale` falls back to PIL bicubic scaling.
-Install the `[dnn]` extra to use the bundled EDSR pre-trained models (2×, 3×, 4×):
+Install the `[dnn]` extra to enable DNN upscaling:
 
 ```bash
 pip install "imgtools_m8[dnn]"
 ```
+
+### Models (DNN upscaling)
+
+The EDSR `.pb` models are **not bundled** in the wheel (saves ~111 MB). After installing the
+`[dnn]` extra, fetch them once with:
+
+```bash
+imgtools download-models
+```
+
+Models are SHA256-verified and stored in the platform cache directory. To use a custom location,
+set `IMGTOOLS_M8_MODELS_DIR` to a directory that contains an `opencv/` subdirectory with the
+`.pb` files. If the models are absent when upscaling is attempted, a `ModelNotFoundError` is
+raised with a reminder to run `imgtools download-models`.
 
 Custom models in `.pb` format can be loaded by passing a `model_conf` dict to `ImageProcessing`:
 

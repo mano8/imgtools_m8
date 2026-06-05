@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `imgtools download-models` CLI; DNN models fetched on demand and SHA256-verified
+- `IMGTOOLS_M8_MODELS_DIR` env override for model location
+- `ModelNotFoundError` raised with a download hint when a required model is absent
+- Models removed from the wheel (≈111 MB) — fetched to the user cache instead
 - `Dockerfile` CUDA build upgraded to CUDA 13.3 / Ubuntu 24.04 / OpenCV 4.13;
   `CUDA_ARCH_BIN` build-arg added for GPU-specific compile (e.g. `8.9` for RTX 40xx)
 - `.env.example` documenting `OPENCV_VERSION` and `CUDA_ARCH_BIN` build arguments

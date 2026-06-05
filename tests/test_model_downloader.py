@@ -112,4 +112,6 @@ class TestDestDirAndRegistry:
         }
         for entry in edsr:
             assert set(entry) == {"filename", "sha256"}
-            assert entry["sha256"].startswith("TODO_SHA256_")
+            assert len(entry["sha256"]) == 64 and all(
+                c in "0123456789abcdef" for c in entry["sha256"]
+            )

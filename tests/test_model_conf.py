@@ -4,8 +4,16 @@ ModelConf unittest class.
 Use pytest package.
 """
 
-from imgtools_m8.helper import ImageToolsHelper
+import os
+
 from imgtools_m8.helpers.model_conf import ModelConf, ScaleSelector
+
+_REPO_MODELS = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "assets",
+    "models",
+    "opencv",
+)
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -23,7 +31,7 @@ class TestModelConf:
         Invoked for every test function in the module.
         """
         self.obj = ModelConf(
-            model_path=ImageToolsHelper.get_package_models_path(),
+            model_path=_REPO_MODELS,
             model_name="edsr",
             scale=2,
         )
@@ -36,10 +44,8 @@ class TestModelConf:
         """Test set_model_path method"""
         self.obj.model_path = None
         assert self.obj.has_model_path() is False
-        assert (
-            self.obj.set_model_path(ImageToolsHelper.get_package_models_path()) is True
-        )
-        assert self.obj.get_path() == ImageToolsHelper.get_package_models_path()
+        assert self.obj.set_model_path(_REPO_MODELS) is True
+        assert self.obj.get_path() == _REPO_MODELS
         assert self.obj.has_model_path() is True
         assert self.obj.set_model_path("/bad_path") is False
         assert self.obj.has_model_path() is False
@@ -102,37 +108,25 @@ class TestModelConf:
     @staticmethod
     def test_is_model_path():
         """Test is_model_path method"""
-        assert (
-            ModelConf.is_model_path(value=ImageToolsHelper.get_package_models_path())
-            is True
-        )
+        assert ModelConf.is_model_path(value=_REPO_MODELS) is True
         assert ModelConf.is_model_path("/bad/path") is False
 
     @staticmethod
     def test_get_models_list():
         """Test get_models_list method"""
-        assert (
-            len(
-                ModelConf.get_models_list(
-                    path=ImageToolsHelper.get_package_models_path()
-                )
-            )
-            == 3
-        )
+        assert len(ModelConf.get_models_list(path=_REPO_MODELS)) == 3
 
     @staticmethod
     def test_get_model_scale():
         """Test get_model_scale method"""
-        models = ModelConf.get_models_list(
-            path=ImageToolsHelper.get_package_models_path()
-        )
+        models = ModelConf.get_models_list(path=_REPO_MODELS)
         assert ModelConf.get_model_scale(file_name=models[0]) == 2
 
     @staticmethod
     def test_get_model_scales_available():
         """Test get_model_scales_available method"""
         scale_list = ModelConf.get_model_scales_available(
-            path=ImageToolsHelper.get_package_models_path(), model_name="edsr"
+            path=_REPO_MODELS, model_name="edsr"
         )
         assert isinstance(scale_list, list) and len(scale_list) > 0
         assert len(scale_list) == 3
@@ -146,12 +140,12 @@ class TestModelConf:
     def test_get_model_file_name():
         """Test get_model_file_name method"""
         file_name = ModelConf.get_model_file_name(
-            path=ImageToolsHelper.get_package_models_path(), model_name="edsr", scale=2
+            path=_REPO_MODELS, model_name="edsr", scale=2
         )
         assert file_name == "EDSR_x2.pb"
         assert (
             ModelConf.is_model_file_name(
-                model_path=ImageToolsHelper.get_package_models_path(),
+                model_path=_REPO_MODELS,
                 file_name=file_name,
             )
             is True
@@ -162,7 +156,7 @@ class TestModelConf:
         assert file_name is None
         assert (
             ModelConf.is_model_file_name(
-                model_path=ImageToolsHelper.get_package_models_path(),
+                model_path=_REPO_MODELS,
                 file_name=file_name,
             )
             is False
@@ -172,13 +166,13 @@ class TestModelConf:
     def test_is_scale():
         """Test is_scale method"""
         is_scale = ModelConf.is_scale(
-            model_path=ImageToolsHelper.get_package_models_path(),
+            model_path=_REPO_MODELS,
             model_name="edsr",
             scale=2,
         )
         assert is_scale is True
         is_scale = ModelConf.is_scale(
-            model_path=ImageToolsHelper.get_package_models_path(),
+            model_path=_REPO_MODELS,
             model_name="edsr",
             scale=12,
         )
