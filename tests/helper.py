@@ -14,11 +14,11 @@ __version__ = "1.0.0"
 
 class HelperTest:
     @staticmethod
-    def get_source_path() -> str or None:
-        """Get package models' path."""
+    def get_source_path() -> str:
+        """Get the test sources directory path."""
         return os.path.join(os.path.dirname(__file__), "sources_test")
 
     @staticmethod
-    def get_output_path() -> str or None:
-        """Get package models' path."""
+    def get_output_path() -> str:
+        """Get the test output directory path."""
         return os.path.join(os.path.dirname(__file__), "output_test")
