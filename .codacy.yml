@@ -4,9 +4,6 @@ engines:
     enabled: true
   ruff:
     enabled: true
-  radon:
-    enabled: true
-    threshold: C
   pylint:
     enabled: false
   prospector:
