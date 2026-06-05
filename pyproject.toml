@@ -28,6 +28,7 @@ dependencies = [
     "Pillow>=12.2.0",
     "pydantic>=2.13.4",
     "numpy>=2.4.6",
+    "platformdirs>=4.0",
 ]
 
 [project.optional-dependencies]
@@ -55,9 +56,6 @@ version = {attr = "imgtools_m8.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["imgtools_m8*"]
-
-[tool.setuptools.package-data]
-"imgtools_m8" = ["models/*.pb"]
 
 [tool.bandit]
 exclude_dirs = ["tests"]
