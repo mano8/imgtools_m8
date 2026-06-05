@@ -5,6 +5,7 @@ from enum import Enum
 from os import path as Path
 from typing import Optional
 
+from imgtools_m8.core.exceptions import ModelNotFoundError
 from imgtools_m8.helper import ImageToolsHelper
 
 __author__ = "Eli Serra"
@@ -346,6 +347,44 @@ class ModelConf:
         return ModelConf.get_model_file_name(
             path=self.model_path, model_name=self.model_name, scale=self.scale
         )
+
+    @staticmethod
+    def ensure_model_available(
+        model_path: Optional[str],
+        model_name: Optional[str],
+        scale: Optional[int],
+    ) -> str:
+        """
+        Ensure the requested DNN model file exists on disk.
+
+        cv2-independent readiness check, used when a caller requests
+        DNN upscaling. Raises early (before any cv2 work) when the
+        resolved model file is absent, hinting at the download command.
+
+        :param model_path: Directory expected to hold the model file.
+        :type model_path: Optional[str]
+        :param model_name: Requested model name (e.g. ``"edsr"``).
+        :type model_name: Optional[str]
+        :param scale: Requested upscale factor.
+        :type scale: Optional[int]
+
+        :return: Absolute path to the resolved model file.
+        :rtype: str
+
+        :raises ModelNotFoundError: If the model file cannot be found.
+
+        Example:
+            >>> ModelConf.ensure_model_available('/path/to/models', 'edsr', 2)
+            '/path/to/models/EDSR_x2.pb'
+        """
+        file_name = ModelConf.get_model_file_name(model_path, model_name, scale)
+        if file_name is None:
+            raise ModelNotFoundError(
+                f"Super-resolution model (name={model_name!r}, "
+                f"scale={scale!r}) not found in {model_path!r}. "
+                "Run: imgtools download-models"
+            )
+        return Path.join(model_path or "", file_name)
 
     @staticmethod
     def get_valid_model_names() -> list:

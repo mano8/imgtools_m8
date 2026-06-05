@@ -175,10 +175,39 @@ class TestImageToolsHelper:
         assert ImageToolsHelper.get_image_size(None) is None
 
     @staticmethod
-    def test_get_package_models_path():
-        """Test get_package_models_path method"""
-        path = ImageToolsHelper.get_package_models_path()
-        assert isinstance(path, str) and "models" in path
+    def test_get_default_models_path(tmp_path, monkeypatch):
+        """Test get_default_models_path resolution order (cv2-free)."""
+        # 1. Environment override wins → {env}/{segment}.
+        monkeypatch.setenv("IMGTOOLS_M8_MODELS_DIR", str(tmp_path))
+        assert ImageToolsHelper.get_default_models_path() == os.path.join(
+            str(tmp_path), "opencv"
+        )
+
+        # 2. No env, but the platform cache dir already holds the models.
+        monkeypatch.delenv("IMGTOOLS_M8_MODELS_DIR", raising=False)
+        cache_root = tmp_path / "cache"
+        cache_models = cache_root / "models" / "opencv"
+        cache_models.mkdir(parents=True)
+        monkeypatch.setattr(
+            "imgtools_m8.helper.platformdirs.user_cache_dir",
+            lambda *a, **k: str(cache_root),
+        )
+        assert ImageToolsHelper.get_default_models_path() == str(cache_models)
+
+        # 3. No env, empty cache → fall back to the co-located source tree.
+        empty_cache = tmp_path / "empty"
+        monkeypatch.setattr(
+            "imgtools_m8.helper.platformdirs.user_cache_dir",
+            lambda *a, **k: str(empty_cache),
+        )
+        source_path = ImageToolsHelper.get_default_models_path()
+        assert source_path.endswith(os.path.join("assets", "models", "opencv"))
+        assert os.path.isdir(source_path)
+
+        # 4. No env, empty cache, no source segment → default cache dir.
+        assert ImageToolsHelper.get_default_models_path("nope") == os.path.join(
+            str(empty_cache), "models", "nope"
+        )
 
     @staticmethod
     def test_convert_size():
