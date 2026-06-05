@@ -1,0 +1,9 @@
+{
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests",
+        "--cov=imgtools_m8",
+        "--cov-report=xml",
+        "--cov-report=term-missing"
+    ]
+}

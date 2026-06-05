@@ -1,0 +1,35 @@
+[build-system]
+requires = [
+    "setuptools>=80.9.0",
+    "wheel>=0.45.1"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "C90"]
+ignore = ["E501"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["imgtools_m8"]
+omit = ["tests/*", "tests/**/*", "examples/*"]
+
+[tool.coverage.report]
+omit = ["tests/*", "tests/**/*", "examples/*"]
+fail_under = 100

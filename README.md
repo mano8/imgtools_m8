@@ -1,286 +1,333 @@
+# imgtools_m8
+
 [![Python package](https://github.com/mano8/imgtools_m8/actions/workflows/python-package.yml/badge.svg)](https://github.com/mano8/imgtools_m8/actions/workflows/python-package.yml)
 [![PyPI package](https://img.shields.io/pypi/v/imgtools_m8.svg)](https://pypi.org/project/imgtools_m8/)
 [![codecov](https://codecov.io/gh/mano8/imgtools_m8/branch/main/graph/badge.svg?token=0J31F62GB7)](https://codecov.io/gh/mano8/imgtools_m8)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/c401bed6812d4f9bb77bfaee16cf0abe)](https://www.codacy.com/gh/mano8/imgtools_m8/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=mano8/imgtools_m8&amp;utm_campaign=Badge_Grade)
 [![Downloads](https://static.pepy.tech/badge/imgtools-m8)](https://pepy.tech/project/imgtools-m8)
 [![Known Vulnerabilities](https://snyk.io/test/github/mano8/vedirect_m8/badge.svg)](https://snyk.io/test/github/mano8/imgtools_m8)
-## Description
 
-`imgtools_m8` is a simple image tools package that provides functionality to convert, downscale, and upscale images.
-
-It uses deep learning and OpenCV to upscale images using pre-trained models developed by Xavier Weber (more info [here](https://towardsdatascience.com/deep-learning-based-super-resolution-with-opencv-4fd736678066)).
+Python image processing package for converting, downscaling, and optionally upscaling images using Pillow. DNN-based super-resolution upscaling (via OpenCV) is available as an optional extra.
 
 ## Installation
 
-You can install the package from GitHub or PyPI.
+```bash
+# Core install (Pillow + Pydantic + NumPy only)
+pip install imgtools_m8 --upgrade
 
-To install directly from GitHub:
+# With DNN upscaling support (adds opencv-contrib-python)
+pip install "imgtools_m8[dnn]" --upgrade
 
-```plaintext
-$ python3 -m pip install "git+https://github.com/mano8/imgtools_m8 --upgrade"
+# With CLI color output (adds colorama)
+pip install "imgtools_m8[cli]" --upgrade
+
+# Everything at once
+pip install "imgtools_m8[dnn,cli]" --upgrade
+
+# From GitHub
+pip install "git+https://github.com/mano8/imgtools_m8" --upgrade
 ```
 
-To install from PypI :
+## Dependencies
 
-```plaintext
-python3 -m pip install imgtools_m8 --upgrade
+| Package | Required | Notes |
+| --- | --- | --- |
+| `Pillow>=12.2.0` | yes | Core image I/O and format conversion |
+| `pydantic>=2.13.4` | yes | Config validation |
+| `numpy>=2.4.6` | yes | Array support |
+| `opencv-contrib-python>=4.13.0.92` | no | DNN upscaling only — `pip install imgtools_m8[dnn]` |
+| `colorama>=0.4.6` | no | Colored CLI output — `pip install imgtools_m8[cli]` |
+
+## Quick start
+
+```python
+from imgtools_m8.image_process import ImageProcessing
+
+obj = ImageProcessing(
+    conf={
+        "source_path": "./tests/sources_test/recien_llegado.jpg",
+        "output_path": "./output",
+        "output_options": [
+            {
+                "formats": [
+                    {"ext": "JPEG", "quality": 80, "progressive": True, "optimize": True},
+                    {"ext": "WEBP", "quality": 70},
+                    {"ext": "PNG"},
+                ]
+            }
+        ],
+    }
+)
+obj.run()
 ```
 
 ## Usage
 
-The imgtools_m8 package offers automated image processing capabilities for a designated source directory, with the output results saved to a specified output directory.
+`ImageProcessing` is the main class. It accepts a `conf` dict validated by `ImageProcessingSchema`.
 
-The package provides versatile resizing options, including:
-
-   - fixed_width: Resizing images to an exact width in pixels.
-   - fixed_height: Resizing images to an exact height in pixels.
-   - fixed_size: Resizing images based on the highest limitation reached (height or width).
-   - fixed_width and fixed_height: Resizing images based on the highest limitation reached,
-     while allowing different height and width values.
-
-In cases where the original image size exceeds the specified output dimensions, the package automatically applies upscaling using pre-trained models.
-
-For more usage examples, refer to the [example's directory](https://github.com/mano8/imgtools_m8/tree/main/examples).
-
-(See accepted extensions from [cv2 documentation](https://docs.opencv.org/4.8.0/d4/da8/group__imgcodecs.html#ga288b8b3da0892bd651fce07b3bbd3a56))
-
-In all the examples provided, the source_path value is set to a single image file path.
-However, this package can also work with a directory path containing multiple image files.
-In this scenario, the processing will be applied to all images within the specified source_path directory.
-
-### Example 1
-
-In this example, we demonstrate how to convert an input image to three different formats
-(.jpg, .webp, and .png) without resizing.
+### Configuration structure
 
 ```python
-from imgtools_m8.img_tools import ImageTools
+conf = {
+    # Required
+    "source_path": "/path/to/image.jpg",   # or a directory
+    "output_path": "/path/to/output/",
 
-# Set up the output formats
-output_formats = [
-    {
-        'formats': [
-            {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1},
-            {'ext': '.webp', 'quality': 70},
-            {'ext': '.png', 'compression': 2}
-        ]
-        
-    }
-]
+    # Optional
+    "include_subdirs": False,   # scan subdirectories when source is a dir
+    "flatten_output": False,    # write all outputs flat (no subdir mirror)
 
-# Create an instance of ImageTools
-imgtools = ImageTools(
-    source_path="./tests/dummy_dir/recien_llegado.jpg",
-    output_path="/my/output/path/directory",
-    output_formats=output_formats
-)
-# Run the image processing
-imgtools.run()
-```
-This code snippet converts the input image to three different formats (JPEG, WEBP, and PNG)
-and saves the resulting images in the specified output directory.
-
-The JPEG images are saved with 80% quality, progressive encoding, and optimization.   
-The WEBP images are saved with 70% quality,   
-and the PNG images are saved with compression level 2.
-
-### Example 2
-
-In this example, we demonstrate how to resize an input image and save it as a .jpeg format.
-
-The source file is 340px wide and 216px high. The output file will be downscaled to 300*190 px,
-and finally saved as a JPEG with 80% quality, progressive encoding, and optimization.
-
-when fixed_width and fixed_height are set, the downscale process selects the higher coefficient as the limitation,
-and in this case, it is the fixed width of 300 px.
-
-For a fixed height of 200 px, the output will be an image of 314x200 px.
-```python
-from imgtools_m8.img_tools import ImageTools
-
-# Set up the output formats
-output_formats = [
-    {
-        'fixed_width': 300,
-        'fixed_height': 200,
-        'formats': [
-            {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
-        ]
-    }
-]
-
-# Create an instance of ImageTools
-imgtools = ImageTools(
-    source_path="./tests/dummy_dir/recien_llegado.jpg",
-    output_path="/my/output/path/directory",
-    output_formats=output_formats
-)
-# Run the image processing
-imgtools.run()
-```
-
-In this example, the input image is downscaled to a fixed width of 300 pixels,
-as the higher coefficient is selected.
-The resulting image is then saved as a JPEG with 80% quality,
-progressive encoding, and optimization.
-
-### Example 3
-
-In this example, we demonstrate how to resize an input image and save it as a .jpeg format.
-
-The source file is 340px wide and 216px high. The output file will be upscaled 4x to 1360x864 px,
-then downscaled to 1200x762 px, and finally saved as a JPEG with 80% quality, progressive encoding, and optimization.
-
-By default, the package uses the pre-trained EDSR model to upscale images, automatically determining the best model scale to use.
-In this case, the best choice is the EDSR_4x.pb model.
-```python
-from imgtools_m8.img_tools import ImageTools
-
-# Set up the output formats
-output_formats = [
-    {
-        'fixed_width': 1200,
-        'formats': [
-            {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
-        ]
-    }
-]
-
-# Create an instance of ImageTools
-imgtools = ImageTools(
-    source_path="./tests/dummy_dir/recien_llegado.jpg",
-    output_path="/my/output/path/directory",
-    output_formats=output_formats
-)
-# Run the image processing
-imgtools.run()
-```
-This code snippet demonstrates how to resize an input image using automatic upscaling and downscaling.
-
-The image is first upscaled using the default EDSR model to achieve a higher resolution,
-then downscaled to the specified width of 1200 pixels.
-
-The resulting image is saved as a JPEG with 80% quality, progressive encoding, and optimization.
-
-The package automatically selects the appropriate model scale for upscaling based on the image dimensions.
-
-### Example 4
-In this example, we demonstrate how to fix the model scale for the upscale process 
-and resize an input image while saving it as a .jpeg format.
-
-For various reasons, users might want to use only a preferred model scale for the upscale process.
-In this case, it's necessary to define a model configuration with the selected model scale value,
-which needs to be a valid model scale.
-
-For example, the pre-trained EDSR model has valid model scales of 2x, 3x, and 4x.
-Other models may have different valid scale values.
-
-The source file is 340px wide and 216px high.
-The output file will be upscaled 2x two times in this case, resulting in a size of 1360x864 px.
-Then it will be downscaled to 1200x762 px, and finally saved as a JPEG with 80% quality,
-progressive encoding, and optimization.
-
-This process is slower compared to Example 3
-due to the necessity of executing two upscale processes, which increases the execution time.
-
-```python
-from imgtools_m8.img_tools import ImageTools
-
-# Set up model configuration
-model_conf = {
-   'scale': 2
+    # At least one of output_options or global_options is required
+    "output_options": [...],    # per-size output rules (see below)
+    "global_options": {...},    # fallback formats/byte-limit for all options
 }
-
-# Set up the output formats
-output_formats = [
-    {
-        'fixed_width': 1200,
-        'formats': [
-            {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
-        ]
-    }
-]
-
-# Create an instance of ImageTools
-imgtools = ImageTools(
-    source_path="./tests/dummy_dir/recien_llegado.jpg",
-    output_path="/my/output/path/directory",
-    output_formats=output_formats,
-    model_conf=model_conf
-)
-# Run the image processing
-imgtools.run()
 ```
 
-### Example 5
-In this example, we demonstrate how to use another pre-trained model.
-While this package currently only contains the EDSR model,
-you have the flexibility to use any available model of your choice.
+### `output_options` entries
 
-To use a different model, you will need to download models with a .pb extension from [here](https://github.com/opencv/opencv_contrib/tree/master/modules/dnn_superres).
-Once downloaded, place the models in a directory, and set the model configuration as shown below.
+Each entry in `output_options` may specify:
 
-If you wish to automatically select the best model scale,
-ensure you have downloaded all available model scales or only the ones you intend to use.
-Keep in mind that when only one model scale is available for a model, it will be used exclusively.
-This can result in slower execution times and/or lower quality results
-depending on the available model scale, input image size,
-and output size(s) defined in the configuration.
+| Field | Type | Description |
+|---|---|---|
+| `image_size` | `OutputSize` | Resize spec (see below) |
+| `allow_upscale` | `bool` | Allow upscaling when image is smaller than target |
+| `max_byte_size` | `int` | Hard byte ceiling per output file (binary-search on quality) |
+| `formats` | `list[FormatConfig]` | Output formats for this size |
 
-In this example, we use the pre-trained TF-ESPCN model to upscale images,
-automatically determining the best model scale to use. In this case,
-the best choice is the TF-ESPCN_4x.pb model.
+### `image_size` variants (mutually exclusive where noted)
+
+| Field | Description |
+| --- | --- |
+| `fixed_width` | Resize to exact width, keep aspect ratio |
+| `fixed_height` | Resize to exact height, keep aspect ratio |
+| `fixed_width` + `fixed_height` | Fit within bounding box, keep aspect ratio |
+| `fixed_size` | Constrain longest side to N pixels |
+| `fixed_downscale` | Divide each dimension by factor (2–10) |
+| `fixed_upscale` | Multiply each dimension by factor (2–10); uses DNN model when available |
+
+### Supported output formats
+
+| `ext` value | Notes |
+|---|---|
+| `"JPEG"` | quality, optimize, progressive, subsampling |
+| `"WEBP"` | quality, lossless, method |
+| `"PNG"` | optimize, compression_level, interlace |
+| `"GIF"` | optimize |
+| `"AVIF"` | quality, lossless |
+
+### Example 1 — convert to multiple formats without resizing
 
 ```python
-from imgtools_m8.img_tools import ImageTools
+from imgtools_m8.image_process import ImageProcessing
 
-# Set up model configuration for downloaded TF-ESPCN models
-model_conf = {
-   'path': "/path/to/your/downloaded/model/directory",
-   'model_name': 'espcn',
-}
-
-# Set up the output formats
-output_formats = [
-    {
-        'fixed_width': 1200,
-        'formats': [
-            {'ext': '.jpg', 'quality': 80, 'progressive': 1, 'optimize': 1}
-        ]
+obj = ImageProcessing(
+    conf={
+        "source_path": "./tests/sources_test/recien_llegado.jpg",
+        "output_path": "./output",
+        "output_options": [
+            {
+                "formats": [
+                    {"ext": "JPEG", "quality": 80, "progressive": True, "optimize": True},
+                    {"ext": "WEBP", "quality": 70},
+                    {"ext": "PNG"},
+                ]
+            }
+        ],
     }
-]
-
-# Create an instance of ImageTools
-imgtools = ImageTools(
-    source_path="./tests/dummy_dir/recien_llegado.jpg",
-    output_path="/my/output/path/directory",
-    output_formats=output_formats,
-    model_conf=model_conf
 )
-# Run the image processing
-imgtools.run()
+obj.run()
 ```
 
-## Input/Output Example :  
+### Example 2 — downscale to a fixed bounding box
+
+The image is 340×216 px. With `fixed_width=300, fixed_height=200`, the wider constraint wins
+(width ratio = 300/340 ≈ 88 %; height ratio = 200/216 ≈ 93 %), so the output is 300×190 px.
+
+```python
+from imgtools_m8.image_process import ImageProcessing
+
+obj = ImageProcessing(
+    conf={
+        "source_path": "./tests/sources_test/recien_llegado.jpg",
+        "output_path": "./output",
+        "output_options": [
+            {
+                "image_size": {"fixed_width": 300, "fixed_height": 200},
+                "formats": [
+                    {"ext": "JPEG", "quality": 80, "progressive": True, "optimize": True}
+                ],
+            }
+        ],
+    }
+)
+obj.run()
+```
+
+### Example 3 — upscale then downscale (DNN model)
+
+Requires `pip install imgtools_m8[dnn]`. The EDSR model (included) is used automatically.
+
+```python
+from imgtools_m8.image_process import ImageProcessing
+
+obj = ImageProcessing(
+    conf={
+        "source_path": "./tests/sources_test/recien_llegado.jpg",
+        "output_path": "./output",
+        "output_options": [
+            {
+                "image_size": {"fixed_width": 1200},
+                "allow_upscale": True,
+                "formats": [
+                    {"ext": "JPEG", "quality": 80, "progressive": True, "optimize": True}
+                ],
+            }
+        ],
+    }
+)
+obj.run()
+```
+
+### Example 4 — process a whole directory with subdirectory mirroring
+
+```python
+from imgtools_m8.image_process import ImageProcessing
+
+obj = ImageProcessing(
+    conf={
+        "source_path": "./tests/sources_test/",
+        "output_path": "./output",
+        "include_subdirs": True,
+        "output_options": [
+            {
+                "image_size": {"fixed_size": 800},
+                "max_byte_size": 200_000,
+                "formats": [
+                    {"ext": "WEBP", "quality": 85}
+                ],
+            }
+        ],
+    }
+)
+obj.run()
+```
+
+### Example 5 — multiprocessing batch with resource monitoring
+
+```python
+from imgtools_m8.multiprocess import MultiProcessImage
+
+obj = MultiProcessImage(
+    conf={
+        "source_path": "./tests/sources_test/",
+        "output_path": "./output",
+        "include_subdirs": True,
+        "output_options": [
+            {
+                "image_size": {"fixed_width": 800},
+                "formats": [{"ext": "WEBP", "quality": 80}],
+            }
+        ],
+    },
+    max_cpu_percent=75,
+    user_cpu_percent=50,
+    batch_size=32,
+)
+obj.run_multiple()
+```
+
+## CLI
+
+After installation, an `imgtools` command is available:
+
+```bash
+# Convert to WEBP at 80% quality (default when no --format is given)
+imgtools --source ./images --output ./out
+
+# Resize to 1920 px wide and save as JPEG + WEBP
+imgtools --source ./images --output ./out --width 1920 --format jpg:95 --format webp:80
+
+# Process subdirectories in parallel with 4 workers
+imgtools --source ./images --output ./out --subdirs --workers 4
+
+# Load a full conf dict from a JSON file
+imgtools --source ./images --output ./out --config ./my_conf.json
+
+# Enable debug logging
+imgtools --source ./images --output ./out --debug
+```
+
+Install `[cli]` to get colored log output:
+
+```bash
+pip install "imgtools_m8[cli]"
+```
+
+Run `imgtools --help` for the full argument reference. The `--workers` flag
+switches from single-process (`ImageProcessing`) to multiprocess
+(`MultiProcessImage`); the worker count is clamped to `cpu_count - 1`
+to avoid saturating the system.
+
+## DNN upscaling note
+
+When `opencv-contrib-python` is not installed, `fixed_upscale` falls back to PIL bicubic scaling.
+Install the `[dnn]` extra to use the bundled EDSR pre-trained models (2×, 3×, 4×):
+
+```bash
+pip install "imgtools_m8[dnn]"
+```
+
+Custom models in `.pb` format can be loaded by passing a `model_conf` dict to `ImageProcessing`:
+
+```python
+obj = ImageProcessing(
+    conf={...},
+    model_conf={
+        "path": "/path/to/model/directory",
+        "model_name": "espcn",   # model prefix, e.g. espcn, edsr, lapsrn
+        "scale": 4,              # fixed scale (omit for AUTO_SCALE)
+    },
+)
+```
+
+## Docker (CUDA-accelerated DNN upscaling)
+
+A `Dockerfile` is provided to build a CUDA-enabled image that compiles OpenCV
+from source with GPU support, enabling hardware-accelerated DNN upscaling.
+
+**Requirements:** Docker + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
+
+```bash
+# Build with defaults (CUDA 13.3 / Ubuntu 24.04 / OpenCV 4.13)
+docker build -t imgtools_m8 .
+
+# Target a specific GPU compute capability (much faster compile)
+docker build --build-arg CUDA_ARCH_BIN=8.9 -t imgtools_m8 .
+
+# Run with GPU access
+docker run --gpus all imgtools_m8 --help
+```
+
+Find your GPU's compute capability at [developer.nvidia.com/cuda-gpus](https://developer.nvidia.com/cuda-gpus):
+RTX 30xx → `8.6`, RTX 40xx → `8.9`, RTX 50xx → `10.0`.
+
+Build arguments (`OPENCV_VERSION`, `CUDA_ARCH_BIN`) are documented in `.env.example`.
+A `docker-compose.yml` for multi-volume GPU batch processing is in `docker_compose/imgtools_dev/`.
+
+## Input/Output Example
 
 ### Input Image
-The source file is 340px width and 216px height.
+The source file is 340×216 px.
 <div align="center">
-  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/sources_test/recien_llegado.jpg" alt="Recien Llegado @Cezar llañez" width="340" height="216" />   
+  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/sources_test/recien_llegado.jpg" alt="Recien Llegado @Cezar llañez" width="340" height="216" />
   <p>Recien llegado by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a></p>
 </div>
 
-### Upscaled Output
-In some examples, the output is upscaled to 1200x762 px and saved as a JPEG with 80% quality,
-progressive encoding, and optimization:
-<div align="center">
-  <img src="https://raw.githubusercontent.com/mano8/imgtools_m8/main/tests/output_test/recien_llegado_1200x762.jpg" alt="Recien Llegado @Cezar llañez" width="1200px" />
-  <p>recien_llegado_1200x762.jpg by <a href="https://www.ichingmaestrodelosespiritus.com/">@Cezar yañez</a></p>
-</div>
+## License
 
-# License
-This project is licensed under the Apache 2 License - see the [LICENSE](https://github.com/mano8/imgtools_m8/blob/main/LICENCE) file for details.
+This project is licensed under the Apache 2 License — see the [LICENSE](https://github.com/mano8/imgtools_m8/blob/main/LICENCE) file for details.
 
-# Authors
- - [Eli Serra](https://github.com/mano8)
- - pre-trained models by [Xavier Weber](https://towardsdatascience.com/deep-learning-based-super-resolution-with-opencv-4fd736678066).
+## Authors
+
+- [Eli Serra](https://github.com/mano8)
+- Pre-trained DNN models by [Xavier Weber](https://towardsdatascience.com/deep-learning-based-super-resolution-with-opencv-4fd736678066)

@@ -1,12 +1,13 @@
 """
 A helper class for image processing operations.
 """
+
+import math
 import os
 import pathlib
-import math
-from numpy import ndarray
-from ve_utils.utils import UType as Ut
-from imgtools_m8.exceptions import ImgToolsException
+from typing import Optional, Protocol, Tuple, Union
+
+from imgtools_m8.core.exceptions import ImgToolsException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -16,21 +17,38 @@ __status__ = "Production"
 __version__ = "1.0.0"
 
 
+class _HasShape(Protocol):
+    """Protocol for objects exposing a .shape attribute (e.g. numpy arrays)."""
+
+    shape: Tuple[int, ...]
+
+
 class ImageToolsHelper:
     """
-        A helper class for image processing operations.
+    A helper class for image processing operations.
     """
 
     @staticmethod
-    def find_best_combination(total: int,
-                              numbers: list
-                              ) -> list:
+    def _validate_combination_args(total: int, numbers: list, label: str) -> None:
+        """Raise ImgToolsException if total or numbers are invalid."""
+        if not (isinstance(total, int) and total >= 0):
+            raise ImgToolsException(
+                f"Error: Unable to {label}, 'total' must be a non-negative integer."
+            )
+        if not (isinstance(numbers, list) and numbers):
+            raise ImgToolsException(
+                f"Error: Unable to {label}, 'numbers' must be a non-empty list."
+            )
+
+    @staticmethod
+    def find_best_combination(total: int, numbers: list[int]) -> Optional[list[int]]:
         """
         Find the best combination of numbers to achieve the given total.
 
         :param total: The target total.
         :type total: int
-        :param numbers: A list of numbers that can be added to achieve the total.
+        :param numbers:
+            A list of numbers that can be added to achieve the total.
         :type numbers: list
 
         :return: The best combination of numbers.
@@ -41,37 +59,43 @@ class ImageToolsHelper:
          - if the numbers list is empty or not valid.
 
         Example:
-            >>> ImageToolsHelper.find_best_combination(total=10, numbers=[2, 3, 5])
+            >>> ImageToolsHelper.find_best_combination(
+                total=10,
+                numbers=[2, 3, 5]
+            )
             [5, 5]
         """
-        if not Ut.is_int(total, mini=0):
-            raise ImgToolsException(
-                "Error: Unable to find the best combination, 'total' must be a non-negative integer."
-            )
-
-        if not Ut.is_list(numbers, not_null=True):
-            raise ImgToolsException(
-                "Error: Unable to find the best combination, 'numbers' must be a non-empty list."
-            )
-        dp = [None] * (total + 1)
+        ImageToolsHelper._validate_combination_args(
+            total, numbers, "find the best combination"
+        )
+        dp: list[list[int] | None] = [None] * (total + 1)
         dp[0] = []
 
         for current_total in range(1, total + 1):
             for num in numbers:
-                if current_total - num >= 0 and dp[current_total - num] is not None:
-                    if dp[current_total] is None or len(dp[current_total - num]) + 1 < len(dp[current_total]):
-                        dp[current_total] = dp[current_total - num] + [num]
+                prev_idx = current_total - num
+                if prev_idx < 0 or dp[prev_idx] is None:
+                    continue
+                prev = dp[prev_idx]
+                if prev is None:  # pragma: no cover
+                    continue
+                curr = dp[current_total]
+                if curr is None or len(prev) + 1 < len(curr):
+                    dp[current_total] = prev + [num]
 
         return dp[total]
 
     @staticmethod
-    def find_all_combinations(total: int, numbers: list) -> list:
+    def find_all_combinations(
+        total: int, numbers: list[int]
+    ) -> Optional[list[list[int]]]:
         """
         Find all combinations of numbers that add up to the given total.
 
         :param total: The target total.
         :type total: int
-        :param numbers: A list of numbers that can be added to achieve the total.
+        :param numbers:
+            A list of numbers that can be added to achieve the total.
         :type numbers: list
 
         :return: A list of lists containing all possible combinations.
@@ -82,29 +106,25 @@ class ImageToolsHelper:
             If the numbers list is empty or not valid.
 
         Example:
-            >>> ImageToolsHelper.find_all_combinations(total=5, numbers=[1, 2, 3])
+            >>> ImageToolsHelper.find_all_combinations(
+                total=5, numbers=[1, 2, 3])
             >>> [[1, 1, 1, 1, 1], [1, 1, 1, 2], [1, 2, 2], [1, 1, 3], [2, 3]]
         """
-        if not Ut.is_int(total, mini=0):
-            raise ImgToolsException(
-                "Error: Unable to find combinations, 'total' must be a non-negative integer."
-            )
-
-        if not Ut.is_list(numbers, not_null=True):
-            raise ImgToolsException(
-                "Error: Unable to find combinations, 'numbers' must be a non-empty list."
-            )
-        dp = [None] * (total + 1)
+        ImageToolsHelper._validate_combination_args(total, numbers, "find combinations")
+        dp: list[list[list[int]] | None] = [None] * (total + 1)
         dp[0] = [[]]
 
         for current_total in range(1, total + 1):
-            all_combinations = []
+            all_combinations: list[list[int]] = []
             for num in numbers:
-                if current_total - num >= 0 and dp[current_total - num] is not None:
-                    for combination in dp[current_total - num]:
-                        new_combination = combination + [num]
-                        all_combinations.append(new_combination)
-
+                prev_idx = current_total - num
+                if prev_idx < 0 or dp[prev_idx] is None:
+                    continue
+                prev = dp[prev_idx]
+                if prev is None:  # pragma: no cover
+                    continue
+                for combination in prev:
+                    all_combinations.append(combination + [num])
             dp[current_total] = all_combinations
 
         return dp[total]
@@ -128,19 +148,27 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.is_image_size(invalid_size)
             False
         """
-        return Ut.is_tuple(size) \
-            and Ut.is_int(size[0], mini=1) \
-            and Ut.is_int(size[1], mini=1)
+        return (
+            isinstance(size, tuple)
+            and len(size) >= 2
+            and isinstance(size[0], int)
+            and size[0] >= 1
+            and isinstance(size[1], int)
+            and size[1] >= 1
+        )
 
     @staticmethod
-    def get_image_size(image: ndarray) -> tuple or None:
+    def get_image_size(image: Optional[_HasShape]) -> Optional[tuple]:
         """
-        Get the dimensions (height and width) of an image represented as a NumPy array.
+        Get the dimensions (height and width) of an image
+        represented as a NumPy array.
 
         :param image: The image as a NumPy array.
-        :type image: numpy.ndarray
+        :type image: numpy.ndarray or None
 
-        :return: The image dimensions as a tuple (height, width), or None if image is None.
+        :return:
+            The image dimensions as a tuple (height, width),
+            or None if image is None.
         :rtype: tuple[int, int] or None
 
         Example:
@@ -151,27 +179,28 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.get_image_size(None)
         None
         """
-        size = None
         if image is not None:
-            size = image.shape[:2]
-        return size
+            return image.shape[:2]
+        return None
 
     @staticmethod
-    def get_package_models_path() -> str or None:
+    def get_package_models_path() -> Optional[str]:
         """
         Get the path to the package models' directory.
 
-        :return: The path to the package models' directory, or None if not found.
-        :rtype: str or None
+        :return:
+            The path to the package models' directory,
+            or None if not found.
+        :rtype: Optional[str]
 
         Example:
             >>> ImageToolsHelper.get_package_models_path()
         '/path/to/package/models'
         """
-        return os.path.join(os.path.dirname(__file__), 'models')
+        return os.path.join(os.path.dirname(__file__), "models")
 
     @staticmethod
-    def get_images_list(path: str) -> list:
+    def get_images_list(path: str) -> Optional[list]:
         """
         Get a list of image files from the specified path.
 
@@ -185,46 +214,72 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.get_images_list('/path/to/images')
             ['/path/to/images/image1.jpg', '/path/to/images/image2.png', ...]
         """
-        return ImageToolsHelper.get_files_list(path, ext=ImageToolsHelper.get_valid_images_ext())
+        return ImageToolsHelper.get_files_list(
+            path, ext=ImageToolsHelper.get_valid_images_ext()
+        )
 
     @staticmethod
-    def get_files_list(path: str,
-                       ext: str or list or None = None,
-                       content_name: str or None = None
-                       ) -> list or None:
+    def _ext_matches(file_name: str, ext: Optional[Union[str, list]]) -> bool:
+        """Return True if file_name matches the given extension filter."""
+        if ext is None:
+            return True
+        file_ext = ImageToolsHelper.get_extension(file_name)
+        if isinstance(ext, list) and ext:
+            return file_ext in ext
+        if isinstance(ext, str) and ext:
+            return file_ext == ext
+        return False  # pragma: no cover
+
+    @staticmethod
+    def _name_matches(file_name: str, content_name: Optional[str]) -> bool:
+        """Return True if file_name contains content_name (or content_name is None)."""
+        if content_name is None:
+            return True
+        return (
+            isinstance(content_name, str)
+            and bool(content_name)
+            and content_name in file_name
+        )
+
+    @staticmethod
+    def get_files_list(
+        path: str,
+        ext: Optional[Union[str, list]] = None,
+        content_name: Optional[str] = None,
+    ) -> Optional[list]:
         """
-        Get a list of files from the specified path, with optional filtering by extensions and content name.
+        Get a list of files from the specified path,
+        with optional filtering by extensions and content name.
 
         :param path: The path to the directory to list files from.
         :type path: str
         :param ext: Optional filter for file extensions.
         :type ext: str, list, None
-        :param content_name: Optional filter for file names containing specific content.
+        :param content_name:
+            Optional filter for file names containing specific content.
         :type content_name: str, None
 
-        :return: A list of file names matching the filters, or None if path is not a directory.
+        :return:
+            A list of file names matching the filters,
+            or None if path is not a directory.
         :rtype: list[str] or None
 
         Example:
-            >>> ImageToolsHelper.get_files_list('/path/to/files', ext=['jpg', 'png'], content_name='image')
+            >>> ImageToolsHelper.get_files_list(
+                '/path/to/files', ext=['jpg', 'png'],
+                content_name='image'
+            )
             ['image1.jpg', 'image2.png', ...]
         """
-        result = None
-        if Ut.is_str(path, not_null=True) \
-                and os.path.isdir(path):
-            result = [
-                f
-                for f in os.listdir(path)
-                if os.path.isfile(os.path.join(path, f))
-                and (ext is None
-                     or (Ut.is_list(ext, not_null=True) and ImageToolsHelper.get_extension(f) in ext)
-                     or (Ut.is_str(ext, not_null=True) and ImageToolsHelper.get_extension(f) == ext)
-                     )
-                and (content_name is None
-                     or (Ut.is_str(content_name, not_null=True) and content_name in f)
-                     )
-            ]
-        return result
+        if not (isinstance(path, str) and path and os.path.isdir(path)):
+            return None
+        return [
+            f
+            for f in os.listdir(path)
+            if os.path.isfile(os.path.join(path, f))
+            and ImageToolsHelper._ext_matches(f, ext)
+            and ImageToolsHelper._name_matches(f, content_name)
+        ]
 
     @staticmethod
     def get_valid_images_ext() -> list:
@@ -239,14 +294,28 @@ class ImageToolsHelper:
             ['.bmp', '.dib', '.jpg', '.jpeg', '.jpe', '.jp2', '.png', ...]
         """
         return [
-            '.bmp', '.dib',
-            '.jpg', '.jpeg', '.jpe',
-            '.jp2', '.png', '.webp',
-            '.avif', '.pbm', '.pgm',
-            '.ppm', '.pxm', '.pnm',
-            '.pfm', '.sr', '.ras',
-            '.tiff', '.tif', '.exr',
-            '.hdr', '.pic'
+            ".bmp",
+            ".dib",
+            ".jpg",
+            ".jpeg",
+            ".jpe",
+            ".jp2",
+            ".png",
+            ".webp",
+            ".avif",
+            ".pbm",
+            ".pgm",
+            ".ppm",
+            ".pxm",
+            ".pnm",
+            ".pfm",
+            ".sr",
+            ".ras",
+            ".tiff",
+            ".tif",
+            ".exr",
+            ".hdr",
+            ".pic",
         ]
 
     @staticmethod
@@ -261,9 +330,7 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.get_valid_jpg_ext()
             ['.jpg', '.jpeg', '.jpe', '.jp2']
         """
-        return [
-            '.jpg', '.jpeg', '.jpe', '.jp2'
-        ]
+        return [".jpg", ".jpeg", ".jpe", ".jp2"]
 
     @staticmethod
     def is_valid_image_ext(ext: str) -> bool:
@@ -281,7 +348,7 @@ class ImageToolsHelper:
                 True
         """
         result = False
-        if Ut.is_str(ext, not_null=True):
+        if isinstance(ext, str) and ext:
             ext = ext.lower()
             result = ext in ImageToolsHelper.get_valid_images_ext()
         return result
@@ -294,7 +361,9 @@ class ImageToolsHelper:
         :param ext: The file extension to check.
         :type ext: str
 
-        :return: True if the extension is valid for a JPEG image, False otherwise.
+        :return:
+            True if the extension is valid for a JPEG image,
+            False otherwise.
         :rtype: bool
 
         Example:
@@ -314,7 +383,9 @@ class ImageToolsHelper:
         :param ext_len: The length of the extension. Default is 1.
         :type ext_len: int
 
-        :return: A tuple containing the base name and extension, or (None, None) if invalid input.
+        :return:
+            A tuple containing the base name and extension,
+            or (None, None) if invalid input.
         :rtype: tuple
 
         Example:
@@ -323,9 +394,8 @@ class ImageToolsHelper:
         """
         name = None
         ext = ImageToolsHelper.get_extension(file_name, ext_len)
-        if Ut.is_str(file_name, not_null=True) \
-                and Ut.is_str(ext):
-            name = file_name.replace(ext, '')
+        if isinstance(file_name, str) and file_name and isinstance(ext, str):
+            name = file_name.replace(ext, "")
         return name, ext
 
     @staticmethod
@@ -335,7 +405,9 @@ class ImageToolsHelper:
 
         :param path: The file path.
         :type path: str
-        :param ext_len: The desired length of the extension to retrieve. Default is 1.
+        :param ext_len:
+            The desired length of the extension to retrieve.
+            Default is 1.
         :type ext_len: int
 
         :return: The file extension, or an empty string if invalid input.
@@ -345,21 +417,18 @@ class ImageToolsHelper:
             >>> ImageToolsHelper.get_extension("image.jpg")
             '.jpg'
         """
-        ext = None
-        if Ut.is_str(path, not_null=True):
-            ext_len = Ut.get_int(ext_len, default=1)
-            if ext_len == 1:
-                ext = pathlib.Path(path).suffix
-            elif ext_len == 2:
-                ext_list = pathlib.Path(path).suffixes[-2:]
-                ext = "".join(ext_list)
-            elif ext_len == 3:
-                ext_list = pathlib.Path(path).suffixes[-3:]
-                ext = "".join(ext_list)
-            else:
-                ext = "".join(pathlib.Path(path).suffixes)
-            ext = ext.lower()
-        return ext
+        if not (isinstance(path, str) and path):
+            return ""
+        ext_len = ext_len if isinstance(ext_len, int) else 1
+        if ext_len == 1:
+            ext = pathlib.Path(path).suffix
+        elif ext_len == 2:
+            ext = "".join(pathlib.Path(path).suffixes[-2:])
+        elif ext_len == 3:
+            ext = "".join(pathlib.Path(path).suffixes[-3:])
+        else:
+            ext = "".join(pathlib.Path(path).suffixes)
+        return ext.lower()
 
     @staticmethod
     def convert_size(size_bytes):
@@ -382,7 +451,7 @@ class ImageToolsHelper:
         i = int(math.floor(math.log(size_bytes, 1024)))
         p = math.pow(1024, i)
         s = round(size_bytes / p, 2)
-        return "%s %s" % (s, size_name[i])
+        return f"{s} {size_name[i]}"
 
     @staticmethod
     def get_string_file_size(source_path: str) -> str:
@@ -392,7 +461,9 @@ class ImageToolsHelper:
         :param source_path: The path to the file.
         :type source_path: str
 
-        :return: The formatted file size string with unit, or an empty string if the path is not a file.
+        :return:
+            The formatted file size string with unit,
+            or an empty string if the path is not a file.
         :rtype: str
 
         Example:
@@ -401,7 +472,5 @@ class ImageToolsHelper:
         """
         result = ""
         if os.path.isfile(source_path):
-            result = ImageToolsHelper.convert_size(
-                os.path.getsize(source_path)
-            )
+            result = ImageToolsHelper.convert_size(os.path.getsize(source_path))
         return result

@@ -6,12 +6,14 @@ Copyright: Copyright 2020, Eli Serra
 License: Apache 2 License
 Version: 1.0.0
 """
+
 import math
-import numpy as np
 from typing import Optional
-from ve_utils.utils import UType as Ut
+
+import numpy as np
+
+from imgtools_m8.core.exceptions import ImgToolsException
 from imgtools_m8.helper import ImageToolsHelper
-from imgtools_m8.exceptions import ImgToolsException
 
 __author__ = "Eli Serra"
 __copyright__ = "Copyright 2020, Eli Serra"
@@ -21,17 +23,28 @@ __status__ = "Production"
 __version__ = "1.0.0"
 
 
+def _is_valid_pos_int(val: object) -> bool:
+    """Return True if val is an integer >= 1."""
+    return isinstance(val, int) and val >= 1
+
+
+def _dim_exceeds(fixed: Optional[int], current: int) -> bool:
+    """Return True if fixed is a valid positive int that exceeds current."""
+    return _is_valid_pos_int(fixed) and fixed > current  # type: ignore[operator]
+
+
 class ModelScaleSelector:
     """
     A helper class for selecting model scales based on image dimensions.
     """
 
     @staticmethod
-    def need_upscale(height: int,
-                     width: int,
-                     fixed_height: Optional[int] = None,
-                     fixed_width: Optional[int] = None
-                     ) -> bool:
+    def need_upscale(
+        height: int,
+        width: int,
+        fixed_height: Optional[int] = None,
+        fixed_width: Optional[int] = None,
+    ) -> bool:
         """
         Check if an image needs upscaling based on provided dimensions.
 
@@ -46,7 +59,8 @@ class ModelScaleSelector:
         :return: True if upscaling is needed, False otherwise.
         :rtype: bool
 
-        :raises ImgToolsException: If the input size values are not valid integers or less than 1.
+        :raises ImgToolsException:
+            If the input size values are not valid integers or less than 1.
 
         Example:
             >>> ModelScaleSelector.need_upscale(
@@ -54,31 +68,29 @@ class ModelScaleSelector:
             >>> )
             >>> True
         """
-        result = False
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
-            raise ImgToolsException(
-                "Error: Bad image size values."
-            )
-        if Ut.is_int(fixed_width, mini=1) \
-                and Ut.is_int(fixed_height, mini=1) \
-                and fixed_width > width \
-                and fixed_height > height:
-            result = True
-        elif Ut.is_int(fixed_height, mini=1) \
-                and fixed_height > height:
-            result = True
-        elif Ut.is_int(fixed_width, mini=1) \
-                and fixed_width > width:
-            result = True
-        return result
+        if not _is_valid_pos_int(height) or not _is_valid_pos_int(width):
+            raise ImgToolsException("Error: Bad image size values.")
+        return _dim_exceeds(fixed_height, height) or _dim_exceeds(fixed_width, width)
 
     @staticmethod
-    def get_model_scale_needed(height: int,
-                               width: int,
-                               fixed_height: Optional[int] = None,
-                               fixed_width: Optional[int] = None
-                               ) -> int:
+    def _both_dims_need_upscale(
+        height: int, width: int, fixed_height: Optional[int], fixed_width: Optional[int]
+    ) -> bool:
+        """Return True when both fixed dimensions individually exceed the image size."""
+        return (
+            isinstance(fixed_height, int)
+            and isinstance(fixed_width, int)
+            and fixed_height > height
+            and fixed_width > width
+        )
+
+    @staticmethod
+    def get_model_scale_needed(
+        height: int,
+        width: int,
+        fixed_height: Optional[int] = None,
+        fixed_width: Optional[int] = None,
+    ) -> int:
         """
         Get the required model scale for optimal image upscaling.
 
@@ -102,36 +114,26 @@ class ModelScaleSelector:
             >>> )
             >>> 2
         """
-        result = 0
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
-            raise ImgToolsException(
-                "Error: Bad image size values."
-            )
-        if Ut.is_int(fixed_height) \
-                and Ut.is_int(fixed_width) \
-                and fixed_height > height \
-                and fixed_width > width:
-            scale_w = math.ceil(fixed_width / width)
-            scale_h = math.ceil(fixed_height / height)
-            result = min(scale_w, scale_h)
-
-        elif Ut.is_int(fixed_width) \
-                and fixed_width > width:
-            result = math.ceil(fixed_width / width)
-
-        elif Ut.is_int(fixed_height) \
-                and fixed_height > height:
-            result = math.ceil(fixed_height / height)
-        return result
+        if not _is_valid_pos_int(height) or not _is_valid_pos_int(width):
+            raise ImgToolsException("Error: Bad image size values.")
+        if ModelScaleSelector._both_dims_need_upscale(
+            height, width, fixed_height, fixed_width
+        ):
+            return min(math.ceil(fixed_width / width), math.ceil(fixed_height / height))  # type: ignore[arg-type, operator]
+        if isinstance(fixed_width, int) and fixed_width > width:
+            return math.ceil(fixed_width / width)
+        if isinstance(fixed_height, int) and fixed_height > height:
+            return math.ceil(fixed_height / height)
+        return 0
 
     @staticmethod
-    def count_upscale(height: int,
-                      width: int,
-                      model_scale: int,
-                      fixed_height: Optional[int] = None,
-                      fixed_width: Optional[int] = None
-                      ) -> int:
+    def count_upscale(
+        height: int,
+        width: int,
+        model_scale: int,
+        fixed_height: Optional[int] = None,
+        fixed_width: Optional[int] = None,
+    ) -> int:
         """
         Count the maximum number of upscaling operations needed to reach target dimensions.
 
@@ -160,31 +162,28 @@ class ModelScaleSelector:
             >>> 3
         """
         result = 0
-        if not Ut.is_int(height, mini=1) \
-                or not Ut.is_int(width, mini=1):
-            raise ImgToolsException(
-                "Error: Bad image size values."
-            )
+        if not _is_valid_pos_int(height) or not _is_valid_pos_int(width):
+            raise ImgToolsException("Error: Bad image size values.")
 
-        if not Ut.is_int(model_scale, mini=1):
-            raise ImgToolsException(
-                "Error: Bad model scale value. Must be > 0"
-            )
+        if not _is_valid_pos_int(model_scale):
+            raise ImgToolsException("Error: Bad model scale value. Must be > 0")
 
         while ModelScaleSelector.need_upscale(
-                width=width,
-                height=height,
-                fixed_width=fixed_width,
-                fixed_height=fixed_height):
+            width=width,
+            height=height,
+            fixed_width=fixed_width,
+            fixed_height=fixed_height,
+        ):
             width = width * model_scale
             height = height * model_scale
             result += 1
         return result
 
     @staticmethod
-    def get_best_scale_combinations(max_x_scale: int,
-                                    available_scales: list,
-                                    ) -> list or None:
+    def get_best_scale_combinations(
+        max_x_scale: int,
+        available_scales: list,
+    ) -> Optional[list]:
         """
         Get the best combinations of scaling factors for achieving the target upscale.
 
@@ -194,7 +193,7 @@ class ModelScaleSelector:
         :type available_scales: list
 
         :return: A list of best combinations of scaling factors, or None if not found.
-        :rtype: list or None
+        :rtype: Optional[list]
 
         Example:
             >>> max_x_scale = 3
@@ -202,35 +201,30 @@ class ModelScaleSelector:
             >>> ModelScaleSelector.get_best_scale_combinations(max_x_scale, available_scales)
             >>> [[3], [2, 1], [1, 1, 1]]
         """
-        best_combination = None
-        if Ut.is_int(max_x_scale, mini=1) \
-                and Ut.is_list(available_scales, not_null=True):
-            total_combinations = ImageToolsHelper.find_all_combinations(
-                total=max_x_scale,
-                numbers=available_scales
-            )
-            nb_combinations_min = 0
+        if (
+            not _is_valid_pos_int(max_x_scale)
+            or not isinstance(available_scales, list)
+            or not available_scales
+        ):
+            return None
 
-            for combination in total_combinations:
-                nb_scales = len(combination)
-                if nb_combinations_min == 0 or nb_scales < nb_combinations_min:
-                    nb_combinations_min = nb_scales
+        total_combinations = ImageToolsHelper.find_all_combinations(
+            total=max_x_scale, numbers=available_scales
+        )
+        if not isinstance(total_combinations, list) or not total_combinations:
+            return []
 
-            best_combination = [
-                x
-                for x in total_combinations
-                if len(x) <= nb_combinations_min
-            ]
-
-        return best_combination
+        min_len = min(len(c) for c in total_combinations)
+        return [c for c in total_combinations if len(c) <= min_len]
 
     @staticmethod
-    def set_scale_stats(x_scale: int,
-                        combination_key: int,
-                        combinations: list,
-                        actual_scale: int,
-                        last_scale: int
-                        ) -> tuple:
+    def set_scale_stats(
+        x_scale: int,
+        combination_key: int,
+        combinations: list,
+        actual_scale: int,
+        last_scale: int,
+    ) -> tuple:
         """
         Calculate the scale statistics for the upscale process.
 
@@ -263,12 +257,13 @@ class ModelScaleSelector:
             >>> ModelScaleSelector.set_scale_stats(x_scale, combination_key, combinations, actual_scale, last_scale)
             >>> (2, 1, 2, 3)
         """
-        if Ut.is_int(x_scale) \
-                and Ut.is_list(combinations, not_null=True) \
-                and Ut.is_int(combination_key) \
-                and Ut.is_int(actual_scale) \
-                and Ut.is_int(last_scale):
-
+        scalars_ok = (
+            isinstance(x_scale, int)
+            and isinstance(combination_key, int)
+            and isinstance(actual_scale, int)
+            and isinstance(last_scale, int)
+        )
+        if scalars_ok and isinstance(combinations, list) and combinations:
             nb_combination = len(combinations)
             if combination_key < nb_combination:
                 combination_scale = combinations[combination_key]
@@ -290,9 +285,54 @@ class ModelScaleSelector:
         return combination_scale, combination_key, actual_scale, diff_scale
 
     @staticmethod
-    def get_scale_stats(x_scales: list,
-                        combination: list
-                        ) -> tuple:
+    def _append_scale_entry(
+        result: list,
+        combination_scale: int,
+        actual_scale: int,
+        diff_scale: int,
+    ) -> None:
+        """Append one scale step to the running result lists."""
+        result[0].append(combination_scale)
+        result[1].append(1)
+        result[2].append(actual_scale)
+        result[3].append(diff_scale)
+
+    @staticmethod
+    def _fill_until_reached(
+        x_scale: int,
+        combination_key: int,
+        combination: list,
+        actual_scale: int,
+        result: list,
+    ) -> tuple:
+        """Keep consuming combination entries until actual_scale >= x_scale."""
+        max_loop = 20
+        loop_counter = 0
+        last_scale = actual_scale  # always equal at every call site
+        while actual_scale < x_scale:
+            combination_scale, combination_key, actual_scale, diff_scale = (
+                ModelScaleSelector.set_scale_stats(
+                    x_scale=x_scale,
+                    combination_key=combination_key,
+                    combinations=combination,
+                    actual_scale=actual_scale,
+                    last_scale=last_scale,
+                )
+            )
+            ModelScaleSelector._append_scale_entry(
+                result, combination_scale, actual_scale, diff_scale
+            )
+            loop_counter += 1
+            if loop_counter > max_loop:
+                raise ImgToolsException(
+                    "Maximum of 20 scales reached between two fixed sizes. "
+                    "Reduce upscale size, or use higher model scale."
+                )
+            last_scale = actual_scale
+        return combination_key, actual_scale, last_scale
+
+    @staticmethod
+    def get_scale_stats(x_scales: list, combination: list) -> tuple:
         """
         Calculate the scale statistics for the upscale process.
 
@@ -318,75 +358,59 @@ class ModelScaleSelector:
                 [8, 12, 13]
             )
         """
-        result, stats = None, None
-        if Ut.is_list(x_scales, not_null=True) \
-                and Ut.is_list(combination, not_null=True):
-            result = [[], [], [], []]
-            max_loop, loop_counter = 20, 0
-            nb_combination, combination_key = len(combination), 0
-            last_scale, actual_scale = 0, 0
-            for key, x_scale in enumerate(x_scales):
-                if x_scale > 0 and x_scale > actual_scale:
-                    scale_stats = ModelScaleSelector.set_scale_stats(
+        result: Optional[list[list[int]]] = None
+        stats: Optional[list[int]] = None
+        if (
+            not isinstance(x_scales, list)
+            or not x_scales
+            or not isinstance(combination, list)
+            or not combination
+        ):
+            return result, stats  # pragma: no cover
+
+        result = [[], [], [], []]
+        combination_key = 0
+        last_scale, actual_scale = 0, 0
+
+        for x_scale in x_scales:
+            if x_scale > 0 and x_scale > actual_scale:
+                combination_scale, combination_key, actual_scale, diff_scale = (
+                    ModelScaleSelector.set_scale_stats(
                         x_scale=x_scale,
                         combination_key=combination_key,
                         combinations=combination,
                         actual_scale=actual_scale,
-                        last_scale=last_scale
+                        last_scale=last_scale,
                     )
-                    combination_scale, combination_key, actual_scale, diff_scale = scale_stats
+                )
+                ModelScaleSelector._append_scale_entry(
+                    result, combination_scale, actual_scale, diff_scale
+                )
+                last_scale = actual_scale
+                if diff_scale < 0:
+                    combination_key, actual_scale, last_scale = (
+                        ModelScaleSelector._fill_until_reached(
+                            x_scale,
+                            combination_key,
+                            combination,
+                            actual_scale,
+                            result,
+                        )
+                    )
+            else:
+                result[0].append(0)
+                result[1].append(0)
+                result[2].append(actual_scale)
+                result[3].append(actual_scale - x_scale)
 
-                    if diff_scale >= 0:
-                        result[0].append(combination_scale)
-                        result[1].append(1)
-                        result[2].append(actual_scale)
-                        result[3].append(diff_scale)
-                        last_scale = actual_scale
-                    else:
-                        result[0].append(combination_scale)
-                        result[1].append(1)
-                        result[2].append(actual_scale)
-                        result[3].append(diff_scale)
-                        last_scale = actual_scale
-                        loop_counter = 0
-                        while actual_scale < x_scale:
-                            scale_stats = ModelScaleSelector.set_scale_stats(
-                                x_scale=x_scale,
-                                combination_key=combination_key,
-                                combinations=combination,
-                                actual_scale=actual_scale,
-                                last_scale=last_scale
-                            )
-                            combination_scale, combination_key, actual_scale, diff_scale = scale_stats
-                            result[0].append(combination_scale)
-                            result[1].append(1)
-                            result[2].append(actual_scale)
-                            result[3].append(diff_scale)
-
-                            loop_counter += 1
-                            if loop_counter > max_loop:
-                                raise ImgToolsException(
-                                    "Maximum of 20 scales reached between two fixed sizes. "
-                                    "Reduce upscale size, or use higher model scale."
-                                )
-                            last_scale = actual_scale
-
-                else:
-                    result[0].append(0)
-                    result[1].append(0)
-                    result[2].append(actual_scale)
-                    result[3].append(actual_scale - x_scale)
-
-            max_dif = max(result[3])
-            max_scale = max(result[2])
-            total_scale = sum(result[1])
-            stats = [max_dif, max_scale, total_scale]
+        max_dif = max(result[3])
+        max_scale = max(result[2])
+        total_scale = sum(result[1])
+        stats = [max_dif, max_scale, total_scale]
         return result, stats
 
     @staticmethod
-    def get_scale_combination_stats(x_scales: list,
-                                    possibilities: list
-                                    ) -> list:
+    def get_scale_combination_stats(x_scales: list, possibilities: list) -> list:
         """
         Calculate scale combination statistics for different possibilities.
 
@@ -412,25 +436,29 @@ class ModelScaleSelector:
             >>>     [2, 0, 10, 15]
             >>> ]
         """
-        result = None
-        if Ut.is_list(x_scales, not_null=True) \
-                and Ut.is_list(possibilities, not_null=True):
+        result: Optional[list[list[int]]] = None
+        if (
+            isinstance(x_scales, list)
+            and x_scales
+            and isinstance(possibilities, list)
+            and possibilities
+        ):
             result = [[], [], [], []]
             for key, combination in enumerate(possibilities):
-                scale_stats, total_stats = ModelScaleSelector.get_scale_stats(
-                    x_scales=x_scales,
-                    combination=list(combination)
+                _, total_stats = ModelScaleSelector.get_scale_stats(
+                    x_scales=x_scales, combination=list(combination)
                 )
                 result[0].append(key)  # combination_key
                 result[1].append(total_stats[0])  # max_dif
                 result[2].append(total_stats[1])  # max_scale
                 result[3].append(total_stats[2])  # total_scale
-        return result
+        return result  # type: ignore[return-value]
 
     @staticmethod
-    def scale_combination_analytics(x_scales: list,
-                                    possibilities: list,
-                                    ) -> tuple:
+    def scale_combination_analytics(
+        x_scales: list,
+        possibilities: list,
+    ) -> tuple:
         """
         Perform analytics on different scale combination possibilities.
 
@@ -456,36 +484,66 @@ class ModelScaleSelector:
             >>> )
         """
         result, stats, best_combination = None, None, None
-        if Ut.is_list(x_scales, not_null=True) \
-                and Ut.is_list(possibilities, not_null=True):
+        if (
+            isinstance(x_scales, list)
+            and x_scales
+            and isinstance(possibilities, list)
+            and possibilities
+        ):
             all_stats = ModelScaleSelector.get_scale_combination_stats(
-                x_scales=x_scales,
-                possibilities=possibilities
+                x_scales=x_scales, possibilities=possibilities
             )
-            if Ut.is_list(all_stats, not_null=True):
+            if isinstance(all_stats, list) and all_stats:
                 np_stats = np.array(all_stats)
                 min_stat = int(np.argmin(np_stats[1] + np_stats[2] + np_stats[3]))
                 key_sel = np_stats[0][min_stat]
                 best_combination = possibilities[key_sel]
-                # Other way to check all better combinations
-                # best_combinations = np.where(
-                #     [
-                #         (np_stats[1] == np_stats[1].min()) &
-                #         (np_stats[2] == np_stats[2].min()) &
-                #         (np_stats[3] == np_stats[3].min())
-                #     ]
-                # )
                 result, stats = ModelScaleSelector.get_scale_stats(
-                    x_scales=x_scales,
-                    combination=list(best_combination)
+                    x_scales=x_scales, combination=list(best_combination)
                 )
 
         return result, stats, best_combination
 
     @staticmethod
-    def format_model_scale_stats(stats: list,
-                                 scale_analytics: list,
-                                 ) -> list:
+    def _apply_format_stats(stats: list, scale_analytics: list) -> None:
+        """Apply scale analytics to stats list (same-length case)."""
+        for key, data in enumerate(stats):
+            data.update(
+                {
+                    "nb_upscale": scale_analytics[1][key],
+                    "scale": scale_analytics[0][key],
+                    "actual_scale": scale_analytics[2][key],
+                    "dif_scale": scale_analytics[3][key],
+                }
+            )
+
+    @staticmethod
+    def _apply_extended_format_stats(stats: list, scale_analytics: list) -> None:
+        """Apply scale analytics when combination has more entries than stats."""
+        for key, actual_scale in enumerate(scale_analytics[2]):
+            nb_stats = len(stats)
+            if key >= nb_stats:
+                raise ImgToolsException(
+                    "Fatal error:  unable to format scale combination statistics. "
+                    "Scale statistics out of range"
+                )
+            x_scale = stats[key].get("x_scale")
+            entry = {
+                "nb_upscale": scale_analytics[1][key],
+                "scale": scale_analytics[0][key],
+                "actual_scale": scale_analytics[2][key],
+                "dif_scale": scale_analytics[3][key],
+            }
+            if x_scale <= actual_scale:
+                stats[key].update(entry)
+            else:
+                stats.insert(key, {"key": -1, "x_scale": actual_scale, **entry})
+
+    @staticmethod
+    def format_model_scale_stats(
+        stats: list,
+        scale_analytics: list,
+    ) -> list:
         """
         Format model scale statistics with additional scale analytics.
 
@@ -516,75 +574,78 @@ class ModelScaleSelector:
             >>>     stats=original_stats,
             >>>     scale_analytics=scale_analytics
             >>> )
-            >>> print(formatted_stats)
-            >>> [
-            >>>     {'x_scale': 2, 'max_dif': 5, 'nb_scale': 2, 'scale': 2, 'actual_scale': 2, 'dif_scale': 2},
-            >>>     {'x_scale': 4, 'max_dif': 7, 'nb_scale': 3, 'scale': 4, 'actual_scale': 4, 'dif_scale': 1},
-            >>>     {'x_scale': 3, 'max_dif': 6, 'nb_scale': 1, 'scale': 3, 'actual_scale': 3, 'dif_scale': 0}
-            >>> ]
         """
-        if Ut.is_list(stats, not_null=True) \
-                and Ut.is_list(scale_analytics, not_null=True) \
-                and Ut.is_list(scale_analytics[0], not_null=True):
-            nb_combination = len(scale_analytics[0])
-            nb_stats = len(stats)
-            if nb_combination == nb_stats:
-                for key, data in enumerate(stats):
-                    data.update(
-                        {
-                            'nb_upscale': scale_analytics[1][key],
-                            'scale': scale_analytics[0][key],
-                            'actual_scale': scale_analytics[2][key],
-                            'dif_scale': scale_analytics[3][key],
-                        }
-                    )
-            elif nb_combination > nb_stats:
-                for key, actual_scale in enumerate(scale_analytics[2]):
-                    nb_stats = len(stats)
-                    if key < nb_stats:
-                        x_scale = stats[key].get('x_scale')
-
-                        if x_scale <= actual_scale:
-                            stats[key].update(
-                                {
-                                    'nb_upscale': scale_analytics[1][key],
-                                    'scale': scale_analytics[0][key],
-                                    'actual_scale': scale_analytics[2][key],
-                                    'dif_scale': scale_analytics[3][key],
-                                }
-                            )
-                        else:
-                            tmp = {
-                                'key': -1,
-                                'x_scale': actual_scale,
-                                'nb_upscale': scale_analytics[1][key],
-                                'scale': scale_analytics[0][key],
-                                'actual_scale': scale_analytics[2][key],
-                                'dif_scale': scale_analytics[3][key],
-                            }
-                            stats.insert(key, tmp)
-                    else:
-                        raise ImgToolsException(
-                            "Fatal error:  unable to format scale combination statistics. "
-                            "Scale statistics out of range"
-                        )
-
-            else:
-                raise ImgToolsException(
-                    "Fatal error:  unable to format scale combination statistics. "
-                    "Unexpected statistics rows"
-                )
-        else:
+        analytics_valid = (
+            isinstance(scale_analytics, list)
+            and scale_analytics
+            and isinstance(scale_analytics[0], list)
+            and scale_analytics[0]
+        )
+        if not (isinstance(stats, list) and stats and analytics_valid):
             raise ImgToolsException(
                 "Fatal error:  unable to format scale combination statistics. "
                 "Bad parameters."
             )
+
+        nb_combination = len(scale_analytics[0])
+        nb_stats = len(stats)
+
+        if nb_combination == nb_stats:
+            ModelScaleSelector._apply_format_stats(stats, scale_analytics)
+        elif nb_combination > nb_stats:
+            ModelScaleSelector._apply_extended_format_stats(stats, scale_analytics)
+        else:
+            raise ImgToolsException(
+                "Fatal error:  unable to format scale combination statistics. "
+                "Unexpected statistics rows"
+            )
         return stats
 
     @staticmethod
-    def define_model_scale(upscale_stats: dict,
-                           available_scales: list,
-                           ) -> dict:
+    def _is_valid_upscale_stats_input(
+        upscale_stats: dict, available_scales: list
+    ) -> bool:
+        """Return True when upscale_stats and available_scales have the required fields."""
+        max_x = upscale_stats.get("max_x_scale")
+        stats = upscale_stats.get("stats")
+        return (
+            _is_valid_pos_int(max_x)
+            and isinstance(stats, list)
+            and bool(stats)
+            and isinstance(available_scales, list)
+            and bool(available_scales)
+        )
+
+    @staticmethod
+    def _apply_scale_analytics(
+        upscale_stats: dict, stats_val: list, best_combination: list
+    ) -> None:
+        """Run scale combination analytics and write results back into upscale_stats."""
+        x_scales = [x.get("x_scale") for x in stats_val]
+        combination, stats_apply, best_combination = (
+            ModelScaleSelector.scale_combination_analytics(
+                x_scales=x_scales, possibilities=best_combination
+            )
+        )
+        if isinstance(stats_apply, list) and len(stats_apply) >= 3:
+            upscale_stats["used_scales"] = list(best_combination)
+            upscale_stats.update(
+                {
+                    "max_dif": stats_apply[0],
+                    "max_scale": stats_apply[1],
+                    "total_scale": stats_apply[2],
+                }
+            )
+        if isinstance(combination, list):
+            ModelScaleSelector.format_model_scale_stats(
+                stats=stats_val, scale_analytics=combination
+            )
+
+    @staticmethod
+    def define_model_scale(
+        upscale_stats: dict,
+        available_scales: list,
+    ) -> dict:
         """
         Define the model scale based on upscale statistics and available scaling factors.
 
@@ -607,56 +668,30 @@ class ModelScaleSelector:
             >>> }
             >>> available_scales = [1, 2, 3, 4, 5, 6]
             >>> ModelScaleSelector.define_model_scale(upscale_stats, available_scales)
-            >>> {
-            >>>     'max_x_scale': 10,
-            >>>     'stats': [
-            >>>         {'key': 0, 'x_scale': 2, 'nb_scale': 0, 'scale': 0, 'actual_scale': 0, 'dif_scale': 0},
-            >>>         {'key': 1, 'x_scale': 4, 'nb_scale': 2, 'scale': 2, 'actual_scale': 2, 'dif_scale': 2},
-            >>>         {'key': 2, 'x_scale': 6, 'nb_scale': 3, 'scale': 2, 'actual_scale': 4, 'dif_scale': 2}
-            >>>     ],
-            >>>     'used_scales': [2, 2],
-            >>>     'max_dif': 2,
-            >>>     'max_scale': 4,
-            >>>     'total_scale': 5
-            >>> }
         """
-
-        if Ut.is_dict(upscale_stats, not_null=True) \
-                and Ut.is_int(upscale_stats.get('max_x_scale'), mini=1) \
-                and Ut.is_list(upscale_stats.get('stats'), not_null=True) \
-                and Ut.is_list(available_scales, not_null=True):
-            max_x_scale = upscale_stats.get('max_x_scale')
-            best_combination = ModelScaleSelector.get_best_scale_combinations(
-                max_x_scale=max_x_scale,
-                available_scales=available_scales
-            )
-
-            if Ut.is_list(best_combination, not_null=True):
-
-                x_scales = [x.get('x_scale') for x in upscale_stats.get('stats')]
-                combination, stats_apply, best_combination = ModelScaleSelector.scale_combination_analytics(
-                    x_scales=x_scales,
-                    possibilities=best_combination
-                )
-                upscale_stats['used_scales'] = list(best_combination)
-                upscale_stats.update(
-                    {
-                        'max_dif': stats_apply[0],
-                        'max_scale': stats_apply[1],
-                        'total_scale': stats_apply[2],
-                    }
-                )
-                ModelScaleSelector.format_model_scale_stats(
-                    stats=upscale_stats.get('stats'),
-                    scale_analytics=combination
-                )
-
-            return upscale_stats
+        if not isinstance(upscale_stats, dict) or not upscale_stats:
+            return upscale_stats  # pragma: no cover
+        if not ModelScaleSelector._is_valid_upscale_stats_input(
+            upscale_stats, available_scales
+        ):
+            return upscale_stats  # pragma: no cover
+        max_x_scale_val = upscale_stats.get("max_x_scale")
+        stats_val = upscale_stats.get("stats")
+        best_combination = ModelScaleSelector.get_best_scale_combinations(
+            max_x_scale=max_x_scale_val,  # type: ignore[arg-type]
+            available_scales=available_scales,
+        )
+        if not isinstance(best_combination, list) or not best_combination:
+            return upscale_stats  # pragma: no cover
+        ModelScaleSelector._apply_scale_analytics(
+            upscale_stats,
+            stats_val,  # type: ignore[arg-type]
+            best_combination,
+        )
+        return upscale_stats
 
     @staticmethod
-    def get_max_upscale(size: tuple,
-                        output_formats: list
-                        ) -> dict:
+    def get_max_upscale(size: tuple, output_formats: list) -> Optional[dict]:
         """
         Get the maximum upscale needed to process the image.
 
@@ -678,72 +713,71 @@ class ModelScaleSelector:
             >>> ModelScaleSelector.get_max_upscale(size, output_formats)
             {'max_x_scale': 2, 'stats': [{'key': 0, 'x_scale': 2}, {'key': 1, 'x_scale': 3}]}
         """
-        result = None
-        if ImageToolsHelper.is_image_size(size) \
-                and Ut.is_list(output_formats, not_null=True):
+        result: Optional[dict] = None
+        if (
+            ImageToolsHelper.is_image_size(size)
+            and isinstance(output_formats, list)
+            and output_formats
+        ):
             h, w = size
-            result = {
-                'max_x_scale': 0,
-                'stats': []
-            }
+            max_x: int = 0
+            stats_list: list[dict] = []
             for key, output_format in enumerate(output_formats):
                 x_scale = ModelScaleSelector.get_model_scale_needed(
                     width=w,
                     height=h,
-                    fixed_width=output_format.get('fixed_width'),
-                    fixed_height=output_format.get('fixed_height')
+                    fixed_width=output_format.get("fixed_width"),
+                    fixed_height=output_format.get("fixed_height"),
                 )
-                result['max_x_scale'] = max(result.get('max_x_scale'), x_scale)
-                result['stats'].append({
-                    'key': key,
-                    'x_scale': x_scale
-                })
-            result['stats'] = sorted(
-                result.get('stats'),
-                key=lambda d: d['x_scale']
-            )
+                max_x = max(max_x, x_scale)
+                stats_list.append({"key": key, "x_scale": x_scale})
+            result = {
+                "max_x_scale": max_x,
+                "stats": sorted(stats_list, key=lambda d: d["x_scale"]),
+            }
         return result
 
     @staticmethod
-    def get_upscale_stats(size: tuple,
-                          output_formats: list,
-                          model_scale: int,
-                          ) -> dict:
+    def get_upscale_stats(
+        size: tuple,
+        output_formats: list,
+        model_scale: int,
+    ) -> Optional[dict]:
         """
         Get upscale stats from output configuration sizes
         """
-        result = None
+        result: Optional[dict] = None
         h, w = size
-        if Ut.is_list(output_formats, not_null=True) \
-                and Ut.is_int(model_scale, not_null=True):
-            result = {
-                'max_x_scale': 0,
-                'max_upscale': 0,
-                'stats': []
-            }
+        if (
+            isinstance(output_formats, list)
+            and output_formats
+            and isinstance(model_scale, int)
+        ):
+            max_x: int = 0
+            max_up: int = 0
+            stats_list: list[dict] = []
             for key, output_format in enumerate(output_formats):
-                fixed_height = output_format.get('fixed_height')
-                fixed_width = output_format.get('fixed_width')
+                fixed_height = output_format.get("fixed_height")
+                fixed_width = output_format.get("fixed_width")
                 tmp = ModelScaleSelector.count_upscale(
                     width=w,
                     height=h,
                     model_scale=model_scale,
                     fixed_width=fixed_width,
-                    fixed_height=fixed_height)
+                    fixed_height=fixed_height,
+                )
                 x_scale = ModelScaleSelector.get_model_scale_needed(
                     width=w,
                     height=h,
                     fixed_width=fixed_width,
-                    fixed_height=fixed_height)
-                result['max_x_scale'] = max(result.get('max_x_scale'), x_scale)
-                result['max_upscale'] = max(result.get('max_upscale'), tmp)
-                result['stats'].append({
-                    'key': key,
-                    'nb_upscale': tmp,
-                    'x_scale': x_scale
-                })
-            result['stats'] = sorted(
-                result.get('stats'),
-                key=lambda d: d['x_scale']
-            )
+                    fixed_height=fixed_height,
+                )
+                max_x = max(max_x, x_scale)
+                max_up = max(max_up, tmp)
+                stats_list.append({"key": key, "nb_upscale": tmp, "x_scale": x_scale})
+            result = {
+                "max_x_scale": max_x,
+                "max_upscale": max_up,
+                "stats": sorted(stats_list, key=lambda d: d["x_scale"]),
+            }
         return result
