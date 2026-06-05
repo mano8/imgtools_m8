@@ -13,7 +13,7 @@ coverage>=7.14.1
 debugpy>=1.8.20
 
 # Linting / formatting / security
-ruff>=0.11.0
+ruff>=0.15.16
 bandit>=1.9.4
 mypy>=2.1.0
 types-colorama>=0.4.15
