@@ -5,6 +5,60 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[project]
+name = "imgtools_m8"
+dynamic = ["version"]
+description = "Python image processing package for converting, downscaling, and optionally upscaling images using Pillow."
+readme = "README.md"
+license = "Apache-2.0"
+authors = [
+    {name = "Eli Serra", email = "mano8@gmail.com"}
+]
+keywords = ["Python", "image converter", "image scale", "cv2", "deep-learning"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "Pillow>=12.2.0",
+    "pydantic>=2.13.4",
+    "numpy>=2.4.6",
+]
+
+[project.optional-dependencies]
+dnn = ["opencv-contrib-python>=4.13.0.92"]
+cli = ["colorama>=0.4.6"]
+test = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "coverage>=7.14.1",
+    "ruff>=0.11.0",
+    "mypy>=2.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/mano8/imgtools_m8"
+
+[project.scripts]
+imgtools = "imgtools_m8.__main__:main"
+
+[tool.setuptools]
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = {attr = "imgtools_m8.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["imgtools_m8*"]
+
+[tool.setuptools.package-data]
+"imgtools_m8" = ["models/*.pb"]
+
 [tool.bandit]
 exclude_dirs = ["tests"]
 
