@@ -91,6 +91,42 @@ class ImageExpander:
         """
         return self.model_conf is not None and self.model_conf.is_ready()
 
+    @staticmethod
+    def _parse_model_conf(
+        model_conf: Optional[UpscaleModelDict],
+    ) -> tuple:
+        """Extract (model_path, model_name, scale, scale_selector) from a conf dict."""
+        model_path: Optional[str] = ImageToolsHelper.get_package_models_path()
+        model_name: str = "edsr"
+        scale: int = 2
+        scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE
+
+        if not (isinstance(model_conf, dict) and model_conf):
+            return model_path, model_name, scale, scale_selector
+
+        raw_path = model_conf.get("path")
+        if isinstance(raw_path, str) and ModelConf.is_model_path(raw_path):
+            model_path = raw_path
+
+        raw_name = model_conf.get("model_name")
+        if isinstance(raw_name, str) and ModelConf.is_model_name(raw_name):
+            model_name = raw_name
+
+        raw_scale = model_conf.get("scale")
+        if isinstance(raw_scale, int) and ModelConf.is_scale(
+            model_path=model_path, model_name=model_name, scale=raw_scale
+        ):
+            scale = raw_scale
+            scale_selector = ScaleSelector.FIXED_SCALE
+
+        raw_selector = model_conf.get("scale_selector")
+        if isinstance(raw_selector, ScaleSelector) and ModelConf.is_scale_selector(
+            raw_selector
+        ):
+            scale_selector = raw_selector
+
+        return model_path, model_name, scale, scale_selector
+
     def set_model_conf(self, model_conf: Optional[UpscaleModelDict] = None) -> bool:
         """
         Set the model configuration for the ImageExpander.
@@ -113,42 +149,16 @@ class ImageExpander:
             >>> expander.set_model_conf(model_config)
             True
         """
-        model_path: Optional[str] = ImageToolsHelper.get_package_models_path()
-        model_name: str = "edsr"
-        scale: int = 2
-        scale_selector: ScaleSelector = ScaleSelector.AUTO_SCALE
-        if isinstance(model_conf, dict) and model_conf:
-            raw_path = model_conf.get("path")
-            if isinstance(raw_path, str) and ModelConf.is_model_path(raw_path):
-                model_path = raw_path
-
-            raw_name = model_conf.get("model_name")
-            if isinstance(raw_name, str) and ModelConf.is_model_name(raw_name):
-                model_name = raw_name
-
-            raw_scale = model_conf.get("scale")
-            if isinstance(raw_scale, int) and ModelConf.is_scale(
-                model_path=model_path,
-                model_name=model_name,
-                scale=raw_scale,
-            ):
-                scale = raw_scale
-                scale_selector = ScaleSelector.FIXED_SCALE
-
-            raw_selector = model_conf.get("scale_selector")
-            if isinstance(raw_selector, ScaleSelector) and ModelConf.is_scale_selector(
-                raw_selector
-            ):
-                scale_selector = raw_selector
-
+        model_path, model_name, scale, scale_selector = ImageExpander._parse_model_conf(
+            model_conf
+        )
         self.model_conf = ModelConf(
             model_path=model_path,
             model_name=model_name,
             scale=scale,
             scale_selector=scale_selector,
         )
-        test = self.model_conf.is_ready()
-        return test
+        return self.model_conf.is_ready()
 
     def init_sr(self):
         """
@@ -227,6 +237,23 @@ class ImageExpander:
             image = self.sr.upsample(image)
         return image
 
+    def _maybe_reload_scale(self, scale: Optional[int]) -> None:
+        """Switch to a new scale and reload the model if needed."""
+        if self.model_conf is None:  # pragma: no cover
+            return  # pragma: no cover
+        is_scale = ModelConf.is_scale(
+            model_path=self.model_conf.model_path,
+            model_name=self.model_conf.model_name,
+            scale=scale,
+        )
+        if isinstance(scale, int) and not is_scale:
+            raise ImgToolsException("Fatal Error: Invalid model scale selected.")
+        if is_scale and self.model_conf.scale != scale:
+            self.model_conf.set_scale(scale)
+            if not self.is_ready():
+                self.init_sr()
+            self.load_model()
+
     def many_image_upscale(
         self, image: object, nb_upscale: int, scale: Optional[int] = None
     ) -> Optional[object]:
@@ -255,28 +282,16 @@ class ImageExpander:
             )
         """
         max_upscale = 10
-        if (
+        if not (
             image is not None
             and isinstance(nb_upscale, int)
             and 1 <= nb_upscale <= max_upscale
             and self.model_conf is not None
         ):
-            is_scale = ModelConf.is_scale(
-                model_path=self.model_conf.model_path,
-                model_name=self.model_conf.model_name,
-                scale=scale,
-            )
-            if isinstance(scale, int) and not is_scale:
-                raise ImgToolsException("Fatal Error: Invalid model scale selected.")
-
-            if is_scale and self.model_conf.scale != scale:
-                self.model_conf.set_scale(scale)
-                if not self.is_ready():
-                    self.init_sr()
-                self.load_model()
-
-            counter = 0
-            while counter < nb_upscale and counter <= max_upscale:
-                image = self.upscale_image(image)
-                counter += 1
+            return image
+        self._maybe_reload_scale(scale)
+        counter = 0
+        while counter < nb_upscale and counter <= max_upscale:
+            image = self.upscale_image(image)
+            counter += 1
         return image

@@ -31,7 +31,7 @@ pip install "git+https://github.com/mano8/imgtools_m8" --upgrade
 ## Dependencies
 
 | Package | Required | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `Pillow>=12.2.0` | yes | Core image I/O and format conversion |
 | `pydantic>=2.13.4` | yes | Config validation |
 | `numpy>=2.4.6` | yes | Array support |
@@ -97,7 +97,7 @@ Each entry in `output_options` may specify:
 ### `image_size` variants (mutually exclusive where noted)
 
 | Field | Description |
-|---|---|
+| --- | --- |
 | `fixed_width` | Resize to exact width, keep aspect ratio |
 | `fixed_height` | Resize to exact height, keep aspect ratio |
 | `fixed_width` + `fixed_height` | Fit within bounding box, keep aspect ratio |

@@ -25,7 +25,7 @@ Classify images with image reconizion tool.
 ### Normalise image size and/or image conversion
 
 | Option | Type | Description |
-| ------ |  ------ |  ------ |
+| ------ | ------ | ------ |
 | `source_path` | str | Source path of directory or single image. |
 | `include_subdirs` | Optional(bool) | If True apply to all images included subdirs, by default limited to 4. |
 | `output_path` | str | Output path directory. |
@@ -35,7 +35,7 @@ Classify images with image reconizion tool.
 The package provides versatile options to resize and or covert images, including:
 
 | Option | Type | Description |
-| ------ |  ------ |  ------ |
+| ------ | ------ | ------ |
 | `fixed_width` | Optional(int) | Resizing images to an exact width in pixels. |
 | `fixed_height` | Optional(int) | Resizing images to an exact height in pixels. |
 | `fixed_size` | Optional(int) | Resizing images based on the highest limitation reached (height or width). |
@@ -52,7 +52,7 @@ The package provides versatile options to resize and or covert images, including
 #### Accepted Output Formats
 
 | Format | Description |
-| ------ |  ------ |
+| ------ | ------ |
 | `jpeg` | Select `jpeg` image output. |
 | `webp` | Select `webp` image output. |
 | `png` | Select `png` image output. |
@@ -64,7 +64,7 @@ The package provides versatile options to resize and or covert images, including
 - **`jpeg` format options**:
 
     | Option | Type | Description |
-    | ------ |  ------ |  ------ |
+    | ------ | ------ | ------ |
     | `name` | str | Set as `jpeg`. |
     | `quality` | Optional(int) | Define `jpeg` quality (1-100). |
     | `optimize` | Optional(bool) | Enable Huffman table optimization. |
@@ -74,7 +74,7 @@ The package provides versatile options to resize and or covert images, including
 - **`webp` format options**:
 
     | Option | Type | Description |
-    | ------ |  ------ |  ------ |
+    | ------ | ------ | ------ |
     | `name` | str | Set as `webp`. |
     | `quality` | Optional(int) | Define quality (1-100). |
     | `lossless` | Optional(bool) | Use lossless compression. |
@@ -83,7 +83,7 @@ The package provides versatile options to resize and or covert images, including
 - **`png` format options**:
 
     | Option | Type | Description |
-    | ------ |  ------ |  ------ |
+    | ------ | ------ | ------ |
     | `name` | str | Set as `png`. |
     | `optimize` | Optional(bool) | Enable PNG optimization. |
     | `compression_level` | Optional(int) | PNG compression level (0-9). |
@@ -92,14 +92,14 @@ The package provides versatile options to resize and or covert images, including
 - **`gif` format options**:
 
     | Option | Type | Description |
-    | ------ |  ------ |  ------ |
+    | ------ | ------ | ------ |
     | `name` | str | Set as `gif`. |
     | `optimize` | Optional(bool) | Enable GIF optimization. |
 
 - **`avif` format options**:
 
     | Option | Type | Description |
-    | ------ |  ------ |  ------ |
+    | ------ | ------ | ------ |
     | `name` | str | Set as `gif`. |
     | `quality` | Optional(int) | AVIF quality (1-100). |
     | `lossless` | Optional(bool) | Use lossless AVIF compression. |

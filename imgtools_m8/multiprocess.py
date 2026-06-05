@@ -71,14 +71,10 @@ class MultiProcessImage:
         self,
         conf: dict,
         model_conf: Optional[dict] = None,
-        max_cpu_percent: int = 75,
-        max_mem_percent: int = 80,
-        max_disk_percent: int = 90,
-        sleep_on_throttle: float = 1.0,
-        user_cpu_percent: int = 50,
         use_progress: bool = True,
         batch_size: int = 32,
         num_processes: Optional[int] = None,
+        **resource_kwargs,
     ):
         """
         Initialize with processing config and system resource thresholds.
@@ -86,26 +82,25 @@ class MultiProcessImage:
         Args:
             conf (dict): Processing configuration (ImageProcessingSchema).
             model_conf (Optional[dict]): DNN upscaling model config.
-            max_cpu_percent (int): Throttle when CPU usage exceeds this.
-            max_mem_percent (int): Throttle when RAM usage exceeds this.
-            max_disk_percent (int): Throttle when disk usage exceeds this.
-            sleep_on_throttle (float): Seconds to wait when throttling.
-            user_cpu_percent (int): Target CPU share for worker processes.
             use_progress (bool): Show tqdm progress bar if available.
             batch_size (int): Number of images per pool batch.
             num_processes (Optional[int]): Override worker count directly.
+            **resource_kwargs: max_cpu_percent (75), max_mem_percent (80),
+                max_disk_percent (90), sleep_on_throttle (1.0),
+                user_cpu_percent (50).
         """
         self.conf_dict = conf
         self.model_conf_dict = model_conf
         self._processor = ImageProcessing(conf=conf, model_conf=model_conf)
 
-        self.max_cpu_percent = max_cpu_percent
-        self.max_mem_percent = max_mem_percent
-        self.max_disk_percent = max_disk_percent
-        self.sleep_on_throttle = sleep_on_throttle
+        self.max_cpu_percent = int(resource_kwargs.get("max_cpu_percent", 75))
+        self.max_mem_percent = int(resource_kwargs.get("max_mem_percent", 80))
+        self.max_disk_percent = int(resource_kwargs.get("max_disk_percent", 90))
+        self.sleep_on_throttle = float(resource_kwargs.get("sleep_on_throttle", 1.0))
         self.use_progress = use_progress and TQDM_AVAILABLE
         self.batch_size = batch_size
 
+        user_cpu_percent = int(resource_kwargs.get("user_cpu_percent", 50))
         cpu_total = multiprocessing.cpu_count()
         safe_max = max(1, cpu_total - 1)  # always leave one core for the OS
         if num_processes is not None:
@@ -155,6 +150,26 @@ class MultiProcessImage:
             logger.warning("Disk check failed: %s", exc)  # pragma: no cover
         return True
 
+    def _iter_group_files(
+        self, group: dict, default_root: str
+    ) -> List[Tuple[str, dict]]:
+        """Return (full_path, file_data) pairs from one ordered-files group."""
+        raw_root = group.get("root_dir")
+        root_dir: str = raw_root if isinstance(raw_root, str) else default_root
+        tasks: List[Tuple[str, dict]] = []
+        for file_data in group.get("files") or []:
+            if not isinstance(file_data, dict):  # pragma: no cover
+                continue  # pragma: no cover
+            name = file_data.get("name", "")
+            sub_dirs = file_data.get("sub_dirs")
+            full_path = (
+                join(root_dir, *sub_dirs, name)
+                if isinstance(sub_dirs, list) and sub_dirs
+                else join(root_dir, name)
+            )
+            tasks.append((full_path, file_data))
+        return tasks
+
     def _collect_file_tasks(self) -> List[Tuple[str, dict]]:
         """Return (full_path, file_data) pairs for all valid source images."""
         if not self._processor.has_input_dir():
@@ -168,26 +183,9 @@ class MultiProcessImage:
         if not isinstance(ordered, dict):  # pragma: no cover
             return []  # pragma: no cover
         tasks: List[Tuple[str, dict]] = []
+        default_root = self._processor.conf.source_path
         for _fmt, group in ordered.items():
-            raw_root = group.get("root_dir")
-            root_dir: str = (
-                raw_root
-                if isinstance(raw_root, str)
-                else self._processor.conf.source_path
-            )
-            raw_files = group.get("files")
-            files_iter = raw_files if isinstance(raw_files, list) else []
-            for file_data in files_iter:
-                if not isinstance(file_data, dict):  # pragma: no cover
-                    continue  # pragma: no cover
-                name = file_data.get("name", "")
-                sub_dirs = file_data.get("sub_dirs")
-                full_path = (
-                    join(root_dir, *sub_dirs, name)
-                    if isinstance(sub_dirs, list) and sub_dirs
-                    else join(root_dir, name)
-                )
-                tasks.append((full_path, file_data))
+            tasks.extend(self._iter_group_files(group, default_root))
         return tasks
 
     def run_multiple(self) -> bool:

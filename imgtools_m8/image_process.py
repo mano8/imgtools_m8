@@ -30,11 +30,11 @@ __version__ = "2.0.0"
 
 try:
     import cv2
-    import numpy as np
+    import numpy as np  # pragma: no cover
 
-    from imgtools_m8.img_expander import CV2_AVAILABLE
+    from imgtools_m8.img_expander import CV2_AVAILABLE  # pragma: no cover
 
-    DNN_AVAILABLE = CV2_AVAILABLE
+    DNN_AVAILABLE = CV2_AVAILABLE  # pragma: no cover
 except ImportError:  # pragma: no cover
     DNN_AVAILABLE = False
     cv2 = None  # type: ignore[assignment]
@@ -126,6 +126,19 @@ class ImageProcessing:
         return target
 
     @staticmethod
+    def _box_ratio(w: int, h: int, fixed_width: int, fixed_height: int) -> float:
+        """Return scale ratio to fit (w, h) inside the bounding box (downscale path)."""
+        need_w = fixed_width < w
+        need_h = fixed_height < h
+        if need_w and not need_h:
+            return fixed_width / w
+        if need_h and not need_w:
+            return fixed_height / h
+        pct_w = (w - fixed_width) / w
+        pct_h = (h - fixed_height) / h
+        return fixed_width / w if pct_w >= pct_h else fixed_height / h
+
+    @staticmethod
     def _fit_within_box(
         w: int,
         h: int,
@@ -134,22 +147,51 @@ class ImageProcessing:
         allow_upscale: bool,
     ) -> Tuple[int, int]:
         """Scale (w, h) to fit inside a fixed_width × fixed_height box."""
-        need_w = fixed_width < w
-        need_h = fixed_height < h
-        if not need_w and not need_h:
+        if fixed_width >= w and fixed_height >= h:
             if not allow_upscale:
                 return w, h
             scale = min(fixed_width / w, fixed_height / h)
             return max(1, round(w * scale)), max(1, round(h * scale))
-        if need_w and not need_h:
-            ratio = fixed_width / w
-        elif need_h and not need_w:
-            ratio = fixed_height / h
-        else:
-            pct_w = (w - fixed_width) / w
-            pct_h = (h - fixed_height) / h
-            ratio = fixed_width / w if pct_w >= pct_h else fixed_height / h
+        ratio = ImageProcessing._box_ratio(w, h, fixed_width, fixed_height)
         return max(1, round(w * ratio)), max(1, round(h * ratio))
+
+    @staticmethod
+    def _compute_new_size(
+        w: int,
+        h: int,
+        image_size: OutputSize,
+        allow_upscale: bool,
+    ) -> Optional[Tuple[int, int]]:
+        """Return target (new_w, new_h) from an OutputSize spec, or None for no-op."""
+        if image_size.fixed_upscale is not None:
+            f = image_size.fixed_upscale
+            return w * f, h * f
+        if image_size.fixed_downscale is not None:
+            f = image_size.fixed_downscale
+            return max(1, w // f), max(1, h // f)
+        if image_size.fixed_size is not None:
+            dominant = max(w, h)
+            if not allow_upscale and dominant <= image_size.fixed_size:
+                return None
+            ratio = image_size.fixed_size / dominant
+            return max(1, round(w * ratio)), max(1, round(h * ratio))
+        if image_size.fixed_width is not None and image_size.fixed_height is not None:
+            return ImageProcessing._fit_within_box(
+                w, h, image_size.fixed_width, image_size.fixed_height, allow_upscale
+            )
+        if image_size.fixed_width is not None:
+            if not allow_upscale and image_size.fixed_width >= w:
+                return None
+            return image_size.fixed_width, max(
+                1, round(h * (image_size.fixed_width / w))
+            )
+        if image_size.fixed_height is not None:
+            if not allow_upscale and image_size.fixed_height >= h:
+                return None
+            return max(
+                1, round(w * (image_size.fixed_height / h))
+            ), image_size.fixed_height
+        return None
 
     @staticmethod
     def _resize_to_fit(
@@ -159,48 +201,10 @@ class ImageProcessing:
     ) -> Image.Image:
         """Resize image according to an OutputSize spec."""
         w, h = img.size
-
-        if image_size.fixed_upscale is not None:
-            factor = image_size.fixed_upscale
-            new_w, new_h = w * factor, h * factor
-
-        elif image_size.fixed_downscale is not None:
-            factor = image_size.fixed_downscale
-            new_w, new_h = max(1, w // factor), max(1, h // factor)
-
-        elif image_size.fixed_size is not None:
-            target = image_size.fixed_size
-            dominant = max(w, h)
-            if not allow_upscale and dominant <= target:
-                return img
-            ratio = target / dominant
-            new_w = max(1, round(w * ratio))
-            new_h = max(1, round(h * ratio))
-
-        elif image_size.fixed_width is not None and image_size.fixed_height is not None:
-            new_w, new_h = ImageProcessing._fit_within_box(
-                w, h, image_size.fixed_width, image_size.fixed_height, allow_upscale
-            )
-
-        elif image_size.fixed_width is not None:
-            target_w = image_size.fixed_width
-            if not allow_upscale and target_w >= w:
-                return img
-            ratio = target_w / w
-            new_w, new_h = target_w, max(1, round(h * ratio))
-
-        elif image_size.fixed_height is not None:
-            target_h = image_size.fixed_height
-            if not allow_upscale and target_h >= h:
-                return img
-            ratio = target_h / h
-            new_w, new_h = max(1, round(w * ratio)), target_h
-
-        else:
+        new_size = ImageProcessing._compute_new_size(w, h, image_size, allow_upscale)
+        if new_size is None or new_size == (w, h):
             return img
-
-        if (new_w, new_h) == (w, h):
-            return img
+        new_w, new_h = new_size
         resampler = (
             Image.Resampling.LANCZOS
             if new_w < w or new_h < h
@@ -245,6 +249,15 @@ class ImageProcessing:
         return best
 
     @staticmethod
+    def _convert_color_mode(img: Image.Image, fmt_val: str) -> Image.Image:
+        """Convert image color mode for the given format when required."""
+        if fmt_val == "JPEG" and img.mode not in ("RGB", "L"):
+            return img.convert("RGB")
+        if fmt_val in ("PNG", "WEBP", "GIF") and img.mode == "CMYK":
+            return img.convert("RGB")
+        return img
+
+    @staticmethod
     def _write_image_to_format(
         img: Image.Image,
         output_dir: str,
@@ -257,11 +270,7 @@ class ImageProcessing:
         ext = _EXT_MAP.get(fmt_val, f".{fmt_val.lower()}")
         out_path = join(output_dir, f"{stem}{ext}")
 
-        working = img
-        if fmt_val == "JPEG" and img.mode not in ("RGB", "L"):
-            working = img.convert("RGB")
-        elif fmt_val in ("PNG", "WEBP", "GIF") and img.mode == "CMYK":
-            working = img.convert("RGB")
+        working = ImageProcessing._convert_color_mode(img, fmt_val)
 
         try:
             if max_byte_size:
@@ -303,6 +312,50 @@ class ImageProcessing:
             result.putalpha(alpha)  # pragma: no cover
         return result  # pragma: no cover
 
+    def _resolve_formats_and_bytes(self, option: OutputOptions):
+        """Return (formats, max_bytes) for an option, falling back to global_options."""
+        formats = option.formats
+        max_bytes = option.max_byte_size
+        if self.conf.global_options is not None:
+            if formats is None:
+                formats = self.conf.global_options.formats
+            if max_bytes is None:
+                max_bytes = self.conf.global_options.max_byte_size
+        return formats, max_bytes
+
+    def _apply_resize(self, image: Image.Image, option: OutputOptions) -> Image.Image:
+        """Apply resize (DNN or PIL) for one output option."""
+        if not isinstance(option.image_size, OutputSize):
+            return image
+        if option.image_size.fixed_upscale is not None and self.has_expander():
+            return self._dnn_upscale(  # pragma: no cover
+                image,
+                option.image_size.fixed_upscale,  # pragma: no cover
+            )  # pragma: no cover
+        return ImageProcessing._resize_to_fit(
+            image, option.image_size, option.allow_upscale or False
+        )
+
+    def _write_option_formats(
+        self,
+        working: Image.Image,
+        file_name: str,
+        output_dir: str,
+        option: OutputOptions,
+    ) -> bool:
+        """Write all formats for one output option; return True if any succeeded."""
+        stem = ImageProcessing._get_output_stem(file_name, working.size)
+        formats, max_bytes = self._resolve_formats_and_bytes(option)
+        if not formats:  # pragma: no cover
+            return False  # pragma: no cover
+        result = False
+        for fmt_conf in formats:
+            if ImageProcessing._write_image_to_format(
+                working, output_dir, stem, fmt_conf, max_bytes
+            ):
+                result = True
+        return result
+
     def process_output_options(
         self,
         image: Image.Image,
@@ -312,44 +365,14 @@ class ImageProcessing:
         """Process all output options (resize + format conversion) for one image."""
         if not self.has_output_options():
             return False
-
-        result = False
         output_options = self.conf.output_options
         if not isinstance(output_options, list):  # pragma: no cover
             return False  # pragma: no cover
+        result = False
         for option in output_options:
-            working = image
-
-            if isinstance(option.image_size, OutputSize):
-                if option.image_size.fixed_upscale is not None and self.has_expander():
-                    working = self._dnn_upscale(  # pragma: no cover
-                        working,
-                        option.image_size.fixed_upscale,  # pragma: no cover
-                    )  # pragma: no cover
-                else:
-                    working = ImageProcessing._resize_to_fit(
-                        working,
-                        option.image_size,
-                        option.allow_upscale or False,
-                    )
-
-            stem = ImageProcessing._get_output_stem(file_name, working.size)
-
-            formats = option.formats
-            max_bytes = option.max_byte_size
-            if self.conf.global_options is not None:
-                if formats is None:
-                    formats = self.conf.global_options.formats
-                if max_bytes is None:
-                    max_bytes = self.conf.global_options.max_byte_size
-
-            if formats:
-                for fmt_conf in formats:
-                    if ImageProcessing._write_image_to_format(
-                        working, output_dir, stem, fmt_conf, max_bytes
-                    ):
-                        result = True
-
+            working = self._apply_resize(image, option)
+            if self._write_option_formats(working, file_name, output_dir, option):
+                result = True
         return result
 
     def process_file(self, source_path: str, info: dict) -> bool:
@@ -375,6 +398,25 @@ class ImageProcessing:
             logger.warning("[ImageProcessing] Cannot open %s: %s", source_path, exc)
             return False
 
+    def _iter_source_files(self, ordered: dict):
+        """Yield (full_path, file_data) for every file in an ordered-files dict."""
+        for _fmt, group in ordered.items():
+            raw_root = group.get("root_dir")
+            root_dir: str = (
+                raw_root if isinstance(raw_root, str) else self.conf.source_path
+            )
+            for file_data in group.get("files") or []:
+                if not isinstance(file_data, dict):  # pragma: no cover
+                    continue  # pragma: no cover
+                name = file_data.get("name", "")
+                sub_dirs = file_data.get("sub_dirs")
+                full_path = (
+                    join(root_dir, *sub_dirs, name)
+                    if isinstance(sub_dirs, list) and sub_dirs
+                    else join(root_dir, name)
+                )
+                yield full_path, file_data
+
     def process_directory(self) -> bool:
         """Process all images in the configured source directory."""
         if not self.has_input_dir():
@@ -387,27 +429,10 @@ class ImageProcessing:
         )
         if not isinstance(ordered, dict):  # pragma: no cover
             return False  # pragma: no cover
-
         result = False
-        for _fmt, group in ordered.items():
-            raw_root = group.get("root_dir")
-            root_dir: str = (
-                raw_root if isinstance(raw_root, str) else self.conf.source_path
-            )
-            raw_files = group.get("files")
-            files_iter = raw_files if isinstance(raw_files, list) else []
-            for file_data in files_iter:
-                if not isinstance(file_data, dict):  # pragma: no cover
-                    continue  # pragma: no cover
-                name = file_data.get("name", "")
-                sub_dirs = file_data.get("sub_dirs")
-                full_path = (
-                    join(root_dir, *sub_dirs, name)
-                    if isinstance(sub_dirs, list) and sub_dirs
-                    else join(root_dir, name)
-                )
-                if self.process_file(source_path=full_path, info=file_data):
-                    result = True
+        for full_path, file_data in self._iter_source_files(ordered):
+            if self.process_file(source_path=full_path, info=file_data):
+                result = True
         return result
 
     def run(self) -> bool:

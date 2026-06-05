@@ -111,6 +111,40 @@ class ImageUtils:
         return result
 
     @staticmethod
+    def _read_image_attrs(
+        img,
+        image_size: bool,
+        image_format: bool,
+        is_valid: bool,
+    ) -> dict:
+        """Read metadata from an open PIL Image; calls verify() when requested."""
+        result: dict = {}
+        if image_size:
+            result["image_size"] = img.size
+        if image_format:
+            result["image_format"] = img.format
+        if is_valid:
+            img.verify()
+            result["is_valid"] = True
+        return result
+
+    @staticmethod
+    def _error_image_attrs(
+        image_size: bool,
+        image_format: bool,
+        is_valid: bool,
+    ) -> dict:
+        """Build a result dict for a failed image open/verify."""
+        result: dict = {}
+        if image_size:
+            result["image_size"] = None
+        if image_format:
+            result["image_format"] = None
+        if is_valid:
+            result["is_valid"] = False
+        return result
+
+    @staticmethod
     def get_image_info(
         filepath: str,
         image_size: bool = True,
@@ -131,30 +165,15 @@ class ImageUtils:
             Optional[dict]: Dictionary with image metadata if requested,
                 or None if no metadata requested or file is invalid.
         """
-        result: Optional[dict] = None
+        if not (image_size or is_valid):
+            return None  # pragma: no cover
         try:
-            if image_size is True or is_valid is True:
-                result = {}
-                with Image.open(filepath) as img:
-                    if image_size is True:
-                        result["image_size"] = img.size
-                    if image_format is True:
-                        result["image_format"] = img.format
-                    if is_valid is True:
-                        img.verify()
-                        result["is_valid"] = True
+            with Image.open(filepath) as img:
+                return ImageUtils._read_image_attrs(
+                    img, image_size, image_format, is_valid
+                )
         except (IOError, UnidentifiedImageError):
-            if image_size is True or is_valid is True:
-                result = {}
-                if image_size is True:
-                    result["image_size"] = None
-                if image_format is True:
-                    result["image_format"] = None
-                if is_valid is True:
-                    result["is_valid"] = False
-            else:  # pragma: no cover
-                result = None  # pragma: no cover
-        return result
+            return ImageUtils._error_image_attrs(image_size, image_format, is_valid)
 
     @staticmethod
     def is_valid_dimension(dim: Union[int, float]) -> bool:
@@ -234,7 +253,7 @@ class ImageUtils:
             new_height = round(original_height * scale, 3)
             return new_width, new_height
 
-        elif fixed_width is not None:
+        if fixed_width is not None:
             new_height = round(fixed_width / aspect_ratio, 3)
             return fixed_width, new_height
 

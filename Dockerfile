@@ -31,11 +31,11 @@ RUN git clone --branch "${OPENCV_VERSION}" --depth 1 \
       -D CUDA_FAST_MATH=1 \
       -D WITH_CUBLAS=1 \
       -D BUILD_opencv_python3=ON \
-      -D PYTHON3_EXECUTABLE=$(which python3) \
-      -D PYTHON3_PACKAGES_PATH=$(python3 -c "import site; print(site.getsitepackages()[0])") \
+      -D "PYTHON3_EXECUTABLE=$(which python3)" \
+      -D "PYTHON3_PACKAGES_PATH=$(python3 -c 'import site; print(site.getsitepackages()[0])')" \
       -D BUILD_EXAMPLES=OFF \
-      ${CUDA_ARCH_BIN:+-D CUDA_ARCH_BIN=${CUDA_ARCH_BIN}} && \
-    cmake --build /opt/opencv/build --parallel $(nproc) && \
+      ${CUDA_ARCH_BIN:+-D "CUDA_ARCH_BIN=${CUDA_ARCH_BIN}"} && \
+    cmake --build /opt/opencv/build --parallel "$(nproc)" && \
     cmake --install /opt/opencv/build && \
     ldconfig && \
     rm -rf /opt/opencv /opt/opencv_contrib
@@ -45,7 +45,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
-RUN pip install --no-cache-dir --no-deps .
+RUN pip install --no-cache-dir --no-deps . && \
+    useradd --no-create-home --uid 1000 appuser && \
+    chown -R appuser:appuser /app
 
+USER appuser
 ENTRYPOINT ["python3", "-m", "imgtools_m8"]
 CMD ["--help"]

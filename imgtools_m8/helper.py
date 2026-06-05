@@ -29,6 +29,18 @@ class ImageToolsHelper:
     """
 
     @staticmethod
+    def _validate_combination_args(total: int, numbers: list, label: str) -> None:
+        """Raise ImgToolsException if total or numbers are invalid."""
+        if not (isinstance(total, int) and total >= 0):
+            raise ImgToolsException(
+                f"Error: Unable to {label}, 'total' must be a non-negative integer."
+            )
+        if not (isinstance(numbers, list) and numbers):
+            raise ImgToolsException(
+                f"Error: Unable to {label}, 'numbers' must be a non-empty list."
+            )
+
+    @staticmethod
     def find_best_combination(total: int, numbers: list[int]) -> Optional[list[int]]:
         """
         Find the best combination of numbers to achieve the given total.
@@ -53,17 +65,9 @@ class ImageToolsHelper:
             )
             [5, 5]
         """
-        if not (isinstance(total, int) and total >= 0):
-            raise ImgToolsException(
-                "Error: Unable to find the best combination, "
-                "'total' must be a non-negative integer."
-            )
-
-        if not (isinstance(numbers, list) and numbers):
-            raise ImgToolsException(
-                "Error: Unable to find the best combination, "
-                "'numbers' must be a non-empty list."
-            )
+        ImageToolsHelper._validate_combination_args(
+            total, numbers, "find the best combination"
+        )
         dp: list[list[int] | None] = [None] * (total + 1)
         dp[0] = []
 
@@ -106,17 +110,7 @@ class ImageToolsHelper:
                 total=5, numbers=[1, 2, 3])
             >>> [[1, 1, 1, 1, 1], [1, 1, 1, 2], [1, 2, 2], [1, 1, 3], [2, 3]]
         """
-        if not (isinstance(total, int) and total >= 0):
-            raise ImgToolsException(
-                "Error: Unable to find combinations, "
-                "'total' must be a non-negative integer."
-            )
-
-        if not (isinstance(numbers, list) and numbers):
-            raise ImgToolsException(
-                "Error: Unable to find combinations, "
-                "'numbers' must be a non-empty list."
-            )
+        ImageToolsHelper._validate_combination_args(total, numbers, "find combinations")
         dp: list[list[list[int]] | None] = [None] * (total + 1)
         dp[0] = [[]]
 
@@ -225,6 +219,18 @@ class ImageToolsHelper:
         )
 
     @staticmethod
+    def _ext_matches(file_name: str, ext: Optional[Union[str, list]]) -> bool:
+        """Return True if file_name matches the given extension filter."""
+        if ext is None:
+            return True
+        file_ext = ImageToolsHelper.get_extension(file_name)
+        if isinstance(ext, list) and ext:
+            return file_ext in ext
+        if isinstance(ext, str) and ext:
+            return file_ext == ext
+        return False  # pragma: no cover
+
+    @staticmethod
     def get_files_list(
         path: str,
         ext: Optional[Union[str, list]] = None,
@@ -254,35 +260,18 @@ class ImageToolsHelper:
             )
             ['image1.jpg', 'image2.png', ...]
         """
-        result = None
-        if isinstance(path, str) and path and os.path.isdir(path):
-            result = [
-                f
-                for f in os.listdir(path)
-                if os.path.isfile(os.path.join(path, f))
-                and (
-                    ext is None
-                    or (
-                        isinstance(ext, list)
-                        and ext
-                        and ImageToolsHelper.get_extension(f) in ext
-                    )
-                    or (
-                        isinstance(ext, str)
-                        and ext
-                        and ImageToolsHelper.get_extension(f) == ext
-                    )
-                )
-                and (
-                    content_name is None
-                    or (
-                        isinstance(content_name, str)
-                        and content_name
-                        and content_name in f
-                    )
-                )
-            ]
-        return result
+        if not (isinstance(path, str) and path and os.path.isdir(path)):
+            return None
+        name_ok = content_name is None or (
+            isinstance(content_name, str) and content_name
+        )
+        return [
+            f
+            for f in os.listdir(path)
+            if os.path.isfile(os.path.join(path, f))
+            and ImageToolsHelper._ext_matches(f, ext)
+            and (name_ok and (content_name is None or content_name in f))
+        ]
 
     @staticmethod
     def get_valid_images_ext() -> list:

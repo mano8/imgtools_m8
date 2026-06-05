@@ -164,15 +164,16 @@ class OutputSize(BaseModel):
     @model_validator(mode="after")
     def check_constraints(self) -> "OutputSize":
         """Ensure valid combination of size constraints."""
-        if self.fixed_size is not None and (self.fixed_width or self.fixed_height):
+        any_fixed_dim = bool(self.fixed_width or self.fixed_height)
+        if self.fixed_size is not None and any_fixed_dim:
             raise ValueError(
                 "fixed_size cannot be combined with fixed_width or fixed_height."
             )
-        if self.fixed_upscale is not None and (self.fixed_width or self.fixed_height):
+        if self.fixed_upscale is not None and any_fixed_dim:
             raise ValueError(
                 "fixed_upscale cannot be combined with fixed_width or fixed_height."
             )
-        if self.fixed_downscale is not None and (self.fixed_width or self.fixed_height):
+        if self.fixed_downscale is not None and any_fixed_dim:
             raise ValueError(
                 "fixed_downscale cannot be combined with fixed_width or fixed_height."
             )

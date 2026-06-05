@@ -58,16 +58,8 @@ def _build_image_size(args: argparse.Namespace) -> Optional[dict]:
     return size or None
 
 
-def _build_conf(args: argparse.Namespace) -> dict:
-    """Build the ImageProcessingSchema conf dict from parsed CLI args."""
-    if args.config:
-        try:
-            with open(args.config) as fh:
-                return json.load(fh)
-        except (OSError, json.JSONDecodeError) as exc:
-            logger.error("Cannot load config file '%s': %s", args.config, exc)
-            sys.exit(1)
-
+def _build_output_option(args: argparse.Namespace) -> dict:
+    """Build the single OutputOptions dict from CLI resize/format flags."""
     option: dict = {}
     image_size = _build_image_size(args)
     if image_size:
@@ -78,71 +70,75 @@ def _build_conf(args: argparse.Namespace) -> dict:
         option["max_byte_size"] = args.max_bytes
     formats = [_parse_format(f) for f in args.format] if args.format else []
     option["formats"] = formats or [{"ext": "WEBP", "quality": 80}]
+    return option
 
+
+def _build_conf(args: argparse.Namespace) -> dict:
+    """Build the ImageProcessingSchema conf dict from parsed CLI args."""
+    if args.config:
+        try:
+            with open(args.config, encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.error("Cannot load config file '%s': %s", args.config, exc)
+            sys.exit(1)
     return {
         "source_path": args.source,
         "output_path": args.output,
         "include_subdirs": args.subdirs,
         "flatten_output": args.flatten,
-        "output_options": [option],
+        "output_options": [_build_output_option(args)],
     }
 
 
-def _make_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="imgtools",
-        description=(
-            "Convert, resize, and batch-process images.\n\n"
-            "Format spec: EXT[:QUALITY]  e.g. webp:80  jpg:95  png"
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    p.add_argument("--source", "-s", required=True, help="Source file or directory")
-    p.add_argument("--output", "-o", required=True, help="Output directory")
-
-    resize = p.add_argument_group("resize")
-    resize.add_argument(
+def _add_resize_args(p: argparse.ArgumentParser) -> None:
+    """Add resize-related arguments to the parser."""
+    g = p.add_argument_group("resize")
+    g.add_argument(
         "--width",
         "-W",
         type=int,
         metavar="N",
         help="Fixed output width (keeps aspect ratio)",
     )
-    resize.add_argument(
+    g.add_argument(
         "--height",
         "-H",
         type=int,
         metavar="N",
         help="Fixed output height (keeps aspect ratio)",
     )
-    resize.add_argument(
+    g.add_argument(
         "--size", type=int, metavar="N", help="Constrain longest side to N pixels"
     )
-    resize.add_argument(
+    g.add_argument(
         "--downscale", type=int, metavar="N", help="Divide dimensions by N (2-10)"
     )
-    resize.add_argument(
+    g.add_argument(
         "--upscale",
         type=int,
         metavar="N",
         help="Multiply dimensions by N (2-10); DNN when [dnn] installed",
     )
-    resize.add_argument(
+    g.add_argument(
         "--allow-upscale",
         dest="allow_upscale",
         action="store_true",
         help="Allow upscaling with width/height/size constraints",
     )
 
-    out = p.add_argument_group("output")
-    out.add_argument(
+
+def _add_output_args(p: argparse.ArgumentParser) -> None:
+    """Add output-format arguments to the parser."""
+    g = p.add_argument_group("output")
+    g.add_argument(
         "--format",
         "-f",
         action="append",
         metavar="EXT[:QUALITY]",
         help="Output format, repeatable (default: webp:80)",
     )
-    out.add_argument(
+    g.add_argument(
         "--max-bytes",
         dest="max_bytes",
         type=int,
@@ -150,6 +146,9 @@ def _make_parser() -> argparse.ArgumentParser:
         help="Hard byte ceiling per output file",
     )
 
+
+def _add_run_args(p: argparse.ArgumentParser) -> None:
+    """Add scanning and processing arguments to the parser."""
     scan = p.add_argument_group("source scanning")
     scan.add_argument(
         "--subdirs", action="store_true", help="Scan subdirectories recursively"
@@ -177,6 +176,22 @@ def _make_parser() -> argparse.ArgumentParser:
         help="Load full conf dict from a JSON file (overrides other flags)",
     )
     run.add_argument("--debug", action="store_true", help="Enable debug logging")
+
+
+def _make_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="imgtools",
+        description=(
+            "Convert, resize, and batch-process images.\n\n"
+            "Format spec: EXT[:QUALITY]  e.g. webp:80  jpg:95  png"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--source", "-s", required=True, help="Source file or directory")
+    p.add_argument("--output", "-o", required=True, help="Output directory")
+    _add_resize_args(p)
+    _add_output_args(p)
+    _add_run_args(p)
     return p
 
 
