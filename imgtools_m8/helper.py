@@ -231,6 +231,13 @@ class ImageToolsHelper:
         return False  # pragma: no cover
 
     @staticmethod
+    def _name_matches(file_name: str, content_name: Optional[str]) -> bool:
+        """Return True if file_name contains content_name (or content_name is None)."""
+        if content_name is None:
+            return True
+        return isinstance(content_name, str) and bool(content_name) and content_name in file_name
+
+    @staticmethod
     def get_files_list(
         path: str,
         ext: Optional[Union[str, list]] = None,
@@ -262,15 +269,12 @@ class ImageToolsHelper:
         """
         if not (isinstance(path, str) and path and os.path.isdir(path)):
             return None
-        name_ok = content_name is None or (
-            isinstance(content_name, str) and content_name
-        )
         return [
             f
             for f in os.listdir(path)
             if os.path.isfile(os.path.join(path, f))
             and ImageToolsHelper._ext_matches(f, ext)
-            and (name_ok and (content_name is None or content_name in f))
+            and ImageToolsHelper._name_matches(f, content_name)
         ]
 
     @staticmethod

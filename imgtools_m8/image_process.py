@@ -156,6 +156,35 @@ class ImageProcessing:
         return max(1, round(w * ratio)), max(1, round(h * ratio))
 
     @staticmethod
+    def _compute_fixed_size(
+        w: int, h: int, fixed_size: int, allow_upscale: bool
+    ) -> Optional[Tuple[int, int]]:
+        """Scale (w, h) uniformly so the dominant side equals fixed_size."""
+        dominant = max(w, h)
+        if not allow_upscale and dominant <= fixed_size:
+            return None
+        ratio = fixed_size / dominant
+        return max(1, round(w * ratio)), max(1, round(h * ratio))
+
+    @staticmethod
+    def _compute_fixed_width(
+        w: int, h: int, fixed_width: int, allow_upscale: bool
+    ) -> Optional[Tuple[int, int]]:
+        """Scale to fixed_width, preserving aspect ratio."""
+        if not allow_upscale and fixed_width >= w:
+            return None
+        return fixed_width, max(1, round(h * (fixed_width / w)))
+
+    @staticmethod
+    def _compute_fixed_height(
+        w: int, h: int, fixed_height: int, allow_upscale: bool
+    ) -> Optional[Tuple[int, int]]:
+        """Scale to fixed_height, preserving aspect ratio."""
+        if not allow_upscale and fixed_height >= h:
+            return None
+        return max(1, round(w * (fixed_height / h))), fixed_height
+
+    @staticmethod
     def _compute_new_size(
         w: int,
         h: int,
@@ -170,27 +199,15 @@ class ImageProcessing:
             f = image_size.fixed_downscale
             return max(1, w // f), max(1, h // f)
         if image_size.fixed_size is not None:
-            dominant = max(w, h)
-            if not allow_upscale and dominant <= image_size.fixed_size:
-                return None
-            ratio = image_size.fixed_size / dominant
-            return max(1, round(w * ratio)), max(1, round(h * ratio))
-        if image_size.fixed_width is not None and image_size.fixed_height is not None:
-            return ImageProcessing._fit_within_box(
-                w, h, image_size.fixed_width, image_size.fixed_height, allow_upscale
-            )
+            return ImageProcessing._compute_fixed_size(w, h, image_size.fixed_size, allow_upscale)
         if image_size.fixed_width is not None:
-            if not allow_upscale and image_size.fixed_width >= w:
-                return None
-            return image_size.fixed_width, max(
-                1, round(h * (image_size.fixed_width / w))
-            )
+            if image_size.fixed_height is not None:
+                return ImageProcessing._fit_within_box(
+                    w, h, image_size.fixed_width, image_size.fixed_height, allow_upscale
+                )
+            return ImageProcessing._compute_fixed_width(w, h, image_size.fixed_width, allow_upscale)
         if image_size.fixed_height is not None:
-            if not allow_upscale and image_size.fixed_height >= h:
-                return None
-            return max(
-                1, round(w * (image_size.fixed_height / h))
-            ), image_size.fixed_height
+            return ImageProcessing._compute_fixed_height(w, h, image_size.fixed_height, allow_upscale)
         return None
 
     @staticmethod

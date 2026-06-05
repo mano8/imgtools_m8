@@ -92,6 +92,22 @@ class ImageExpander:
         return self.model_conf is not None and self.model_conf.is_ready()
 
     @staticmethod
+    def _resolve_scale_conf(
+        model_conf: dict,
+        model_path: Optional[str],
+        model_name: str,
+        scale: int,
+        scale_selector: "ScaleSelector",
+    ) -> tuple:
+        """Resolve scale and scale_selector from model_conf."""
+        raw_scale = model_conf.get("scale")
+        if isinstance(raw_scale, int) and ModelConf.is_scale(
+            model_path=model_path, model_name=model_name, scale=raw_scale
+        ):
+            scale, scale_selector = raw_scale, ScaleSelector.FIXED_SCALE
+        return scale, scale_selector
+
+    @staticmethod
     def _parse_model_conf(
         model_conf: Optional[UpscaleModelDict],
     ) -> tuple:
@@ -112,12 +128,9 @@ class ImageExpander:
         if isinstance(raw_name, str) and ModelConf.is_model_name(raw_name):
             model_name = raw_name
 
-        raw_scale = model_conf.get("scale")
-        if isinstance(raw_scale, int) and ModelConf.is_scale(
-            model_path=model_path, model_name=model_name, scale=raw_scale
-        ):
-            scale = raw_scale
-            scale_selector = ScaleSelector.FIXED_SCALE
+        scale, scale_selector = ImageExpander._resolve_scale_conf(
+            model_conf, model_path, model_name, scale, scale_selector
+        )
 
         raw_selector = model_conf.get("scale_selector")
         if isinstance(raw_selector, ScaleSelector) and ModelConf.is_scale_selector(

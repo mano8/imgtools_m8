@@ -188,6 +188,22 @@ class MultiProcessImage:
             tasks.extend(self._iter_group_files(group, default_root))
         return tasks
 
+    def _run_batches(self, pool, tasks: List[Tuple[str, dict]], bar) -> bool:
+        """Process all task batches through the pool; return True iff every batch succeeded."""
+        result = True
+        for i in range(0, len(tasks), self.batch_size):
+            if self.interrupted.is_set():
+                pool.terminate()
+                return False
+            while not self._system_resource_ok():
+                time.sleep(self.sleep_on_throttle)  # pragma: no cover
+            batch = tasks[i : i + self.batch_size]
+            if not all(pool.starmap(_process_one_file, batch)):
+                result = False
+            if bar:
+                bar.update(len(batch))
+        return result
+
     def run_multiple(self) -> bool:
         """
         Run batch image processing with multiprocessing and resource checks.
@@ -206,30 +222,18 @@ class MultiProcessImage:
             return False
 
         total = len(tasks)
-        result = True
         bar = (
             tqdm(total=total, desc="Processing", unit="img")
             if self.use_progress
             else None
         )
-
         try:
             with multiprocessing.Pool(
                 processes=self.num_processes,
                 initializer=_init_worker,
                 initargs=(self.conf_dict, self.model_conf_dict),
             ) as pool:
-                for i in range(0, total, self.batch_size):
-                    if self.interrupted.is_set():
-                        pool.terminate()
-                        return False
-                    while not self._system_resource_ok():
-                        time.sleep(self.sleep_on_throttle)  # pragma: no cover
-                    batch = tasks[i : i + self.batch_size]
-                    if not all(pool.starmap(_process_one_file, batch)):
-                        result = False
-                    if bar:
-                        bar.update(len(batch))
+                result = self._run_batches(pool, tasks, bar)
         except Exception as exc:
             logger.exception("Multiprocessing error: %s", exc)
             return False
