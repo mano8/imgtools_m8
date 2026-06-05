@@ -1,0 +1,27 @@
+---
+engines:
+  bandit:
+    enabled: true
+  ruff:
+    enabled: true
+  radon:
+    enabled: true
+    threshold: C
+  pylint:
+    enabled: false
+  prospector:
+    enabled: false
+  pydocstyle:
+    enabled: false
+  pycodestyle:
+    enabled: false
+  pyflakes:
+    enabled: false
+
+exclude_paths:
+  - "tests/**"
+  - "dist/**"
+  - "*.egg-info/**"
+  - ".pytest_cache/**"
+  - "**/__pycache__/**"
+  - "examples/**"
