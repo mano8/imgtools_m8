@@ -10,7 +10,7 @@ pytest-cov>=7.1.0
 coverage>=7.14.1
 
 # Debugging
-debugpy>=1.8.20
+debugpy>=1.8.21
 
 # Linting / formatting / security
 ruff>=0.15.16
