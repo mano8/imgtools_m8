@@ -4,7 +4,7 @@ import io
 import logging
 import os
 from os.path import basename, isdir, isfile, join, splitext
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from PIL import Image, UnidentifiedImageError
 from pydantic import TypeAdapter
@@ -12,6 +12,7 @@ from pydantic import TypeAdapter
 from imgtools_m8.helpers.file_utils import FileUtils
 from imgtools_m8.helpers.model_conf import ModelConf
 from imgtools_m8.helpers.scan_dir import ScanDir
+from imgtools_m8.results import VariantResult
 from imgtools_m8.schemas.conf_schema import (
     FormatsList,
     ImageProcessingSchema,
@@ -288,6 +289,34 @@ class ImageProcessing:
         return img
 
     @staticmethod
+    def _encode_to_bytes(
+        img: Image.Image,
+        format_conf,
+        max_byte_size: Optional[int] = None,
+    ) -> bytes:
+        """Encode an image to in-memory bytes for a specific format.
+
+        Applies the same colour-mode conversion and ``max_byte_size`` quality
+        search used when writing to disk, so the encoded stream is identical to
+        what :meth:`_write_image_to_format` persists.
+        """
+        fmt_val = format_conf.ext.value
+        working = ImageProcessing._convert_color_mode(img, fmt_val)
+        if max_byte_size:
+            save_kwargs = ImageProcessing._enforce_max_bytes(
+                working, format_conf, max_byte_size
+            )
+        else:
+            save_kwargs = {
+                k: v
+                for k, v in format_conf.model_dump(exclude={"ext"}).items()
+                if v is not None
+            }
+        buf = io.BytesIO()
+        working.save(buf, format=fmt_val, **save_kwargs)
+        return buf.getvalue()
+
+    @staticmethod
     def _write_image_to_format(
         img: Image.Image,
         output_dir: str,
@@ -300,20 +329,10 @@ class ImageProcessing:
         ext = _EXT_MAP.get(fmt_val, f".{fmt_val.lower()}")
         out_path = join(output_dir, f"{stem}{ext}")
 
-        working = ImageProcessing._convert_color_mode(img, fmt_val)
-
         try:
-            if max_byte_size:
-                save_kwargs = ImageProcessing._enforce_max_bytes(
-                    working, format_conf, max_byte_size
-                )
-            else:
-                save_kwargs = {
-                    k: v
-                    for k, v in format_conf.model_dump(exclude={"ext"}).items()
-                    if v is not None
-                }
-            working.save(out_path, format=fmt_val, **save_kwargs)
+            data = ImageProcessing._encode_to_bytes(img, format_conf, max_byte_size)
+            with open(out_path, "wb") as handle:
+                handle.write(data)
             logger.debug(
                 "[ImageProcessing] Wrote %s (%s)",
                 out_path,
@@ -525,3 +544,74 @@ class ImageProcessing:
     ) -> bool:
         """Check if output_format is a valid format config instance."""
         return isinstance(output_format, FormatsList)
+
+
+def process_image(
+    source: bytes,
+    output_options: List[dict],
+    model_conf: Optional[dict] = None,
+) -> List[VariantResult]:
+    """Encode in-memory image bytes into resized/converted variants.
+
+    Storage-agnostic counterpart to :meth:`ImageProcessing.run`: it never
+    touches the filesystem. ``output_options`` is validated against the shipped
+    :class:`OutputOptions` schema (nested ``image_size`` + ``OutputFormatsEnum``)
+    and the shared resize/encode pipeline helpers are reused unchanged.
+
+    Args:
+        source: Raw encoded image bytes (any Pillow-readable format).
+        output_options: Output-option dicts (same shape as the file pipeline).
+            Each may carry an optional ``name`` label (≤64 chars).
+        model_conf: Optional DNN upscaling model configuration. When a
+            ``fixed_upscale`` option requests DNN upscaling but the model file is
+            absent, the PR#1 resolver raises ``ModelNotFoundError`` (no fallback).
+
+    Returns:
+        One :class:`VariantResult` per produced format; empty options yield ``[]``.
+
+    Raises:
+        ValueError: If ``source`` is not a decodable image.
+    """
+    options = TypeAdapter(List[OutputOptions]).validate_python(output_options)
+    if not options:
+        return []
+
+    try:
+        image = Image.open(io.BytesIO(source))
+        image.load()
+    except UnidentifiedImageError as exc:
+        raise ValueError("source is not a valid image") from exc
+
+    # Reuse the shipped pipeline via a minimal, storage-agnostic instance: it
+    # wires the optional DNN expander (model_conf) and exposes _apply_resize.
+    # flatten_output satisfies the schema without file-bound output_options.
+    processor = ImageProcessing(
+        conf={
+            "source_path": "<bytes>",
+            "output_path": "<bytes>",
+            "flatten_output": True,
+        },
+        model_conf=model_conf,
+    )
+
+    results: List[VariantResult] = []
+    for raw, option in zip(output_options, options):
+        working = processor._apply_resize(image, option)
+        label = raw.get("name") or ImageProcessing._get_output_stem(
+            "image", working.size
+        )
+        for fmt_conf in option.formats or []:
+            data = ImageProcessing._encode_to_bytes(
+                working, fmt_conf, option.max_byte_size
+            )
+            results.append(
+                VariantResult(
+                    name=label,
+                    data=data,
+                    width=working.width,
+                    height=working.height,
+                    size_bytes=len(data),
+                    format=fmt_conf.ext.value,
+                )
+            )
+    return results
