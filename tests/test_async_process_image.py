@@ -90,9 +90,7 @@ class TestProcessImageAsync:
         # the sync tests avoid requiring the model file on disk.
         src = _mar_bytes()
         model_conf = {"path": "/nonexistent", "model_name": "edsr", "scale": 4}
-        async_results = asyncio.run(
-            process_image_async(src, _WEBP_OPTS, model_conf)
-        )
+        async_results = asyncio.run(process_image_async(src, _WEBP_OPTS, model_conf))
         sync_results = process_image(src, _WEBP_OPTS, model_conf)
         _assert_variants_equal(async_results, sync_results)
 

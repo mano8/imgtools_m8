@@ -37,9 +37,7 @@ async def process_image_async(
     processing remains CPU-bound — only its execution location changes.
     Same args, return value, and exceptions as :func:`process_image`.
     """
-    return await asyncio.to_thread(
-        process_image, source, output_options, model_conf
-    )
+    return await asyncio.to_thread(process_image, source, output_options, model_conf)
 
 
 async def process_images_async(
