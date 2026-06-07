@@ -291,6 +291,67 @@ for r in results:
 `process_image` returns a `list[VariantResult]`; each result carries `name`, `data` (raw bytes),
 `width`, `height`, `size_bytes`, and `format`. No disk paths required.
 
+## Async / FastAPI usage
+
+`process_image` is synchronous and CPU-bound (Pillow/OpenCV decode, resize, encode).
+Calling it directly from an `async def` route blocks the event loop for the whole encode,
+starving every other in-flight request. The async wrappers offload that work to a worker
+thread so the loop stays responsive:
+
+```python
+from imgtools_m8 import process_image_async, process_images_async
+
+@app.post("/resize")
+async def resize(file: UploadFile):
+    src_bytes = await file.read()
+    results = await process_image_async(
+        src_bytes,
+        [{"image_size": {"fixed_width": 200}, "formats": [{"ext": "WEBP", "quality": 80}]}],
+    )
+    return {"variants": [r.name for r in results]}
+
+@app.post("/resize-batch")
+async def resize_batch(files: list[UploadFile]):
+    sources = [await f.read() for f in files]
+    # one list[VariantResult] per source, order preserved
+    batches = await process_images_async(
+        sources,
+        [{"image_size": {"fixed_width": 64}, "formats": [{"ext": "JPEG"}]}],
+    )
+    return {"count": len(batches)}
+```
+
+A few things worth knowing:
+
+- **What async buys you:** the image work is still CPU-bound. `await process_image_async(...)`
+  does **not** make encoding asynchronous — it runs the existing synchronous pipeline in a
+  worker thread so it no longer blocks the event loop. The execution *location* changed, not
+  the work. Because Pillow/OpenCV release the GIL during encode/decode/resize, this also gives
+  real parallelism for concurrent requests.
+- **Thread-pool behavior:** the work runs on the event loop's default thread pool, which has a
+  bounded worker count managed by the loop. `process_images_async([...])` schedules every source
+  via `asyncio.gather`, but the executor caps how many run at once — passing thousands of sources
+  creates thousands of awaitables, not thousands of OS threads.
+- **Cancellation:** cancelling the awaiting task does not stop image processing already running
+  in a worker thread (standard `asyncio.to_thread` behavior).
+- **Heterogeneous options:** `process_images_async` applies the same `output_options` to every
+  source. For per-image differing options, compose `asyncio.gather` over `process_image_async`
+  directly:
+
+  ```python
+  import asyncio
+
+  batches = await asyncio.gather(
+      process_image_async(img1, opts1),
+      process_image_async(img2, opts2),
+  )
+  ```
+
+- **Security boundary:** these wrappers do not alter image validation, decoding,
+  decompression-bomb protections, or upload-size controls. Input validation and request limits
+  remain the caller's responsibility — see Pillow's `Image.MAX_IMAGE_PIXELS` and your framework's
+  upload-size caps.
+
 ## DNN upscaling note
 
 When `opencv-contrib-python` is not installed, `fixed_upscale` falls back to PIL bicubic scaling.
