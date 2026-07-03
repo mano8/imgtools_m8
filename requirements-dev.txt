@@ -1,7 +1,7 @@
 -r requirements.txt
 
 # Optional extras (needed for full test coverage)
-opencv-contrib-python-headless>=4.13.0.92
+opencv-contrib-python-headless>=5.0.0.93
 colorama>=0.4.6
 
 # Testing
