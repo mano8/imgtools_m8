@@ -22,3 +22,6 @@ exclude_paths:
   - ".pytest_cache/**"
   - "**/__pycache__/**"
   - "examples/**"
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - "REPOSITORY_CONTEXT.md"
