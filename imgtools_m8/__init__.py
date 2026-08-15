@@ -7,7 +7,7 @@ __copyright__ = "Copyright 2023, Eli Serra"
 __deprecated__ = False
 __license__ = "Apache Software License"
 __status__ = "Production"
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 try:
     import colorama
