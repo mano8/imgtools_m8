@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release can no longer ship undocumented and the duplicate-`2.0.0` defect
   found by `A32-changelog-version-parity` cannot recur.
 
+### Changed
+
+- **Breaking:** floor raised to Python 3.12 (`requires-python`, classifiers,
+  the CI test matrix, and `.readthedocs.yaml` all dropped 3.11).
+
 ### Documentation
 
 - Merged the two sibling `## [2.0.0]` entries into one and backfilled the

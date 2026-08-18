@@ -50,7 +50,12 @@ obj = ImageProcessing(
         "output_options": [
             {
                 "formats": [
-                    {"ext": "JPEG", "quality": 80, "progressive": True, "optimize": True},
+                    {
+                        "ext": "JPEG",
+                        "quality": 80,
+                        "progressive": True,
+                        "optimize": True,
+                    },
                     {"ext": "WEBP", "quality": 70},
                     {"ext": "PNG"},
                 ]
@@ -70,16 +75,14 @@ obj.run()
 ```python
 conf = {
     # Required
-    "source_path": "/path/to/image.jpg",   # or a directory
+    "source_path": "/path/to/image.jpg",  # or a directory
     "output_path": "/path/to/output/",
-
     # Optional
-    "include_subdirs": False,   # scan subdirectories when source is a dir
-    "flatten_output": False,    # write all outputs flat (no subdir mirror)
-
+    "include_subdirs": False,  # scan subdirectories when source is a dir
+    "flatten_output": False,  # write all outputs flat (no subdir mirror)
     # At least one of output_options or global_options is required
-    "output_options": [...],    # per-size output rules (see below)
-    "global_options": {...},    # fallback formats/byte-limit for all options
+    "output_options": [...],  # per-size output rules (see below)
+    "global_options": {...},  # fallback formats/byte-limit for all options
 }
 ```
 
@@ -127,7 +130,12 @@ obj = ImageProcessing(
         "output_options": [
             {
                 "formats": [
-                    {"ext": "JPEG", "quality": 80, "progressive": True, "optimize": True},
+                    {
+                        "ext": "JPEG",
+                        "quality": 80,
+                        "progressive": True,
+                        "optimize": True,
+                    },
                     {"ext": "WEBP", "quality": 70},
                     {"ext": "PNG"},
                 ]
@@ -154,7 +162,12 @@ obj = ImageProcessing(
             {
                 "image_size": {"fixed_width": 300, "fixed_height": 200},
                 "formats": [
-                    {"ext": "JPEG", "quality": 80, "progressive": True, "optimize": True}
+                    {
+                        "ext": "JPEG",
+                        "quality": 80,
+                        "progressive": True,
+                        "optimize": True,
+                    }
                 ],
             }
         ],
@@ -179,7 +192,12 @@ obj = ImageProcessing(
                 "image_size": {"fixed_width": 1200},
                 "allow_upscale": True,
                 "formats": [
-                    {"ext": "JPEG", "quality": 80, "progressive": True, "optimize": True}
+                    {
+                        "ext": "JPEG",
+                        "quality": 80,
+                        "progressive": True,
+                        "optimize": True,
+                    }
                 ],
             }
         ],
@@ -202,9 +220,7 @@ obj = ImageProcessing(
             {
                 "image_size": {"fixed_size": 800},
                 "max_byte_size": 200_000,
-                "formats": [
-                    {"ext": "WEBP", "quality": 85}
-                ],
+                "formats": [{"ext": "WEBP", "quality": 85}],
             }
         ],
     }
@@ -301,14 +317,21 @@ thread so the loop stays responsive:
 ```python
 from imgtools_m8 import process_image_async, process_images_async
 
+
 @app.post("/resize")
 async def resize(file: UploadFile):
     src_bytes = await file.read()
     results = await process_image_async(
         src_bytes,
-        [{"image_size": {"fixed_width": 200}, "formats": [{"ext": "WEBP", "quality": 80}]}],
+        [
+            {
+                "image_size": {"fixed_width": 200},
+                "formats": [{"ext": "WEBP", "quality": 80}],
+            }
+        ],
     )
     return {"variants": [r.name for r in results]}
+
 
 @app.post("/resize-batch")
 async def resize_batch(files: list[UploadFile]):
@@ -382,8 +405,8 @@ obj = ImageProcessing(
     conf={...},
     model_conf={
         "path": "/path/to/model/directory",
-        "model_name": "espcn",   # model prefix, e.g. espcn, edsr, lapsrn
-        "scale": 4,              # fixed scale (omit for AUTO_SCALE)
+        "model_name": "espcn",  # model prefix, e.g. espcn, edsr, lapsrn
+        "scale": 4,  # fixed scale (omit for AUTO_SCALE)
     },
 )
 ```
