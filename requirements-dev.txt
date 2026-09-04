@@ -23,4 +23,4 @@ types-tqdm>=4.70.0.20260805
 # Build tools
 setuptools>=82.0.1
 wheel>=0.47.0
-build>=1.5.1
+build>=1.6.0
