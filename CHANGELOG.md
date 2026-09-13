@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > entry below, dated at the tag's actual commit date, so the file no longer
 > carries two headings for one version.
 
+## [2.1.2] - 2026-09-13
+
+### Changed
+
+- `ruff` `target-version` set to `py312` to match the Python 3.12 floor
+  raised in `2.1.1`.
+
+---
+
 ## [2.1.1] - 2026-08-15
 
 ### Added
