@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > entry below, dated at the tag's actual commit date, so the file no longer
 > carries two headings for one version.
 
+## [2.1.3] - 2026-09-26
+
+### Changed
+
+- CI: `codecov/codecov-action` bumped from 7.0.0 to 7.1.0 (#71).
+- Dev dependencies: `build` requirement raised from `>=1.6.0` to `>=1.6.1`
+  (#72).
+
+---
+
 ## [2.1.2] - 2026-09-13
 
 ### Changed
